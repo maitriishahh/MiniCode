@@ -35,11 +35,24 @@ src/minicode/__init__.py      # empty
 src/minicode/__main__.py      # everything in this guide lives here
 ```
 
-Run from the repo root:
+After those two files exist, make the package runnable. Add this to
+`pyproject.toml` (keep the existing `[project]` table):
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+```
+
+Then from the repo root:
 
 ```powershell
+uv sync
 uv run python -m minicode
 ```
+
+`uv sync` installs `minicode` editable so `-m minicode` finds `src/minicode`.
+Without the build-system block, that command fails with `No module named minicode`.
 
 Config, at the top of `__main__.py`:
 
@@ -62,7 +75,8 @@ grows in this same file until it is awkward — then it splits into
 
 ## Segment 2 — Clean loop, no tools yet
 
-Add, then run with a plain prompt to prove the flow before tools exist:
+Add this. **Do not run yet** — there is no REPL until Segment 5. The
+`for call` branch is scaffolding; Segment 4 replaces it and adds `tools=`.
 
 ```python
 SYSTEM = "You are a concise coding assistant. Use tools when they help. Be brief."
@@ -85,8 +99,7 @@ def run_agent(messages: list) -> str:
     return f"Stopped after {MAX_STEPS} steps without an answer. Try a smaller request."
 ```
 
-**Expected:** a normal chat reply. No `tools=` yet, so the `for call` branch
-never fires — it is scaffolding for Segment 4.
+No `tools=` yet, so the `for call` branch never fires until Segment 4.
 
 **What just moved:** the assistant message is stored before anything else, so
 the next `completion()` sees what the model proposed. The `max_steps` fallthrough
@@ -167,7 +180,9 @@ def tool_from_fn(fn):
 
 Adapt the parser to your taste, but keep the contract: **(schema, run)**,
 validation errors as strings, tool exceptions as strings. Do not use
-`litellm.utils.function_to_dict`.
+`litellm.utils.function_to_dict`. Do not add a `Returns:` block to tool
+docstrings unless the parser skips section headers — a line like
+`Returns: ...` would be treated as a fake parameter named `Returns`.
 
 ## Segment 4 — Sandbox + `read`
 
@@ -183,7 +198,7 @@ def _resolve(path: str) -> Path:
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
     if p != SANDBOX and SANDBOX not in p.parents:
         raise ValueError(f"Outside sandbox: {path}")
-    if p.suffix == ".env" or p.name.startswith(".env."):
+    if p.name == ".env" or p.name.startswith(".env."):
         raise ValueError("Refusing to read .env files")
     return p
 
@@ -218,14 +233,41 @@ for _fn in (read,):
     SCHEMAS.append(_schema)
 ```
 
-In `run_agent`, pass `tools=SCHEMAS` to `completion()`, and in the tool
-branch:
+Replace Segment 2's `run_agent` with this. `tools=SCHEMAS` is required —
+without it the model never sees `read`.
 
 ```python
-for call in msg.tool_calls:
-    run = TOOLS.get(call.function.name)
-    content = run(call.function.arguments) if run else f"Unknown tool: {call.function.name}"
-    messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
+last_usage = {"total_tokens": 0}
+
+def run_agent(messages: list) -> str:
+    for step in range(MAX_STEPS):
+        resp = completion(
+            model=MODEL,
+            api_key=API_KEY,
+            messages=messages,
+            tools=SCHEMAS,
+        )
+        usage = getattr(resp, "usage", None)
+        last_usage["total_tokens"] = getattr(usage, "total_tokens", 0) or 0
+        msg = resp.choices[0].message
+        messages.append(msg)
+        if not msg.tool_calls:
+            return msg.content or ""
+        for call in msg.tool_calls:
+            run = TOOLS.get(call.function.name)
+            content = (
+                run(call.function.arguments)
+                if run
+                else f"Unknown tool: {call.function.name}"
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": content,
+                }
+            )
+    return f"Stopped after {MAX_STEPS} steps without an answer. Try a smaller request."
 ```
 
 **Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see the
@@ -256,17 +298,18 @@ def main() -> None:
         messages.append({"role": "user", "content": text})  # once, here only
         answer = run_agent(messages)
         print(answer)
-        usage = getattr(answer, "usage", None)  # see note below
-        print(f"-- {MODEL}  {MODE}  tools: {','.join(TOOLS)} --")
+        print(
+            f"-- {MODEL}  {MODE}  tools: {','.join(TOOLS)}  "
+            f"{last_usage['total_tokens']:,} tok --"
+        )
 
 if __name__ == "__main__":
     main()
 ```
 
-Status line for this layer: model id, mode, enabled tool names. Token counts
-come from `resp.usage` — capture `resp.usage.total_tokens` inside `run_agent`
-(the simplest is a small `last_usage` dict updated per call) and print it in
-the status line:
+Now you can run `uv run python -m minicode`. Status line for this layer:
+model id, mode, enabled tool names, tokens from `last_usage` (updated inside
+`run_agent` from `resp.usage` — not from the returned string).
 
 ```
 -- gemini/gemini-3.5-flash-lite  build  tools: read  1,204 tok --
