@@ -4,7 +4,7 @@ Do first: `docs/00-setup.md` (venv, `.env`, Gemini reachable).
 
 ## What you'll build
 
-`src/minicode` Layer 0: a REPL that sends one message, runs the tool loop to
+`../src` Layer 0: a REPL that sends one message, runs the tool loop to
 completion, prints one status line, and exits cleanly on `exit`. One tool:
 `read`. Still one growing module.
 
@@ -51,7 +51,7 @@ uv sync
 uv run python -m minicode
 ```
 
-`uv sync` installs `minicode` editable so `-m minicode` finds `src/minicode`.
+`uv sync` installs `minicode` editable so `-m minicode` finds `../src`.
 Without the build-system block, that command fails with `No module named minicode`.
 
 Config, at the top of `__main__.py`:
@@ -320,9 +320,9 @@ Cost waits for pricing on the record. Don't fake either here.
 
 ## Your finished module
 
-`src/minicode/__main__.py`: `MODEL`, `API_KEY`, `MAX_STEPS`, `SYSTEM`,
+`../src`: `MODEL`, `API_KEY`, `MAX_STEPS`, `SYSTEM`,
 `SANDBOX`, `tool_from_fn`, `read`, `TOOLS`/`SCHEMAS`, `run_agent`,
-`main`. Roughly 150–200 lines. No `write`, `edit`, shell, modes, or config
+`__main__.py`. Roughly 150–200 lines. No `write`, `edit`, shell, modes, or config
 file.
 
 ## Don't add yet

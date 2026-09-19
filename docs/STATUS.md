@@ -15,7 +15,7 @@
 
 1. `docs/00-setup.md` — create the venv, `.env`, verify LiteLLM reaches
    Gemini. No agent code yet.
-2. `docs/01-loop.md` — write `src/minicode` Layer 0: clean loop,
+2. `docs/01-loop.md` — write `../src` Layer 0: clean loop,
    `tool_from_fn`, sandbox, `read`, REPL + status line.
 3. Then write `docs/02-file-tools.md` (`write`, `edit`, diff print).
 4. Then write `docs/03-models.md` (Model registry, `/model`, one local or

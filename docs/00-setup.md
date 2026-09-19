@@ -34,7 +34,7 @@ uv sync
 `uv sync` creates `.venv/`. New terminals usually open at the repo root;
 PyCharm sometimes restores inside a subfolder — `cd` back to the root first.
 
-Do **not** add a `[build-system]` yet — there is no `src/minicode` package.
+Do **not** add a `[build-system]` yet — there is no `../src` package.
 `docs/01-loop.md` Segment 1 adds hatchling once those files exist, so
 `uv run python -m minicode` works. Until then, do not run the agent.
 
