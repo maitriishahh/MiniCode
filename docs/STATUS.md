@@ -14,11 +14,14 @@
 - [x] `docs/01-loop.md` / Layer 0: `src/minicode/__main__.py` — clean loop,
   `tool_from_fn`, sandbox, `read`, REPL, tool-executed line, status block
   (model / mode / tools / summed tokens / Tok/s).
+- [x] `docs/02-file-tools.md` — Layer 1 guide (`write`, `edit`, one-shot
+  unified diff). Not implemented in `__main__.py` yet.
 
 ## Next
 
-1. `docs/02-file-tools.md` (`write`, `edit`, diff print).
-2. Then `docs/03-models.md` (Model registry, `/model`, one local or
+1. Implement `docs/02-file-tools.md` into `src/minicode/__main__.py`
+   (`write`, `edit`, diff print, registry).
+2. Then write `docs/03-models.md` (Model registry, `/model`, one local or
    OpenAI-compat endpoint).
 
 ## Deferred (do not start)
