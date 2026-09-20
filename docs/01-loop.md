@@ -5,8 +5,8 @@ Do first: `docs/00-setup.md` (venv, `.env`, Gemini reachable).
 ## What you'll build
 
 `../src` Layer 0: a REPL that sends one message, runs the tool loop to
-completion, prints one status line, and exits cleanly on `exit`. One tool:
-`read`. Still one growing module.
+completion, prints a tool line on success, a status block, and exits
+cleanly on `exit`. One tool: `read`. Still one growing module.
 
 ## Why it matters
 
@@ -24,7 +24,9 @@ once.
    return text → else run each tool (never raise out), append one
    `role: "tool"` per call with the same `tool_call_id` → repeat.
 3. `max_steps` reached → return a message the user can act on. Never raise.
-4. REPL prints the answer + one status line: model, mode, tools, tokens.
+4. After a successful tool run, print `Tool: `{name}` executed`. Unknown
+   tools stay silent on stdout. REPL then prints the answer + a status
+   block: model, mode, tools, tokens this turn, Tok/s.
 
 ## Segment 1 — Package + config
 
@@ -58,20 +60,22 @@ Config, at the top of `__main__.py`:
 
 ```python
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()  # before litellm: it reads LITELLM_LOG at import time
 
 from litellm import completion
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini/gemini-3.5-flash-lite")
+MODEL = os.getenv("GEMINI_MODEL")  # from .env; no Python default
 API_KEY = os.getenv("GEMINI_API_KEY")
 MAX_STEPS = 8
 ```
 
-Keep `MODEL`, `API_KEY`, `MAX_STEPS` and the import order. Everything below
-grows in this same file until it is awkward — then it splits into
-`loop.py` / `tools.py` with the same function names.
+Keep `MODEL`, `API_KEY`, `MAX_STEPS` and the import order. `time` is for
+Tok/s in Segment 5. Everything below grows in this same file until it is
+awkward — then it splits into `loop.py` / `tools.py` with the same function
+names.
 
 ## Segment 2 — Clean loop, no tools yet
 
@@ -96,7 +100,7 @@ def run_agent(messages: list) -> str:
                     "content": f"Unknown tool: {call.function.name}",
                 }
             )
-    return f"Stopped after {MAX_STEPS} steps without an answer. Try a smaller request."
+    return f"Max limit reached: {MAX_STEPS}. Try smaller request."
 ```
 
 No `tools=` yet, so the `for call` branch never fires until Segment 4.
@@ -170,7 +174,7 @@ def tool_from_fn(fn):
         try:
             args = model.model_validate_json(raw_json)
         except ValidationError as exc:
-            return f"Invalid arguments: {exc}"
+            return f"Invalid Arguments: {exc}"
         try:
             return str(fn(**args.model_dump()))
         except Exception as exc:  # tool code never raises out of the loop
@@ -240,6 +244,7 @@ without it the model never sees `read`.
 last_usage = {"total_tokens": 0}
 
 def run_agent(messages: list) -> str:
+    last_usage["total_tokens"] = 0
     for step in range(MAX_STEPS):
         resp = completion(
             model=MODEL,
@@ -248,18 +253,18 @@ def run_agent(messages: list) -> str:
             tools=SCHEMAS,
         )
         usage = getattr(resp, "usage", None)
-        last_usage["total_tokens"] = getattr(usage, "total_tokens", 0) or 0
+        last_usage["total_tokens"] += getattr(usage, "total_tokens", 0) or 0
         msg = resp.choices[0].message
         messages.append(msg)
         if not msg.tool_calls:
             return msg.content or ""
         for call in msg.tool_calls:
             run = TOOLS.get(call.function.name)
-            content = (
-                run(call.function.arguments)
-                if run
-                else f"Unknown tool: {call.function.name}"
-            )
+            if run:
+                content = run(call.function.arguments)
+                print(f"Tool: `{call.function.name}` executed")
+            else:
+                content = f"Unknown tool: {call.function.name}"
             messages.append(
                 {
                     "role": "tool",
@@ -267,12 +272,18 @@ def run_agent(messages: list) -> str:
                     "content": content,
                 }
             )
-    return f"Stopped after {MAX_STEPS} steps without an answer. Try a smaller request."
+    return f"Max limit reached: {MAX_STEPS}. Try smaller request."
 ```
 
-**Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see the
-numbered contents. Ask for a missing file or `../` escape → a tool-error
-string the model acknowledges, not a traceback.
+Reset `last_usage` at the start of each turn and **add** every step's
+`total_tokens`. A read turn is two `completion()` calls — overwriting would
+drop the first. Print `Tool: `{name}` executed` **after** a successful run,
+not before, and not for unknown tools.
+
+**Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see
+`Tool: `read` executed`. Numbered contents go to the model as `role: "tool"`;
+Gemini may quote them or summarize — both are fine. Ask for a missing file
+or `../` escape → a tool-error string the model acknowledges, not a traceback.
 
 **What just moved:** the model never sees `read`'s Python. It sees the schema
 `tool_from_fn` built from the docstring, proposes a call, and your code runs
@@ -281,13 +292,13 @@ it inside the sandbox.
 ## Segment 5 — REPL + status line
 
 ```python
-MODE = "build"  # plan mode arrives later; the status line already shows it
+MODE = "build"
 
 def main() -> None:
     messages = [{"role": "system", "content": SYSTEM}]
     while True:
         try:
-            text = input("minicode> ")
+            text = input("minicode >> ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -296,23 +307,33 @@ def main() -> None:
         if not text.strip():
             continue
         messages.append({"role": "user", "content": text})  # once, here only
+        start_time = time.perf_counter()
         answer = run_agent(messages)
+        end_time = time.perf_counter()
+        token_usage = last_usage["total_tokens"]
+        token_time = end_time - start_time
+        token_per_sec = token_usage / token_time if token_time else 0.0
         print(answer)
         print(
-            f"-- {MODEL}  {MODE}  tools: {','.join(TOOLS)}  "
-            f"{last_usage['total_tokens']:,} tok --"
+            f"---"
+            f"\nModel: {MODEL} | Mode: {MODE} | Tools: {','.join(TOOLS)}\n"
+            f"{token_usage:,} Tokens | {token_per_sec:.4f} Tok/s\n"
+            f"---"
         )
 
 if __name__ == "__main__":
     main()
 ```
 
-Now you can run `uv run python -m minicode`. Status line for this layer:
-model id, mode, enabled tool names, tokens from `last_usage` (updated inside
-`run_agent` from `resp.usage` — not from the returned string).
+Now you can run `uv run python -m minicode`. Status block for this layer:
+model id, mode, enabled tool names, **summed** tokens this turn from
+`last_usage`, Tok/s = that sum / wall clock of `run_agent` (0 if elapsed is 0).
 
 ```
--- gemini/gemini-3.5-flash-lite  build  tools: read  1,204 tok --
+---
+Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools: read
+1,204 Tokens | 152.8776 Tok/s
+---
 ```
 
 Context % waits for Layer 2's Model registry (`usage` ÷ `context_window`).
@@ -329,7 +350,8 @@ file.
 
 `write`/`edit` (next guide), shell, plan/build swap, permissions UI, Rich,
 streaming, sessions, compaction, cost, diff viewer. If the REPL reads files,
-survives bad args and escapes, shows the status, and exits cleanly — stop.
+prints the tool line, survives bad args and escapes, shows the status block,
+and exits cleanly — stop.
 
 ## Checkpoint
 

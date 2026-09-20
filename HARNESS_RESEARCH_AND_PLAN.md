@@ -66,7 +66,7 @@ cannot be added through it.
 | Workspace | Sandbox directory. Tools cannot leave it in v0 |
 | Modes | Plan and build are **separate** (§6) |
 | Permissions | YOLO inside the sandbox for now. Allow/ask/deny later (§5) |
-| UI | `input()` REPL + one status line per turn (§7) |
+| UI | `input()` REPL + tool line + status block per turn (§7) |
 | Layout | `src/minicode/`, growing from one module (§8) |
 | Sync vs async | Sync until abort/streaming is actually needed |
 | Tests | After `tool_from_fn` exists — the schema compiler is the first thing worth testing without an API key |
@@ -224,10 +224,20 @@ anything to restrict is theater.
 
 ## 7. Observability — early, in the REPL
 
-No TUI yet. After every turn, one status line:
+No TUI yet. After a successful tool run, one line:
 
 ```
-gemini/gemini-3.5-flash-lite  build  tools: read  1,204 tok  2%
+Tool: `read` executed
+```
+
+Print **after** the tool returns, not before. Unknown tools stay silent on
+stdout. After the model's reply, a status block:
+
+```
+---
+Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools: read
+1,204 Tokens | 152.8776 Tok/s
+---
 ```
 
 | Now (Layer 0) | Next | Later |
@@ -235,12 +245,16 @@ gemini/gemini-3.5-flash-lite  build  tools: read  1,204 tok  2%
 | Active model id | Context % (`usage` totals ÷ `context_window`) | Cost (needs pricing on the Model record) |
 | Mode | Prompt-cache hits when `usage` reports cache tokens | Diff **viewer** UI |
 | Enabled tool names | | Sessions / resume |
-| Tokens this turn (`response.usage`) | | |
+| Tokens this turn (sum of `resp.usage.total_tokens` across steps) | | |
+| Tok/s (turn tokens / wall clock of `run_agent`; 0 if elapsed is 0) | | |
 
-LiteLLM `usage` is enough for Gemini token counts — no tiktoken needed. Cost
-and cache-hit display wait for the Model registry to carry pricing and cache
-flags. Edit diffs: a short unified-diff print in the REPL when `edit` lands
-is useful for testing and is not a viewer; the viewer itself is deferred.
+Reset `last_usage` at the start of each turn and add each step — a read is
+two `completion()` calls. LiteLLM `usage` is enough for Gemini token counts —
+no tiktoken needed. Cost and cache-hit display wait for the Model registry to
+carry pricing and cache flags. Edit diffs: a short unified-diff print in the
+REPL when `edit` lands is useful for testing and is not a viewer; the viewer
+itself is deferred. The numbered body of `read` is `role: "tool"` content;
+Gemini may quote it or summarize.
 
 ---
 
@@ -274,10 +288,11 @@ empty package scaffolding.
 **Layer 0 — loop + sandbox + `read` + status.**
 Fix the five raw-loop bugs (`user_input = str`, unused `user_text`, `exit`
 sent to the model, `max_steps` raising, unbounded history — note it, don't
-build compaction). `tool_from_fn`. Sandbox. `read`. Status line. REPL that
-exits cleanly.
-Checkpoint: a session that reads a file, survives bad tool args, shows
-model/tools/tokens, and exits without sending `"exit"` to Gemini.
+build compaction). `tool_from_fn`. Sandbox. `read`. Tool line + status block.
+REPL that exits cleanly.
+Checkpoint: a session that reads a file, prints `Tool: `read` executed` on
+a successful call, survives bad tool args, shows model/mode/tools/tokens/Tok/s,
+and exits without sending `"exit"` to Gemini.
 
 **Layer 1 — `write` + `edit`.** Exact-match `edit`. Optional one-shot diff
 print. Still no shell.

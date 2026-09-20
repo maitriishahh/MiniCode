@@ -1,4 +1,5 @@
 import os
+import time
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -121,6 +122,7 @@ last_usage = {"total_tokens":0}
 
 
 def run_agent(messages:list) -> str:
+    last_usage["total_tokens"] = 0
     for step in range(MAX_STEPS):
         resp = completion(
             model=MODEL,
@@ -129,18 +131,19 @@ def run_agent(messages:list) -> str:
             tools=SCHEMAS
         )
         usage = getattr(resp,"usage",None)
-        last_usage["total_tokens"] = getattr(usage,"total_tokens",0) or 0
+        last_usage["total_tokens"] += getattr(usage,"total_tokens",0) or 0
         msg = resp.choices[0].message
         messages.append(msg)
         if not msg.tool_calls:
             return msg.content or ""
         for call in msg.tool_calls:
             run = TOOLS.get(call.function.name)
-            content = (
-                run(call.function.arguments)
-                if run
-                else f"Unknown tool: {call.function.name}"
-            )
+            if run:
+               content = run(call.function.arguments)
+               print(f"Tool: `{str(call.function.name)}` executed")
+            else:
+                content = f"Unknown tool: {call.function.name}"
+
             messages.append(
                 {
                     "role":"tool",
@@ -150,3 +153,44 @@ def run_agent(messages:list) -> str:
             )
     return f"Max limit reached: {MAX_STEPS}. Try smaller request."
 
+MODE = "build"
+
+def main() -> None:
+    messages = [
+        {
+            "role":"system",
+            "content": SYSTEM
+        }
+    ]
+    while True:
+        try:
+            text = input("minicode >> ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if text.strip().lower() in ("exit", "quit"):
+            break
+        if not text.strip():
+            continue
+
+        messages.append(
+            {
+                "role":"user",
+                "content": text
+            }
+        )
+        start_time = time.perf_counter()
+        answer = run_agent(messages)
+        end_time = time.perf_counter()
+        token_usage = last_usage["total_tokens"]
+        token_time = end_time - start_time
+        token_per_sec = token_usage / token_time if token_time else 0.0
+        print(answer)
+        print(
+            f"---"
+            f"\nModel: {MODEL} | Mode: {MODE} | Tools: {','.join(TOOLS)}\n{token_usage:,} Tokens | {token_per_sec:.4f} Tok/s\n"
+            f"---"
+        )
+
+if __name__ == "__main__":
+    main()

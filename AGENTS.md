@@ -56,8 +56,15 @@ Split `src/minicode` only when the file is awkward — same functions.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
 - `load_dotenv()` runs before importing LiteLLM. `LITELLM_LOG=ERROR` in
   `.env` quiets its Gemini sampling notice.
-- Default model: `os.getenv("GEMINI_MODEL", "gemini/gemini-3.5-flash-lite")`
-  with `api_key=os.getenv("GEMINI_API_KEY")` passed into every call.
+- Model id: `os.getenv("GEMINI_MODEL")` with no Python default — `.env`
+  supplies it (`GEMINI_MODEL=gemini/gemini-3.5-flash-lite`). Pass
+  `api_key=os.getenv("GEMINI_API_KEY")` into every `completion()` call.
+- REPL prompt is `minicode >> `. After a successful tool run, print
+  `Tool: `{name}` executed`. Unknown tools stay silent on stdout.
+- `last_usage` resets to 0 at the start of each `run_agent` turn and
+  **sums** `resp.usage.total_tokens` across steps. Status block after the
+  answer: Model / Mode / Tools, then `{tokens:,} Tokens | {tok/s:.4f} Tok/s`
+  (Tok/s = turn tokens / wall clock of `run_agent`, `0.0` if elapsed is 0).
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
 - Do not commit secrets, session dumps, or transcripts.
 
