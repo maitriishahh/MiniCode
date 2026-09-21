@@ -190,13 +190,24 @@ docstrings unless the parser skips section headers — a line like
 
 ## Segment 4 — Sandbox + `read`
 
-Paths resolve inside a sandbox directory and never escape. `.env` files stay
-denied even inside it.
+Paths resolve inside a root-level `sandbox/` directory and never escape.
+`.env` files stay denied even inside it. The sandbox is pinned to the repo
+root (never `cwd`, never `src/`, so the agent can't overwrite the harness),
+with a `--sandbox path` override:
 
 ```python
+import sys
 from pathlib import Path
 
-SANDBOX = Path.cwd().resolve()
+def _sandbox_root() -> Path:
+    if "--sandbox" in sys.argv:
+        i = sys.argv.index("--sandbox")
+        if i + 1 < len(sys.argv):
+            return Path(sys.argv[i + 1]).resolve()
+    return Path(__file__).resolve().parents[2] / "sandbox"
+
+SANDBOX = _sandbox_root()
+SANDBOX.mkdir(parents=True, exist_ok=True)
 
 def _resolve(path: str) -> Path:
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
@@ -255,14 +266,16 @@ def run_agent(messages: list) -> str:
         usage = getattr(resp, "usage", None)
         last_usage["total_tokens"] += getattr(usage, "total_tokens", 0) or 0
         msg = resp.choices[0].message
-        messages.append(msg)
+        messages.append(
+            msg.model_dump(exclude_none=True) if hasattr(msg, "model_dump") else msg
+        )  # plain dicts only — never the raw Message object
         if not msg.tool_calls:
             return msg.content or ""
         for call in msg.tool_calls:
             run = TOOLS.get(call.function.name)
             if run:
                 content = run(call.function.arguments)
-                print(f"Tool: `{call.function.name}` executed")
+                print(f"---\nTools Used: `{call.function.name}`\n---")
             else:
                 content = f"Unknown tool: {call.function.name}"
             messages.append(
@@ -277,11 +290,15 @@ def run_agent(messages: list) -> str:
 
 Reset `last_usage` at the start of each turn and **add** every step's
 `total_tokens`. A read turn is two `completion()` calls — overwriting would
-drop the first. Print `Tool: `{name}` executed` **after** a successful run,
-not before, and not for unknown tools.
+drop the first. Print `---\nTools Used: `{name}`\n---` **after** a successful
+run, not before, and not for unknown tools. History stores the assistant
+message as a plain dict via `msg.model_dump(exclude_none=True)` — appending
+the raw LiteLLM `Message` object triggers Pydantic
+`PydanticSerializationUnexpectedValue` warnings on the next `completion()`
+when `tool_calls` are present.
 
 **Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see
-`Tool: `read` executed`. Numbered contents go to the model as `role: "tool"`;
+`---\nTools Used: `read`\n---`. Numbered contents go to the model as `role: "tool"`;
 Gemini may quote them or summarize — both are fine. Ask for a missing file
 or `../` escape → a tool-error string the model acknowledges, not a traceback.
 
@@ -295,6 +312,7 @@ it inside the sandbox.
 MODE = "build"
 
 def main() -> None:
+    print(f"Sandbox: {SANDBOX}")
     messages = [{"role": "system", "content": SYSTEM}]
     while True:
         try:
@@ -313,11 +331,11 @@ def main() -> None:
         token_usage = last_usage["total_tokens"]
         token_time = end_time - start_time
         token_per_sec = token_usage / token_time if token_time else 0.0
-        print(answer)
+        print(f"---\n{answer}\n---")
         print(
             f"---"
-            f"\nModel: {MODEL} | Mode: {MODE} | Tools: {','.join(TOOLS)}\n"
-            f"{token_usage:,} Tokens | {token_per_sec:.4f} Tok/s\n"
+            f"\nModel: {MODEL} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
+            f"\nSandbox: {SANDBOX}\n{token_usage:,} Tokens | {token_per_sec:.4f} Tok/s\n"
             f"---"
         )
 
@@ -325,13 +343,15 @@ if __name__ == "__main__":
     main()
 ```
 
-Now you can run `uv run python -m minicode`. Status block for this layer:
-model id, mode, enabled tool names, **summed** tokens this turn from
-`last_usage`, Tok/s = that sum / wall clock of `run_agent` (0 if elapsed is 0).
+Now you can run `uv run python -m minicode`. It prints `Sandbox: {SANDBOX}`
+once at startup. Status block for this layer: model id, mode, enabled tool
+names, sandbox path, **summed** tokens this turn from `last_usage`, Tok/s =
+that sum / wall clock of `run_agent` (0 if elapsed is 0).
 
 ```
 ---
-Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools: read
+Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Sandbox: C:\Users\hp\Desktop\PyCharm Projects\MiniCode
 1,204 Tokens | 152.8776 Tok/s
 ---
 ```

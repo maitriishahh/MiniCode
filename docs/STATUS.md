@@ -14,14 +14,31 @@
 - [x] `docs/01-loop.md` / Layer 0: `src/minicode/__main__.py` — clean loop,
   `tool_from_fn`, sandbox, `read`, REPL, tool-executed line, status block
   (model / mode / tools / summed tokens / Tok/s).
-- [x] `docs/02-file-tools.md` — Layer 1 guide (`write`, `edit`, one-shot
-  unified diff). Not implemented in `__main__.py` yet.
+- [x] `docs/02-file-tools.md` / Layer 1: `write`, `edit`, one-shot
+  unified diff — implemented in `__main__.py`.
+- [x] Hardening pass on the loop: assistant history stored as
+  `msg.model_dump(exclude_none=True)` dicts (fixes Pydantic
+  `PydanticSerializationUnexpectedValue` warnings on tool-call turns);
+  `SYSTEM` routes `write` (whole-file create/overwrite) vs `edit`
+  (one exact unique span, `read` first for partial changes; add/append
+  preserves existing content); diff headers `a/{path} (before)` /
+  `b/{path} (after)` printed as `---\nDiff: {path}\n{diff}---`;
+  per-tool `---\nTools Used: \`name\`\n---` line and `---`-wrapped answer.
+- [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
+  block carries a `Sandbox: {SANDBOX}` line.
+- [x] `uv.lock` staged for commit (pins exact versions).
+- [x] Dedicated `sandbox/` dir at the project root: `_sandbox_root()`
+  (`Path(__file__).resolve().parents[2] / "sandbox"`, auto-created,
+  `--sandbox path` overrides), so the agent can never overwrite the harness
+  in `src/` and the root no longer depends on the launcher cwd. `sandbox/`
+  is gitignored; REPL startup + status block show the path. Dummy `.txt`
+  files stay on disk untouched.
+- [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
+  "\n---\n"` — closing `---` always lands on its own line.
 
 ## Next
 
-1. Implement `docs/02-file-tools.md` into `src/minicode/__main__.py`
-   (`write`, `edit`, diff print, registry).
-2. Then write `docs/03-models.md` (Model registry, `/model`, one local or
+1. Write `docs/03-models.md` (Model registry, `/model`, one local or
    OpenAI-compat endpoint).
 
 ## Deferred (do not start)

@@ -47,25 +47,53 @@ Split `src/minicode` only when the file is awkward — same functions.
 - Growing file: each guide says keep / add / replace. The loop shape in
   `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
-- Tool functions use Google-style docstrings (first line = description,
-  `Args:` = parameter docs). `tool_from_fn` compiles schema + validation.
+  History stores plain dicts only: the assistant message is appended as
+  `msg.model_dump(exclude_none=True)`, never the raw LiteLLM `Message`
+  object (raw objects trigger Pydantic `PydanticSerializationUnexpectedValue`
+  warnings on the next `completion()` when `tool_calls` are present).
+- Tool functions use Google-style docstrings. Only the first line becomes the
+  model-visible description and `Args:` entries become parameter docs;
+  extra scope sentences in the docstring body are invisible to the model.
+  `tool_from_fn` compiles schema + validation.
+- `write` and `edit` stay separate tools, never merged: `write` creates a new
+  file or overwrites the whole file (`content` = FULL final contents);
+  `edit` changes one exact unique span (insert via anchor:
+  `old_text`=anchor, `new_text`=anchor+insertion). Partial changes
+  (add/append/insert, replace X with Y) are `read` then `edit` — never
+  `write` with partial content. The routing rule lives in `SYSTEM`, not in
+  per-tool docstrings.
+- `edit` prints a one-shot stdlib `difflib.unified_diff` to stdout with
+  `fromfile=f"a/{path} (before)"`, `tofile=f"b/{path} (after)"`,
+  `lineterm="\n"`, printed as `---\nDiff: {path}\n{diff}` with
+  `end="---\n" if diff.endswith("\n") else "\n---\n"` so the closing `---`
+  always lands on its own line and never fuses with the next block.
+  The model only gets `Replaced 1 occurrence in {path}`.
 - Validation errors and tool failures return as `role: "tool"` strings. Tool
   code never raises out of the loop. `max_steps` returns a message, never
   raises.
 - `exit` / `quit` leave before any `completion()` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
+  `SANDBOX` is the root-level `sandbox/` dir
+  (`_sandbox_root()`: `Path(__file__).resolve().parents[2] / "sandbox"`,
+  auto-created at startup, `--sandbox path` overrides it), so the agent can
+  never overwrite the harness source in `src/`. `sandbox/` is gitignored.
+  REPL prints `Sandbox: {SANDBOX}` once at startup, and the status block
+  carries a `Sandbox: {SANDBOX}` line.
 - `load_dotenv()` runs before importing LiteLLM. `LITELLM_LOG=ERROR` in
   `.env` quiets its Gemini sampling notice.
 - Model id: `os.getenv("GEMINI_MODEL")` with no Python default — `.env`
   supplies it (`GEMINI_MODEL=gemini/gemini-3.5-flash-lite`). Pass
   `api_key=os.getenv("GEMINI_API_KEY")` into every `completion()` call.
 - REPL prompt is `minicode >> `. After a successful tool run, print
-  `Tool: `{name}` executed`. Unknown tools stay silent on stdout.
+  `---\nTools Used: `{name}`\n---`. Unknown tools stay silent on stdout.
+  The model answer prints wrapped in `---` separators. Status block after the
+  answer: Model / Mode / Tools Loaded, then `{tokens:,} Tokens | {tok/s:.4f} Tok/s`
 - `last_usage` resets to 0 at the start of each `run_agent` turn and
   **sums** `resp.usage.total_tokens` across steps. Status block after the
   answer: Model / Mode / Tools, then `{tokens:,} Tokens | {tok/s:.4f} Tok/s`
   (Tok/s = turn tokens / wall clock of `run_agent`, `0.0` if elapsed is 0).
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
+  `uv.lock` is committed (pins exact versions).
 - Do not commit secrets, session dumps, or transcripts.
 
 ## Do not
