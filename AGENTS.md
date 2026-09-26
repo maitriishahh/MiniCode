@@ -73,12 +73,15 @@ Split `src/minicode` only when the file is awkward — same functions.
   raises.
 - `exit` / `quit` leave before any `completion()` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
-  `SANDBOX` is the root-level `sandbox/` dir
+  Product workspace is the launch cwd, like Pi and OpenCode. The current
+  default is the root-level `sandbox/` dir
   (`_sandbox_root()`: `Path(__file__).resolve().parents[2] / "sandbox"`,
-  auto-created at startup, `--sandbox path` overrides it), so the agent can
-  never overwrite the harness source in `src/`. `sandbox/` is gitignored.
-  REPL prints `Sandbox: {SANDBOX}` once at startup, and the status block
-  carries a `Sandbox: {SANDBOX}` line.
+  auto-created at startup, `--sandbox path` overrides it). That default is
+  the dev fence so tool tests cannot overwrite harness source in `src/`.
+  It is not the product rule. Point at a real repo today with
+  `--sandbox <that repo>`. Do not flip the default to cwd in the model
+  registry layer. `sandbox/` is gitignored. REPL prints `Sandbox: {SANDBOX}`
+  once at startup, and the status block carries a `Sandbox: {SANDBOX}` line.
 - `load_dotenv()` runs before importing LiteLLM. `LITELLM_LOG=ERROR` in
   `.env` quiets its Gemini sampling notice.
 - Model id: `os.getenv("GEMINI_MODEL")` with no Python default — `.env`

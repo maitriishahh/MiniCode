@@ -29,20 +29,28 @@
 - [x] `uv.lock` staged for commit (pins exact versions).
 - [x] Dedicated `sandbox/` dir at the project root: `_sandbox_root()`
   (`Path(__file__).resolve().parents[2] / "sandbox"`, auto-created,
-  `--sandbox path` overrides), so the agent can never overwrite the harness
-  in `src/` and the root no longer depends on the launcher cwd. `sandbox/`
-  is gitignored; REPL startup + status block show the path. Dummy `.txt`
-  files stay on disk untouched.
+  `--sandbox path` overrides). This is the **dev fence**, not the product
+  workspace: tool tests must not overwrite harness source in `src/`.
+  Product intent (Pi/OpenCode) is the launch cwd. A real repo today is
+  `--sandbox <that repo>`. `sandbox/` is gitignored; REPL startup + status
+  block show the path.
 - [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
   "\n---\n"` — closing `---` always lands on its own line.
 
+- [x] `docs/03-models.md` — Layer 2 guide (model record, `/model`, Gemini
+  + one `ollama_chat/` entry). Not implemented in `__main__.py` yet.
+
 ## Next
 
-1. Write `docs/03-models.md` (Model registry, `/model`, one local or
-   OpenAI-compat endpoint).
+1. Implement `docs/03-models.md` into `src/minicode/__main__.py`
+   (registry, `/model`, active-record `completion()` kwargs). Do not
+   change `SANDBOX` in that pass.
+2. Then flip the default workspace from the dev `sandbox/` fence to the
+   launch cwd (product behavior, Pi/OpenCode). Keep `--sandbox path`.
+3. Then one capped search tool (`grep` or `find`). Not a shell.
 
 ## Deferred (do not start)
 
 shell, plan/build swap, permissions, streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, tests (with
-`tool_from_fn`), README.
+`tool_from_fn`), README, models.dev import, `/connect`, variants.

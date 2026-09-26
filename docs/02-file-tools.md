@@ -36,8 +36,10 @@ before anything else writes.
 
 ## Segment 1 — `_resolve` error text
 
-The sandbox gate is already correct (cwd, no `..` escape, no `.env*`). Only
-the error string is `read`-specific. Replace it:
+The sandbox gate is already correct (paths resolve against `SANDBOX`, no
+`..` escape, no `.env*`). The current default is the dev `sandbox/` dir,
+not cwd — see `AGENTS.md`. Only the error string is `read`-specific.
+Replace it:
 
 ```python
     if p.name == ".env" or p.name.startswith(".env."):

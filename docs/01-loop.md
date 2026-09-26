@@ -191,9 +191,10 @@ docstrings unless the parser skips section headers — a line like
 ## Segment 4 — Sandbox + `read`
 
 Paths resolve inside a root-level `sandbox/` directory and never escape.
-`.env` files stay denied even inside it. The sandbox is pinned to the repo
-root (never `cwd`, never `src/`, so the agent can't overwrite the harness),
-with a `--sandbox path` override:
+`.env` files stay denied even inside it. This default is the dev fence
+(not cwd, not `src/`) so tool tests cannot overwrite the harness. Product
+workspace is the launch cwd, like Pi and OpenCode; flipping the default is
+a later pass. `--sandbox path` overrides it:
 
 ```python
 import sys
