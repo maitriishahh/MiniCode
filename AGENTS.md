@@ -34,13 +34,27 @@ Textual (yet), pi-agent-core (read-only reference).
 ## Layout
 
 ```
-src/minicode/    # the harness; starts as one growing module
-docs/            # STATUS + setup + one build guide per layer
-.env.example     # copy to .env
+src/minicode/            # package
+  __main__.py            # REPL only
+  agent.py               # loop, SYSTEM, registry
+  schema_generator.py    # tool_from_fn
+  resolve_path.py        # sandbox root + _resolve
+  tools/                 # read.py, write.py, edit.py
+docs/                    # STATUS + setup + one build guide per layer
+.env.example             # copy to .env
 ```
 
 Do not invent empty package dirs (`llm/`, `core/`, `session/`, `ui/` …).
-Split `src/minicode` only when the file is awkward — same functions.
+Imports are `minicode.*`. Do not split further without a reason.
+
+A guide names the file. It does not say "grow `__main__.py`". REPL, slash
+commands, and the status print live in `__main__.py`. The loop, `SYSTEM`,
+the registry, and the one `completion()` site live in `agent.py`. The
+function is `agent`, not `run_agent`. `tool_from_fn` stays in
+`schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
+`tools/<name>.py` plus one registry line in `agent.py`. Snippets use
+`user >>`, `|Tools Used: \`name\`|`, and `{In} | {Out} | {elapsed}`.
+No Tok/s.
 
 ## Conventions (do not break)
 
@@ -64,14 +78,20 @@ Split `src/minicode` only when the file is awkward — same functions.
   per-tool docstrings.
 - `edit` prints a one-shot stdlib `difflib.unified_diff` to stdout with
   `fromfile=f"a/{path} (before)"`, `tofile=f"b/{path} (after)"`,
-  `lineterm="\n"`, printed as `---\nDiff: {path}\n{diff}` with
+  `lineterm="\n"`. Diff input is `splitlines()` plus `\n` (`_diff_lines`),
+  not `keepends=True`, so a file with no trailing newline cannot fuse a
+  `-` line and a `+` line. Printed as `---\nDiff: {path}\n{diff}` with
   `end="---\n" if diff.endswith("\n") else "\n---\n"` so the closing `---`
   always lands on its own line and never fuses with the next block.
-  The model only gets `Replaced 1 occurrence in {path}`.
+  The model gets `Replaced 1 occurrence in {path} (changed A - B)` plus numbered
+  lines in the same `N: line` shape as `read`: the full changed span, plus up
+  to 5 lines before the first changed line and 5 after the last, clamped to
+  the file. A deletion says `deleted at N`. An empty result says `(empty file)`.
+  The diff is not sent to the model.
 - Validation errors and tool failures return as `role: "tool"` strings. Tool
   code never raises out of the loop. `max_steps` returns a message, never
   raises.
-- `exit` / `quit` leave before any `completion()` call.
+- `exit` / `quit` / `bye` leave before any `completion()` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Product workspace is the launch cwd, like Pi and OpenCode. The current
   default is the root-level `sandbox/` dir
@@ -87,14 +107,15 @@ Split `src/minicode` only when the file is awkward — same functions.
 - Model id: `os.getenv("GEMINI_MODEL")` with no Python default — `.env`
   supplies it (`GEMINI_MODEL=gemini/gemini-3.5-flash-lite`). Pass
   `api_key=os.getenv("GEMINI_API_KEY")` into every `completion()` call.
-- REPL prompt is `minicode >> `. After a successful tool run, print
-  `---\nTools Used: `{name}`\n---`. Unknown tools stay silent on stdout.
-  The model answer prints wrapped in `---` separators. Status block after the
-  answer: Model / Mode / Tools Loaded, then `{tokens:,} Tokens | {tok/s:.4f} Tok/s`
-- `last_usage` resets to 0 at the start of each `run_agent` turn and
-  **sums** `resp.usage.total_tokens` across steps. Status block after the
-  answer: Model / Mode / Tools, then `{tokens:,} Tokens | {tok/s:.4f} Tok/s`
-  (Tok/s = turn tokens / wall clock of `run_agent`, `0.0` if elapsed is 0).
+- REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
+  After a successful tool run, print `|Tools Used: `{name}`|`. Unknown tools
+  stay silent on stdout. Status block after the answer, wrapped in `---`:
+  Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
+  `{prompt:,} In | {out:,} Out | {elapsed:.1f}` (elapsed is seconds).
+- `last_usage` resets at the start of each turn. `prompt_tokens` is the last
+  call only (overwrite) — that is `In`. `completion_tokens` **sums** across
+  steps — that is `Out`. No Tok/s. A wall-clock rate is network wait, not
+  model speed, and summed `total_tokens` counts the prompt once per step.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
 - Do not commit secrets, session dumps, or transcripts.

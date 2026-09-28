@@ -1,14 +1,16 @@
 # 02 — write + edit + diff print
 
-Do first: `docs/01-loop.md` (loop, sandbox, `read`, REPL). Layer 0 is in
-`src/minicode/__main__.py`. This guide grows that same file.
+The layer was built in one file, then split. Snippets below are the live
+locations. `write` and `edit` live in `tools/`. The registry loop lives in
+`agent.py`. See `AGENTS.md`. Do not grow `__main__.py` with tools.
+
+Do first: `docs/01-loop.md` (loop, sandbox, `read`, REPL).
 
 ## What you'll build
 
 Layer 1: two more tools, same registry, same loop. `write` creates or
 overwrites. `edit` replaces one exact unique span. A successful `edit` prints
-a short unified diff to stdout (not a viewer). Still one growing module.
-Still no shell.
+a short unified diff to stdout (not a viewer). Still no shell.
 
 ## Why it matters
 
@@ -20,7 +22,7 @@ before anything else writes.
 
 **Keep the loop. Grow the registry.**
 
-1. Keep: `tool_from_fn`, `_resolve`, `read`, `run_agent`, REPL, tool line,
+1. Keep: `tool_from_fn`, `_resolve`, `read`, `agent`, REPL, tool line,
    status block. Do not touch the message flow.
 2. Reword `_resolve`'s `.env` error from "read" to "access" — `write`/`edit`
    use it too.
@@ -32,9 +34,11 @@ before anything else writes.
    routing rule must live in `SYSTEM`, not in per-tool docstrings.)
 5. A successful `edit` prints a stdlib `difflib.unified_diff` to stdout, then
    returns a short string to the model. The existing
-   `---\nTools Used: `{name}`\n---` line still prints after the tool returns.
+   `|Tools Used: `{name}`|` line still prints after the tool returns.
 
 ## Segment 1 — `_resolve` error text
+
+File: `src/minicode/resolve_path.py`.
 
 The sandbox gate is already correct (paths resolve against `SANDBOX`, no
 `..` escape, no `.env*`). The current default is the dev `sandbox/` dir,
@@ -50,6 +54,8 @@ Keep the rest of `_resolve`. `read` / `write` / `edit` all go through it, so
 escapes and `.env` stay tool errors, never tracebacks.
 
 ## Segment 2 — `write` + `SYSTEM` routing rule
+
+`write` lives in `src/minicode/tools/write.py`. `SYSTEM` lives in `agent.py`.
 
 Add this next to `read`. Google-style docstring, no `Returns:` block.
 Only the first line reaches the model — the add/append/insert routing rule
@@ -79,11 +85,13 @@ YOLO inside the sandbox (HARNESS §5). Missing `content` is a `ValidationError`
 string from `tool_from_fn`, not a crash. `write` is never used for partial
 changes: "add X to the file" means `read` then `edit`, not `write`.
 
-**Expected:** "write hello.txt with hello" → `---\nTools Used: `write`\n---`,
+**Expected:** "write hello.txt with hello" → `|Tools Used: `write`|`,
 file on disk, status `Tools Loaded:` lists `read,write,edit` once the registry
 includes them. `../secret` or `.env` → tool-error string.
 
 ## Segment 3 — `edit` + one-shot diff
+
+File: `src/minicode/tools/edit.py`.
 
 Exact match only. Line numbers drift; unique text is the stable handle.
 `0` or `>1` matches raise — `tool_from_fn` turns that into `Tool error: …`
@@ -127,19 +135,21 @@ def edit(path: str, old_text: str, new_text: str) -> str:
     return f"Replaced 1 occurrence in {path}"
 ```
 
-Put `import difflib` with the other imports at the top of `__main__.py`.
+`import difflib` lives in `tools/edit.py`, not in `__main__.py`.
 
-The diff is for **you** (REPL stdout). The model gets the short return
-string. This is not a diff viewer — that stays deferred. `difflib` is
+The diff is for **you** (REPL stdout). The model gets `Replaced 1 occurrence
+in {path} (changed A - B)` plus up to 5 numbered lines before and after the
+changed span, same `N: line` shape as `read`. This is not a diff viewer —
+that stays deferred. `difflib` is
 stdlib; do not add a package.
 
 Print the diff **inside** `edit`, before the function returns. Then
-`run_agent` prints `---\nTools Used: `edit`\n---` as it already does for any
+`agent` prints `|Tools Used: `edit`|` as it already does for any
 successful tool. Do not add a special case in the loop.
 
 **Expected:** unique `old_text` → file changes, a `---\nDiff: {path}` block
 with `a/{path} (before)` / `b/{path} (after)` headers on stdout,
-`---\nTools Used: `edit`\n---`. Zero matches or two copies of `old_text` →
+`|Tools Used: `edit`|`. Zero matches or two copies of `old_text` →
 `Tool error: …` as `role: "tool"` content, file unchanged, model retries.
 Missing file → `Tool error:` from the exception.
 
@@ -154,18 +164,18 @@ for _fn in (read, write, edit):
     SCHEMAS.append(_schema)
 ```
 
-That is the whole dispatch change. `run_agent` already looks up
+File: `src/minicode/agent.py`. That is the whole dispatch change. `agent` already looks up
 `TOOLS.get(call.function.name)`. Status `Tools Loaded:` is `', '.join(TOOLS)` —
 it will show `read,write,edit` with no REPL edits.
 
 Do **not** add `if/elif` on tool names. Do **not** merge `write` and `edit`.
-Do not change token summing or Tok/s. The only prompt change in this layer is
+Do not change `In | Out | elapsed`. The only prompt change in this layer is
 the `SYSTEM` routing rule from Segment 2.
 
 ## Your finished module
 
 Same file as Layer 0, plus `SYSTEM` routing rule, `write`, `edit`,
-`difflib`. Roughly 230–280 lines. Still no `loop.py` / `tools.py` split —
+`difflib` in `tools/edit.py`. Still no further split —
 the file is not awkward yet.
 
 ## Don't add yet
@@ -181,7 +191,7 @@ stop.
 
 ## Checkpoint
 
-1. Where do `write` and `edit` get registered, and how does `run_agent` find
+1. Where do `write` and `edit` get registered, and how does `agent` find
    them?
 2. What happens on 0 matches? On 2? Does the file change?
 3. Who sees the unified diff — the model, the REPL, or both?
@@ -191,9 +201,11 @@ stop.
    `write` with partial content? Where does that routing rule live?
 
 Answers: (1) `for _fn in (read, write, edit)` → `TOOLS` / `SCHEMAS`;
-`run_agent` is unchanged (`TOOLS.get`); (2) `ValueError` → `Tool error: …`,
-file untouched; (3) REPL stdout only — the model gets `Replaced 1 occurrence
-in {path}`; (4) empty `old_text` matches every position; (5) same sandbox and
+`agent` is unchanged (`TOOLS.get`); (2) `ValueError` → `Tool error: …`,
+file untouched; (3) REPL stdout only for the diff — the model gets
+`Replaced 1 occurrence in {path} (changed A - B)` plus up to 5 numbered
+lines before and after the changed span, same `N: line` shape as `read`;
+(4) empty `old_text` matches every position; (5) same sandbox and
 `.env` gate as `read`; (6) `read` then `edit` (insert via anchor), because
 `write` replaces the whole file — the rule lives in `SYSTEM`, since only the
 first docstring line reaches the model.

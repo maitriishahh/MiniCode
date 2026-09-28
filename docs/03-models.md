@@ -1,14 +1,15 @@
 # 03 — Model registry + `/model`
 
-Do first: `docs/02-file-tools.md` (`write`, `edit`, diff). Layer 1 is in
-`src/minicode/__main__.py`. This guide grows that same file.
+Do first: `docs/02-file-tools.md`. Layer 1 is split under `src/minicode/`.
+Registry and the one `completion()` site go in `agent.py`. `/model` and the
+status id go in `__main__.py`. Do not grow `__main__.py` with the loop.
 
 ## What you'll build
 
 Layer 2: a small model registry and a `/model` REPL command. Two entries.
 Gemini stays the default. One local entry (`ollama_chat/`) proves a second
-provider without a new loop. Still one `completion()` site. Still one
-growing module. Still no shell, and do not change `SANDBOX`.
+provider without a new loop. Still one `completion()` site. Still no shell,
+and do not change `SANDBOX`.
 
 ## Why it matters
 
@@ -28,25 +29,26 @@ record.
 
 **Keep the loop. Swap the model arguments.**
 
-1. Keep: `tool_from_fn`, sandbox, tools, `SYSTEM`, message flow, token
-   summing, Tok/s, separators. Do not touch `SANDBOX` or flip the default
-   to cwd — that is a later pass.
-2. Add a `MODELS` dict and an `active` holder. The Gemini id comes from
+1. Keep: tools, `SYSTEM`, message flow, `In | Out | elapsed`, separators.
+   Do not touch `SANDBOX` or flip the default to cwd. Do not bring Tok/s
+   or summed `total_tokens` back.
+2. In `agent.py`, add a `MODELS` dict and an `active` holder. Export
+   `active` the same way as `last_usage`. The Gemini id comes from
    `GEMINI_MODEL`. No Python default.
-3. The one `completion()` call reads the active record: `model`,
-   `api_key=os.getenv(...)`, `api_base` only when set. A raised
+3. The one `completion()` call in `agent()` reads the active record:
+   `model`, `api_key=os.getenv(...)`, `api_base` only when set. A raised
    `completion()` returns a string. It must not kill the REPL.
-4. The REPL handles `/model` and `/model <id>` before appending a user
-   message, same as `exit`. Never sent to the model.
-5. The status line shows the active id. Context % only from the last call's
-   `prompt_tokens / context_window`. Skip it when the window is unknown.
-   No cost line.
+4. `__main__.py` handles `/model` and `/model <id>` before appending a user
+   message, same as `exit`. Never sent to the model. Import `active`.
+5. The status line shows `active["id"]`. Context % is appended to the
+   existing `In | Out | elapsed` line only when `context_window` is a real
+   number. No cost line.
 
 ## Segment 1 — Record + registry
 
-A dict, not a class, not TOML. Put this next to `MODEL` / `API_KEY`.
-`active` is a dict so `main()` can reassign the id without a `global`
-statement — same pattern as `last_usage`.
+File: `src/minicode/agent.py`, next to `MODEL` / `API_KEY`. `active` is a
+dict so `main()` can reassign the id without a `global` statement — same
+pattern as `last_usage`.
 
 ```python
 def _entry(model_id, api_key_env, api_base=None, context_window=None, max_tokens=None):
@@ -86,17 +88,24 @@ is done even if Ollama is not installed: `/model` must list it. A later
 turn that actually calls it may fail on the network; that failure is a
 string, not a dead REPL.
 
-## Segment 2 — One `completion()` site
-
-Replace the `completion(...)` call inside `run_agent`. Keep the
-`last_usage` reset, the step loop, dict-history append, and tool dispatch.
+`__main__.py` imports `active` and `MODELS` with the other names from
+`agent.py`. Drop the `MODEL` import once the status line uses
+`active["id"]`.
 
 ```python
-last_usage = {"total_tokens": 0, "prompt_tokens": 0}
+from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS
+```
 
-def run_agent(messages: list) -> str:
-    last_usage["total_tokens"] = 0
+## Segment 2 — One `completion()` site
+
+File: `src/minicode/agent.py`. Replace the `completion(...)` call inside
+`agent`. Keep the existing `last_usage` reset, the step loop, dict-history
+append, and tool dispatch. Do not add `total_tokens` back.
+
+```python
+def agent(messages: list) -> str:
     last_usage["prompt_tokens"] = 0
+    last_usage["completion_tokens"] = 0
     record = MODELS[active["id"]]
     for step in range(MAX_STEPS):
         kwargs = {
@@ -116,24 +125,24 @@ def run_agent(messages: list) -> str:
         except Exception as exc:
             return f"Model error: {exc}"
         usage = getattr(resp, "usage", None)
-        last_usage["total_tokens"] += getattr(usage, "total_tokens", 0) or 0
         last_usage["prompt_tokens"] = getattr(usage, "prompt_tokens", 0) or 0
+        last_usage["completion_tokens"] += getattr(usage, "completion_tokens", 0) or 0
         # rest of the loop unchanged: model_dump append, tool dispatch
 ```
 
 Read `record` once per turn, before the step loop, so a `/model` between
 turns is picked up and a switch mid-turn cannot happen (the REPL is blocked
-inside `run_agent`). Overwrite `prompt_tokens` from the latest response.
-Do not sum it. Summed `total_tokens` is the turn cost for Tok/s. It is not
-context occupancy.
+inside `agent`). Overwrite `prompt_tokens`. Do not sum it. That last prompt
+is `In`. Summed `completion_tokens` is `Out`. Neither is a Tok/s.
 
 Do not pass `api_base=None`. Do not pass the dummy `"ollama"` key when the
 Gemini key is missing — a missing cloud key must still fail visibly.
 
 ## Segment 3 — `/model`
 
-In `main()`, after the empty-line `continue` and before `messages.append`.
-Same rule as `exit`: handled locally, never sent to the model.
+File: `src/minicode/__main__.py`, in `main()`, after the empty-line
+`continue` and before `messages.append`. Same rule as `exit`: handled
+locally, never sent to the model.
 
 ```python
 stripped = text.strip()
@@ -155,37 +164,45 @@ if stripped == "/model" or stripped.startswith("/model "):
 
 Unknown id prints an error and does not switch. `/model` with no argument
 lists every id and marks the active one. Do not append a user message.
-Do not call `run_agent`.
+Do not call `agent`.
 
 ## Segment 4 — Status line
 
-The status block already prints `Model: {MODEL}`. Print `active["id"]`
-instead. After the token line, append context % only when both numbers
-exist:
+File: `src/minicode/__main__.py`. The status block prints `Model: {MODEL}`.
+Print `active["id"]` instead. Append context % to the existing
+`In | Out | elapsed` line only when both numbers exist:
 
 ```python
 window = MODELS[active["id"]]["context_window"]
-prompt_tokens = last_usage["prompt_tokens"]
 ctx = f" | {prompt_tokens / window:.1%} context" if window else ""
 ```
 
-Put `{ctx}` on the token line. No cost. No fake percent from
-`total_tokens`. If you have not verified `context_window` for that exact
-id, leave it `None` and the `%` stays off.
+```python
+print(
+    f"---"
+    f"\nModel: {active['id']} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
+    f"\nSandbox: {SANDBOX}"
+    f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {elapsed:.1f}{ctx}\n"
+    f"---"
+)
+```
 
+No cost. No fake percent from summed tokens. If you have not verified
+`context_window` for that exact id, leave it `None` and `{ctx}` stays empty.
 Startup `Sandbox:` line stays. Do not retarget `SANDBOX`.
 
-## Your finished module
+## Your finished modules
 
-Same file as Layer 1, plus `_entry`, `MODELS`, `active`, `/model`, and the
-`completion()` kwargs. Still no `loop.py` split. Still no TOML.
+`agent.py` holds `_entry`, `MODELS`, `active`, and the `completion()` kwargs.
+`__main__.py` holds `/model` and the status id. Still no TOML. Still no new
+package dirs.
 
 ## Don't add yet
 
 models.dev import, `/connect`, variants, streaming, fallbacks,
 thinking-trace conversion, shell, grep, plan/build, flipping the sandbox
 default to cwd, a third registry entry, passing `max_tokens`, a cost line,
-new deps.
+Tok/s, new deps, moving the loop back into `__main__.py`.
 
 If `/model` lists both ids, an unknown id does not switch, the next real
 turn uses the active record's `model` / `api_key` / `api_base`, a down
@@ -198,18 +215,18 @@ the status id matches — stop.
    are there?
 2. What happens to `/model` — is it appended, sent to the model, or neither?
 3. What happens on an unknown id? On a `completion()` exception?
-4. Why is context % not `total_tokens / context_window`?
+4. Why is context % not a summed token count divided by `context_window`?
 5. Why `ollama_chat/` and not `ollama/`? Why is a missing Ollama still a
    finished layer?
 6. Why must this layer not change `SANDBOX`?
 
-Answers: (1) `MODELS[active["id"]]` once per `run_agent` turn; one
-`completion()` site; (2) neither — the REPL handles it and `continue`s,
-same as `exit`; (3) print `Unknown model: …` and keep the current id; a
-raised `completion()` returns `Model error: …`; (4) summed `total_tokens`
-is turn usage, not how full the window is — use the last call's
-`prompt_tokens`, and skip the line when `context_window` is `None`;
-(5) LiteLLM tool calls need the `ollama_chat/` prefix; the checkpoint is
-the record and the switch, not a live local server; (6) `sandbox/` is the
-dev fence so tool tests cannot touch harness source — product cwd is a
-later flip, not a model-registry change.
+Answers: (1) `MODELS[active["id"]]` once per `agent` turn, in `agent.py`;
+one `completion()` site; (2) neither — `__main__.py` handles it and
+`continue`s, same as `exit`; (3) print `Unknown model: …` and keep the
+current id; a raised `completion()` returns `Model error: …`; (4) `In` is
+the last call's `prompt_tokens`, not a sum — skip the `%` when
+`context_window` is `None`; `In | Out | elapsed` stay; (5) LiteLLM tool
+calls need the `ollama_chat/` prefix; the checkpoint is the record and the
+switch, not a live local server; (6) `sandbox/` is the dev fence so tool
+tests cannot touch harness source — product cwd is a later flip, not a
+model-registry change.

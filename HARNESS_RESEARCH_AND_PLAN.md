@@ -19,7 +19,7 @@ One shape, no doubles:
 
 ```
 REPL appends the user message once
-run_agent:
+agent:
   msg = completion(messages, tools)
   append the assistant message        # always, once
   if no tool_calls:
@@ -32,9 +32,10 @@ max_steps reached:
   return a message the user can act on (never raise)
 ```
 
-`exit` / `quit` leave before any `completion()` call. The REPL owns the user
-message; `run_agent` never appends it again. One `completion()` site in the
-whole codebase.
+`exit` / `quit` / `bye` leave before any `completion()` call. The REPL owns
+the user message; `agent` never appends it again. One `completion()` site
+in the whole codebase. The function is `agent` in `agent.py`, not
+`run_agent`.
 
 This is the same shape as Pi, Claude Code, Codex, and OpenCode: prompt →
 model → tool calls → results → repeat. One node with a self-loop, not a graph.
@@ -234,7 +235,7 @@ anything to restrict is theater.
 No TUI yet. After a successful tool run, one line:
 
 ```
-Tool: `read` executed
+|Tools Used: `read`|
 ```
 
 Print **after** the tool returns, not before. Unknown tools stay silent on
@@ -242,21 +243,25 @@ stdout. After the model's reply, a status block:
 
 ```
 ---
-Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools: read
-1,204 Tokens | 152.8776 Tok/s
+Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
+398 In | 12 Out | 1.7
 ---
 ```
 
-| Now (Layer 0) | Next | Later |
+`In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
+`completion_tokens`. Elapsed is seconds. No Tok/s — a wall-clock rate is
+network wait, and summed `total_tokens` counts the prompt once per step.
+`AGENTS.md` wins if this section and the REPL ever disagree.
+
+| Now | Next | Later |
 |---|---|---|
-| Active model id | Context % (`usage` totals ÷ `context_window`) | Cost (needs pricing on the Model record) |
+| Active model id | Context % (last `prompt_tokens` ÷ `context_window`) | Cost (needs pricing on the Model record) |
 | Mode | Prompt-cache hits when `usage` reports cache tokens | Diff **viewer** UI |
 | Enabled tool names | | Sessions / resume |
-| Tokens this turn (sum of `resp.usage.total_tokens` across steps) | | |
-| Tok/s (turn tokens / wall clock of `run_agent`; 0 if elapsed is 0) | | |
+| `In` / `Out` / elapsed | | |
 
-Reset `last_usage` at the start of each turn and add each step — a read is
-two `completion()` calls. LiteLLM `usage` is enough for Gemini token counts —
+LiteLLM `usage` is enough for Gemini token counts —
 no tiktoken needed. Cost and cache-hit display wait for the Model registry to
 carry pricing and cache flags. Edit diffs: a short unified-diff print in the
 REPL when `edit` lands is useful for testing and is not a viewer; the viewer
@@ -268,19 +273,21 @@ Gemini may quote it or summarize.
 ## 8. Layout
 
 ```
-src/minicode/          # the harness; starts as one growing module
-docs/                  # setup + build guides + STATUS
-AGENTS.md              # session start
+src/minicode/            # package
+  __main__.py            # REPL only
+  agent.py               # loop, SYSTEM, registry
+  schema_generator.py    # tool_from_fn
+  resolve_path.py        # sandbox root + _resolve
+  tools/                 # read.py, write.py, edit.py
+docs/                    # setup + build guides + STATUS
+AGENTS.md                # session start
 HARNESS_RESEARCH_AND_PLAN.md  # this file
 .env.example
 ```
 
-`src/minicode` looks professional and splits without rewrites: start with the
-whole loop in `__main__.py` (REPL + loop + `tool_from_fn` + `read`), split
-into `loop.py` / `tools.py` only when the file is hard to hold in your head.
-Same functions either way. Rule that survives the split: the loop owns
-dispatch; tools never import the LLM; a future UI is never imported by the
-loop.
+The loop owns dispatch. Tools never import the LLM. A future UI is never
+imported by the loop. New guides name the file (`AGENTS.md`). They do not
+grow `__main__.py` with the loop.
 
 Docs follow the AgenticRoadmap shape (guide first, then the `.py` from it),
 as a product spine rather than a course: `docs/STATUS.md` (done / next),
@@ -297,8 +304,8 @@ Fix the five raw-loop bugs (`user_input = str`, unused `user_text`, `exit`
 sent to the model, `max_steps` raising, unbounded history — note it, don't
 build compaction). `tool_from_fn`. Sandbox. `read`. Tool line + status block.
 REPL that exits cleanly.
-Checkpoint: a session that reads a file, prints `Tool: `read` executed` on
-a successful call, survives bad tool args, shows model/mode/tools/tokens/Tok/s,
+Checkpoint: a session that reads a file, prints `|Tools Used: `read`|` on
+a successful call, survives bad tool args, shows model/mode/tools/`In`/`Out`/elapsed,
 and exits without sending `"exit"` to Gemini.
 
 **Layer 1 — `write` + `edit`.** Exact-match `edit`. Optional one-shot diff

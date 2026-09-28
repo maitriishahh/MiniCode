@@ -1,12 +1,18 @@
 # 01 — Loop + sandbox + read + status
 
+The layer was built in one file, then split. Snippets below are the live
+locations. A new guide names the file — see `AGENTS.md`. Do not grow
+`__main__.py` with the loop.
+
 Do first: `docs/00-setup.md` (venv, `.env`, Gemini reachable).
 
 ## What you'll build
 
 `../src` Layer 0: a REPL that sends one message, runs the tool loop to
 completion, prints a tool line on success, a status block, and exits
-cleanly on `exit`. One tool: `read`. Still one growing module.
+cleanly on `exit` / `quit` / `bye`. One tool: `read`. Live files:
+`__main__.py` (REPL), `agent.py` (loop), `schema_generator.py`,
+`resolve_path.py`, `tools/read.py`.
 
 ## Why it matters
 
@@ -18,23 +24,29 @@ once.
 
 **REPL owns the user message. Loop owns the turn.**
 
-1. REPL: read line → `exit`/`quit` leaves before any model call → else append
-   `{"role": "user", ...}` once and call `run_agent(messages)`.
-2. `run_agent`: `completion()` → append assistant once → no `tool_calls`?
-   return text → else run each tool (never raise out), append one
-   `role: "tool"` per call with the same `tool_call_id` → repeat.
+1. REPL (`__main__.py`): read line → `exit`/`quit`/`bye` leaves before any
+   model call → else append `{"role": "user", ...}` once and call
+   `agent(messages)`.
+2. `agent` (`agent.py`): `completion()` → append assistant once → no
+   `tool_calls`? return text → else run each tool (never raise out), append
+   one `role: "tool"` per call with the same `tool_call_id` → repeat.
 3. `max_steps` reached → return a message the user can act on. Never raise.
-4. After a successful tool run, print `Tool: `{name}` executed`. Unknown
-   tools stay silent on stdout. REPL then prints the answer + a status
-   block: model, mode, tools, tokens this turn, Tok/s.
+4. After a successful tool run, print `|Tools Used: `{name}`|`. Unknown
+   tools stay silent on stdout. REPL then prints `minicode >> {answer}` and
+   a status block: model, mode, tools, sandbox, `{In} | {Out} | {elapsed}`.
+   No Tok/s.
 
 ## Segment 1 — Package + config
 
-Create the package as one growing module:
+Create the package. The live split:
 
 ```
-src/minicode/__init__.py      # empty
-src/minicode/__main__.py      # everything in this guide lives here
+src/minicode/__init__.py
+src/minicode/__main__.py         # REPL only
+src/minicode/agent.py            # loop, SYSTEM, registry
+src/minicode/schema_generator.py # tool_from_fn
+src/minicode/resolve_path.py     # sandbox
+src/minicode/tools/read.py
 ```
 
 After those two files exist, make the package runnable. Add this to
@@ -56,7 +68,7 @@ uv run python -m minicode
 `uv sync` installs `minicode` editable so `-m minicode` finds `../src`.
 Without the build-system block, that command fails with `No module named minicode`.
 
-Config, at the top of `__main__.py`:
+Config, at the top of `agent.py` (`load_dotenv()` before importing LiteLLM):
 
 ```python
 import os
@@ -73,11 +85,12 @@ MAX_STEPS = 8
 ```
 
 Keep `MODEL`, `API_KEY`, `MAX_STEPS` and the import order. `time` is for
-Tok/s in Segment 5. Everything below grows in this same file until it is
-awkward — then it splits into `loop.py` / `tools.py` with the same function
-names.
+elapsed seconds in the REPL (`__main__.py`). Do not put the loop back in
+`__main__.py`.
 
 ## Segment 2 — Clean loop, no tools yet
+
+File: `src/minicode/agent.py`. The function is `agent`.
 
 Add this. **Do not run yet** — there is no REPL until Segment 5. The
 `for call` branch is scaffolding; Segment 4 replaces it and adds `tools=`.
@@ -85,7 +98,7 @@ Add this. **Do not run yet** — there is no REPL until Segment 5. The
 ```python
 SYSTEM = "You are a concise coding assistant. Use tools when they help. Be brief."
 
-def run_agent(messages: list) -> str:
+def agent(messages: list) -> str:
     for step in range(MAX_STEPS):
         resp = completion(model=MODEL, api_key=API_KEY, messages=messages)
         msg = resp.choices[0].message
@@ -190,6 +203,9 @@ docstrings unless the parser skips section headers — a line like
 
 ## Segment 4 — Sandbox + `read`
 
+Sandbox: `src/minicode/resolve_path.py`. `read`: `src/minicode/tools/read.py`.
+Registry and `agent`: `src/minicode/agent.py`.
+
 Paths resolve inside a root-level `sandbox/` directory and never escape.
 `.env` files stay denied even inside it. This default is the dev fence
 (not cwd, not `src/`) so tool tests cannot overwrite the harness. Product
@@ -249,14 +265,15 @@ for _fn in (read,):
     SCHEMAS.append(_schema)
 ```
 
-Replace Segment 2's `run_agent` with this. `tools=SCHEMAS` is required —
+Replace Segment 2's `agent` with this. `tools=SCHEMAS` is required —
 without it the model never sees `read`.
 
 ```python
-last_usage = {"total_tokens": 0}
+last_usage = {"prompt_tokens": 0, "completion_tokens": 0}
 
-def run_agent(messages: list) -> str:
-    last_usage["total_tokens"] = 0
+def agent(messages: list) -> str:
+    last_usage["prompt_tokens"] = 0
+    last_usage["completion_tokens"] = 0
     for step in range(MAX_STEPS):
         resp = completion(
             model=MODEL,
@@ -265,7 +282,8 @@ def run_agent(messages: list) -> str:
             tools=SCHEMAS,
         )
         usage = getattr(resp, "usage", None)
-        last_usage["total_tokens"] += getattr(usage, "total_tokens", 0) or 0
+        last_usage["prompt_tokens"] = getattr(usage, "prompt_tokens", 0) or 0
+        last_usage["completion_tokens"] += getattr(usage, "completion_tokens", 0) or 0
         msg = resp.choices[0].message
         messages.append(
             msg.model_dump(exclude_none=True) if hasattr(msg, "model_dump") else msg
@@ -276,7 +294,7 @@ def run_agent(messages: list) -> str:
             run = TOOLS.get(call.function.name)
             if run:
                 content = run(call.function.arguments)
-                print(f"---\nTools Used: `{call.function.name}`\n---")
+                print(f"|Tools Used: `{call.function.name}`|")
             else:
                 content = f"Unknown tool: {call.function.name}"
             messages.append(
@@ -289,9 +307,10 @@ def run_agent(messages: list) -> str:
     return f"Max limit reached: {MAX_STEPS}. Try smaller request."
 ```
 
-Reset `last_usage` at the start of each turn and **add** every step's
-`total_tokens`. A read turn is two `completion()` calls — overwriting would
-drop the first. Print `---\nTools Used: `{name}`\n---` **after** a successful
+Reset `last_usage` at the start of each turn. `prompt_tokens` is the last
+call only (`In`). `completion_tokens` sums across steps (`Out`). A read
+turn is two `completion()` calls — summing `prompt_tokens` would count the
+prompt twice. Print `|Tools Used: `{name}`|` **after** a successful
 run, not before, and not for unknown tools. History stores the assistant
 message as a plain dict via `msg.model_dump(exclude_none=True)` — appending
 the raw LiteLLM `Message` object triggers Pydantic
@@ -299,7 +318,7 @@ the raw LiteLLM `Message` object triggers Pydantic
 when `tool_calls` are present.
 
 **Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see
-`---\nTools Used: `read`\n---`. Numbered contents go to the model as `role: "tool"`;
+`|Tools Used: `read`|`. Numbered contents go to the model as `role: "tool"`;
 Gemini may quote them or summarize — both are fine. Ask for a missing file
 or `../` escape → a tool-error string the model acknowledges, not a traceback.
 
@@ -309,6 +328,8 @@ it inside the sandbox.
 
 ## Segment 5 — REPL + status line
 
+File: `src/minicode/__main__.py`.
+
 ```python
 MODE = "build"
 
@@ -317,26 +338,26 @@ def main() -> None:
     messages = [{"role": "system", "content": SYSTEM}]
     while True:
         try:
-            text = input("minicode >> ")
+            text = input("user >> ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
-        if text.strip().lower() in ("exit", "quit"):
+        if text.strip().lower() in ("exit", "quit", "bye"):
             break  # never sent to the model
         if not text.strip():
             continue
         messages.append({"role": "user", "content": text})  # once, here only
         start_time = time.perf_counter()
-        answer = run_agent(messages)
-        end_time = time.perf_counter()
-        token_usage = last_usage["total_tokens"]
-        token_time = end_time - start_time
-        token_per_sec = token_usage / token_time if token_time else 0.0
-        print(f"---\n{answer}\n---")
+        answer = agent(messages)
+        elapsed = time.perf_counter() - start_time
+        prompt_tokens = last_usage["prompt_tokens"]
+        out_tokens = last_usage["completion_tokens"]
+        print(f"\nminicode >> {answer}\n")
         print(
             f"---"
             f"\nModel: {MODEL} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
-            f"\nSandbox: {SANDBOX}\n{token_usage:,} Tokens | {token_per_sec:.4f} Tok/s\n"
+            f"\nSandbox: {SANDBOX}"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {elapsed:.1f}\n"
             f"---"
         )
 
@@ -344,16 +365,16 @@ if __name__ == "__main__":
     main()
 ```
 
-Now you can run `uv run python -m minicode`. It prints `Sandbox: {SANDBOX}`
-once at startup. Status block for this layer: model id, mode, enabled tool
-names, sandbox path, **summed** tokens this turn from `last_usage`, Tok/s =
-that sum / wall clock of `run_agent` (0 if elapsed is 0).
+Now you can run `uv run python -m minicode` from the repo root. It prints
+`Sandbox: {SANDBOX}` once at startup. Status block: model id, mode, enabled
+tool names, sandbox path, last `prompt_tokens` (`In`), summed
+`completion_tokens` (`Out`), elapsed seconds. No Tok/s.
 
 ```
 ---
 Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
-Sandbox: C:\Users\hp\Desktop\PyCharm Projects\MiniCode
-1,204 Tokens | 152.8776 Tok/s
+Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
+398 In | 12 Out | 1.7
 ---
 ```
 
@@ -362,10 +383,8 @@ Cost waits for pricing on the record. Don't fake either here.
 
 ## Your finished module
 
-`../src`: `MODEL`, `API_KEY`, `MAX_STEPS`, `SYSTEM`,
-`SANDBOX`, `tool_from_fn`, `read`, `TOOLS`/`SCHEMAS`, `run_agent`,
-`__main__.py`. Roughly 150–200 lines. No `write`, `edit`, shell, modes, or config
-file.
+`agent.py` holds the loop. `__main__.py` holds the REPL. `read` is
+`tools/read.py`. No `write`, `edit`, shell, modes, or config file.
 
 ## Don't add yet
 
@@ -382,7 +401,7 @@ and exits cleanly — stop.
 4. What does the model see of `read` — the Python or something else?
 5. Why does `exit` never reach `completion()`?
 
-Answers: (1) in the REPL, once, before `run_agent`; (2) the assistant message
+Answers: (1) in the REPL, once, before `agent`; (2) the assistant message
 itself, once; (3) both become strings returned to the user / model — the loop
 never raises; (4) only the schema (name, description, types); (5) the REPL
 breaks before appending or calling.

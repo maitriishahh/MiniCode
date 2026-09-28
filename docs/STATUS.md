@@ -38,12 +38,18 @@
   "\n---\n"` — closing `---` always lands on its own line.
 
 - [x] `docs/03-models.md` — Layer 2 guide (model record, `/model`, Gemini
-  + one `ollama_chat/` entry). Not implemented in `__main__.py` yet.
+  + one `ollama_chat/` entry). Not implemented yet.
+- [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
+  `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
+  Status is last prompt (`In`) + summed output tokens (`Out`) + elapsed
+  seconds. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
+- [x] `edit` returns a numbered window to the model (changed span, up to 5
+  lines before and after). Diff stays stdout-only.
 
 ## Next
 
-1. Implement `docs/03-models.md` into `src/minicode/__main__.py`
-   (registry, `/model`, active-record `completion()` kwargs). Do not
+1. Implement `docs/03-models.md`: registry and `completion()` kwargs in
+   `agent.py`; `/model` and the status id in `__main__.py`. Do not
    change `SANDBOX` in that pass.
 2. Then flip the default workspace from the dev `sandbox/` fence to the
    launch cwd (product behavior, Pi/OpenCode). Keep `--sandbox path`.
