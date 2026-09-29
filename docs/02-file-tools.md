@@ -100,6 +100,27 @@ and the model can retry. Empty `old_text` would match everywhere; reject it.
 ```python
 import difflib
 
+def _diff_lines(text: str) -> list[str]:
+    return [line + "\n" for line in text.splitlines()]
+
+CONTEXT = 5
+
+def _window(original: str, old_text: str, new_text: str, updated: str) -> tuple[str, str]:
+    start_line = original[:original.find(old_text)].count("\n")
+    changed = len(new_text.splitlines()) if new_text else 0
+    lines = updated.splitlines()
+    if not lines:
+        return "(empty file)", f"deleted at {start_line + 1}"
+    lo = max(0, start_line - CONTEXT)
+    if changed == 0:
+        hi = min(len(lines), start_line + CONTEXT)
+        where = f"deleted at {start_line + 1}"
+    else:
+        hi = min(len(lines), start_line + changed + CONTEXT)
+        where = f"changed {start_line + 1} - {start_line + changed}"
+    body = "\n".join(f"{i + 1}: {lines[i]}" for i in range(lo, hi))
+    return body, where
+
 def edit(path: str, old_text: str, new_text: str) -> str:
     """Replace one exact unique span in an existing file.
     Use for any partial change: replacements, insertions (old_text=anchor, new_text=anchor+insertion), deletions.
@@ -122,8 +143,8 @@ def edit(path: str, old_text: str, new_text: str) -> str:
     updated = original.replace(old_text, new_text, 1)
     diff = "".join(
         difflib.unified_diff(
-            original.splitlines(keepends=True),
-            updated.splitlines(keepends=True),
+            _diff_lines(original),
+            _diff_lines(updated),
             fromfile=f"a/{path} (before)",
             tofile=f"b/{path} (after)",
             lineterm="\n",
@@ -132,10 +153,15 @@ def edit(path: str, old_text: str, new_text: str) -> str:
     if diff:
         print(f"---\nDiff: {path}\n{diff}", end="---\n" if diff.endswith("\n") else "\n---\n")
     target.write_text(updated, encoding="utf-8")
-    return f"Replaced 1 occurrence in {path}"
+    body, where = _window(original, old_text, new_text, updated)
+    return f"Replaced 1 occurrence in {path} ({where})\n{body}"
 ```
 
-`import difflib` lives in `tools/edit.py`, not in `__main__.py`.
+`import difflib` lives in `tools/edit.py`, not in `__main__.py`. Diff
+lines are `splitlines()` plus `\n`, not `keepends=True`. `_window` is in
+the same file: changed span, plus up to 5 lines before and after, clamped
+to the file. A deletion says `deleted at N`. An empty result says
+`(empty file)`.
 
 The diff is for **you** (REPL stdout). The model gets `Replaced 1 occurrence
 in {path} (changed A - B)` plus up to 5 numbered lines before and after the
@@ -164,8 +190,9 @@ for _fn in (read, write, edit):
     SCHEMAS.append(_schema)
 ```
 
-File: `src/minicode/agent.py`. That is the whole dispatch change. `agent` already looks up
-`TOOLS.get(call.function.name)`. Status `Tools Loaded:` is `', '.join(TOOLS)` —
+File: `src/minicode/agent.py`. That is the whole registry change. `agent`
+looks up `TOOLS.get(call["function"]["name"])`. Status `Tools Loaded:` is
+`', '.join(TOOLS)` —
 it will show `read,write,edit` with no REPL edits.
 
 Do **not** add `if/elif` on tool names. Do **not** merge `write` and `edit`.
@@ -201,7 +228,7 @@ stop.
    `write` with partial content? Where does that routing rule live?
 
 Answers: (1) `for _fn in (read, write, edit)` → `TOOLS` / `SCHEMAS`;
-`agent` is unchanged (`TOOLS.get`); (2) `ValueError` → `Tool error: …`,
+`agent` looks up `TOOLS.get(call["function"]["name"])`; (2) `ValueError` → `Tool error: …`,
 file untouched; (3) REPL stdout only for the diff — the model gets
 `Replaced 1 occurrence in {path} (changed A - B)` plus up to 5 numbered
 lines before and after the changed span, same `N: line` shape as `read`;

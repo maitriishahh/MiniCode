@@ -4,7 +4,8 @@ Do first: read `AGENTS.md`. Then do this guide end to end. No agent code yet.
 
 ## What you'll build
 
-A working Python environment with LiteLLM able to reach Gemini. That is all.
+A working Python environment with the OpenAI client able to reach Gemini.
+That is all. Layer 0 used LiteLLM. This guide is the live setup.
 
 ## 1. Install uv (Windows PowerShell)
 
@@ -41,7 +42,7 @@ Do **not** add a `[build-system]` yet — there is no `../src` package.
 ## 3. Dependencies
 
 ```powershell
-uv add litellm pydantic python-dotenv
+uv add openai pydantic python-dotenv
 ```
 
 Nothing else. Never bare `pip install`.
@@ -57,22 +58,23 @@ Open `.env` and set your key from [AI Studio](https://aistudio.google.com)
 
 ```
 GEMINI_API_KEY=paste-your-key-here
-GEMINI_MODEL=gemini/gemini-3.5-flash-lite
-LITELLM_LOG=ERROR
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-`.env` is never committed (see `.gitignore`). `LITELLM_LOG=ERROR` quiets
-LiteLLM's Gemini sampling notice — and `load_dotenv()` must run **before**
-importing LiteLLM, since it reads that variable at import time.
+`.env` is never committed (see `.gitignore`). The model id has no `gemini/`
+prefix. The base URL lives on the model record, not in `.env`. If an old
+`.env` still has `gemini/` or `LITELLM_LOG`, delete both or the first call
+404s. `load_dotenv()` runs once in `agent.py`, before any `os.getenv`.
 
 ## 5. Verify (one throwaway check, not a project file)
 
 ```powershell
-uv run python -c "from dotenv import load_dotenv; load_dotenv(); from litellm import completion; import os; print(completion(model=os.getenv('GEMINI_MODEL','gemini/gemini-3.5-flash-lite'), api_key=os.getenv('GEMINI_API_KEY'), messages=[{'role':'user','content':'Say hi in five words.'}]).choices[0].message.content)"
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); from openai import OpenAI; import os; print(OpenAI(api_key=os.getenv('GEMINI_API_KEY'), base_url='https://generativelanguage.googleapis.com/v1beta/openai/').chat.completions.create(model=os.getenv('GEMINI_MODEL'), messages=[{'role':'user','content':'Say hi in five words.'}]).choices[0].message.content)"
 ```
 
-**Expected:** a short greeting. `401` → key or `load_dotenv()` order.
-Anything else → stop here and fix it before `docs/01-loop.md`.
+**Expected:** a short greeting. `401` → key. `404` → the model id still has
+a `gemini/` prefix. Anything else → stop here and fix it before
+`docs/01-loop.md`.
 
 ## Don't add yet
 

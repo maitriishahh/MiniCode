@@ -10,7 +10,8 @@
   registry, sandbox, plan/build, observability, layers).
 - [x] Session files: `AGENTS.md`, this STATUS, `docs/00-setup.md`,
   `docs/01-loop.md`, `.env.example`, `.gitignore`.
-- [x] `docs/00-setup.md` — venv, `.env`, LiteLLM reaches Gemini.
+- [x] `docs/00-setup.md` — venv, `.env`, Gemini reachable. Guide now
+  targets the OpenAI client.
 - [x] `docs/01-loop.md` / Layer 0: `src/minicode/__main__.py` — clean loop,
   `tool_from_fn`, sandbox, `read`, REPL, tool-executed line, status block
   (model / mode / tools / summed tokens / Tok/s).
@@ -37,8 +38,11 @@
 - [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
   "\n---\n"` — closing `---` always lands on its own line.
 
-- [x] `docs/03-models.md` — Layer 2 guide (model record, `/model`, Gemini
-  + one `ollama_chat/` entry). Not implemented yet.
+- [x] `docs/03-models.md` — rewritten for the OpenAI client (record, required
+  `api_base`, `/model`, Gemini + one Ollama `/v1` entry). Not implemented.
+  Code still imports LiteLLM until that pass. Do not add a new LiteLLM call.
+- [x] Transport convention locked in `AGENTS.md`: `openai` package, one
+  `chat.completions.create`, raw message dict, no provider prefix.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
   Status is last prompt (`In`) + summed output tokens (`Out`) + elapsed
@@ -48,9 +52,9 @@
 
 ## Next
 
-1. Implement `docs/03-models.md`: registry and `completion()` kwargs in
-   `agent.py`; `/model` and the status id in `__main__.py`. Do not
-   change `SANDBOX` in that pass.
+1. Implement `docs/03-models.md`: swap `litellm` for `openai` in the same
+   pass. Registry and the create call in `agent.py`; `/model` and the
+   status id in `__main__.py`. Do not change `SANDBOX`.
 2. Then flip the default workspace from the dev `sandbox/` fence to the
    launch cwd (product behavior, Pi/OpenCode). Keep `--sandbox path`.
 3. Then one capped search tool (`grep` or `find`). Not a shell.

@@ -15,21 +15,22 @@ pass. A new session must not need prior chat history.
 
 ## What this is
 
-A minimal coding agent: hand-written tool loop over LiteLLM, `read` / `write`
-/ `edit` inside a sandbox, plan and build as separate modes, a small model
-registry, and a REPL status line. Few features, each finished.
+A minimal coding agent: hand-written tool loop over the OpenAI client, `read`
+/ `write` / `edit` inside a sandbox, plan and build as separate modes, a small
+model registry, and a REPL status line. Few features, each finished.
 
 ## Stack (only these)
 
 | Role | Choice |
 |---|---|
-| LLM transport | LiteLLM Python SDK, one `completion()` call |
+| LLM transport | `openai` package, one `chat.completions.create` |
 | Validation | `pydantic` (`create_model` in `tool_from_fn`) |
 | Env | `python-dotenv`, `.env` from `.env.example` (never commit `.env`) |
 | Python | ≥3.13, managed with **uv** |
 
-Not in the project: LangGraph, LangChain, deepagents, LlamaIndex, Rich /
-Textual (yet), pi-agent-core (read-only reference).
+Not in the project: LiteLLM, one SDK per provider, LangGraph, LangChain,
+deepagents, LlamaIndex, Rich / Textual (yet), pi-agent-core (read-only
+reference).
 
 ## Layout
 
@@ -49,22 +50,24 @@ Imports are `minicode.*`. Do not split further without a reason.
 
 A guide names the file. It does not say "grow `__main__.py`". REPL, slash
 commands, and the status print live in `__main__.py`. The loop, `SYSTEM`,
-the registry, and the one `completion()` site live in `agent.py`. The
-function is `agent`, not `run_agent`. `tool_from_fn` stays in
+the registry, and the one `chat.completions.create` site live in `agent.py`.
+The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
 `user >>`, `|Tools Used: \`name\`|`, and `{In} | {Out} | {elapsed}`.
-No Tok/s.
+No Tok/s. Future guides must not say `from litellm import completion`,
+`ollama_chat/`, or a `gemini/` prefix.
 
 ## Conventions (do not break)
 
 - Growing file: each guide says keep / add / replace. The loop shape in
   `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
-  History stores plain dicts only: the assistant message is appended as
-  `msg.model_dump(exclude_none=True)`, never the raw LiteLLM `Message`
-  object (raw objects trigger Pydantic `PydanticSerializationUnexpectedValue`
-  warnings on the next `completion()` when `tool_calls` are present).
+  History stores plain dicts only. The assistant message appended is the raw
+  JSON object from the response body (`choices[0].message`), not an SDK
+  object and not a rebuilt `tool_calls` list. A Gemini thought signature
+  rides in that dict. Do not parse it. A 400 that names `thought_signature`
+  is the only reason to touch that append.
 - Tool functions use Google-style docstrings. Only the first line becomes the
   model-visible description and `Args:` entries become parameter docs;
   extra scope sentences in the docstring body are invisible to the model.
@@ -91,7 +94,7 @@ No Tok/s.
 - Validation errors and tool failures return as `role: "tool"` strings. Tool
   code never raises out of the loop. `max_steps` returns a message, never
   raises.
-- `exit` / `quit` / `bye` leave before any `completion()` call.
+- `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Product workspace is the launch cwd, like Pi and OpenCode. The current
   default is the root-level `sandbox/` dir
@@ -102,11 +105,15 @@ No Tok/s.
   `--sandbox <that repo>`. Do not flip the default to cwd in the model
   registry layer. `sandbox/` is gitignored. REPL prints `Sandbox: {SANDBOX}`
   once at startup, and the status block carries a `Sandbox: {SANDBOX}` line.
-- `load_dotenv()` runs before importing LiteLLM. `LITELLM_LOG=ERROR` in
-  `.env` quiets its Gemini sampling notice.
-- Model id: `os.getenv("GEMINI_MODEL")` with no Python default — `.env`
-  supplies it (`GEMINI_MODEL=gemini/gemini-3.5-flash-lite`). Pass
-  `api_key=os.getenv("GEMINI_API_KEY")` into every `completion()` call.
+- `load_dotenv()` runs once in `agent.py`, before any `os.getenv`. No
+  `LITELLM_LOG`.
+- Model id is the server's id. `os.getenv("GEMINI_MODEL")` with no Python
+  default — `.env` supplies it (`GEMINI_MODEL=gemini-3.5-flash-lite`). No
+  `gemini/` or `ollama_chat/` prefix. Every record has a required
+  `api_base`. Gemini's is
+  `https://generativelanguage.googleapis.com/v1beta/openai/`. A missing
+  local key on `127.0.0.1` or `localhost` becomes `"ollama"`. A missing
+  Gemini key still fails.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
   After a successful tool run, print `|Tools Used: `{name}`|`. Unknown tools
   stay silent on stdout. Status block after the answer, wrapped in `---`:
@@ -127,3 +134,4 @@ No Tok/s.
 - Add a feature without finishing it: unknown tools, escapes, and bad args
   must all behave before the layer is done.
 - Send `exit`, secrets, or half-built scaffolding to the model.
+- LiteLLM, or one SDK per provider. Transport is the `openai` package.

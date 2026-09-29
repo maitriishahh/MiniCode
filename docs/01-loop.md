@@ -1,8 +1,9 @@
 # 01 — Loop + sandbox + read + status
 
-The layer was built in one file, then split. Snippets below are the live
-locations. A new guide names the file — see `AGENTS.md`. Do not grow
-`__main__.py` with the loop.
+The layer was built in one file, then split. It was also built on LiteLLM.
+The live call is the OpenAI client. Snippets below are the live locations.
+A new guide names the file — see `AGENTS.md`. Do not grow `__main__.py`
+with the loop.
 
 Do first: `docs/00-setup.md` (venv, `.env`, Gemini reachable).
 
@@ -27,7 +28,8 @@ once.
 1. REPL (`__main__.py`): read line → `exit`/`quit`/`bye` leaves before any
    model call → else append `{"role": "user", ...}` once and call
    `agent(messages)`.
-2. `agent` (`agent.py`): `completion()` → append assistant once → no
+2. `agent` (`agent.py`): `chat.completions.create` → append the raw assistant
+   message once → no
    `tool_calls`? return text → else run each tool (never raise out), append
    one `role: "tool"` per call with the same `tool_call_id` → repeat.
 3. `max_steps` reached → return a message the user can act on. Never raise.
@@ -68,25 +70,26 @@ uv run python -m minicode
 `uv sync` installs `minicode` editable so `-m minicode` finds `../src`.
 Without the build-system block, that command fails with `No module named minicode`.
 
-Config, at the top of `agent.py` (`load_dotenv()` before importing LiteLLM):
+Config, at the top of `agent.py` (`load_dotenv()` before any `os.getenv`):
 
 ```python
+import json
 import os
-import time
 from dotenv import load_dotenv
 
-load_dotenv()  # before litellm: it reads LITELLM_LOG at import time
+load_dotenv()
 
-from litellm import completion
+from openai import OpenAI
 
-MODEL = os.getenv("GEMINI_MODEL")  # from .env; no Python default
+MODEL = os.getenv("GEMINI_MODEL")  # no prefix; no Python default
 API_KEY = os.getenv("GEMINI_API_KEY")
+API_BASE = "https://generativelanguage.googleapis.com/v1beta/openai/"
 MAX_STEPS = 8
 ```
 
-Keep `MODEL`, `API_KEY`, `MAX_STEPS` and the import order. `time` is for
-elapsed seconds in the REPL (`__main__.py`). Do not put the loop back in
-`__main__.py`.
+Keep `MODEL`, `API_KEY`, `API_BASE`, `MAX_STEPS`. `time` stays in the REPL
+(`__main__.py`). Do not put the loop back in `__main__.py`. Layer 2 moves
+`API_BASE` onto the model record.
 
 ## Segment 2 — Clean loop, no tools yet
 
@@ -99,18 +102,22 @@ Add this. **Do not run yet** — there is no REPL until Segment 5. The
 SYSTEM = "You are a concise coding assistant. Use tools when they help. Be brief."
 
 def agent(messages: list) -> str:
+    client = OpenAI(api_key=API_KEY, base_url=API_BASE)
     for step in range(MAX_STEPS):
-        resp = completion(model=MODEL, api_key=API_KEY, messages=messages)
-        msg = resp.choices[0].message
-        messages.append(msg)  # always, once
-        if not msg.tool_calls:
-            return msg.content or ""
-        for call in msg.tool_calls:
+        raw = client.with_raw_response.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+        )
+        msg = json.loads(raw.text)["choices"][0]["message"]
+        messages.append(msg)  # raw dict, once
+        if not msg.get("tool_calls"):
+            return msg.get("content") or ""
+        for call in msg["tool_calls"]:
             messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": f"Unknown tool: {call.function.name}",
+                    "tool_call_id": call["id"],
+                    "content": f"Unknown tool: {call['function']['name']}",
                 }
             )
     return f"Max limit reached: {MAX_STEPS}. Try smaller request."
@@ -119,8 +126,9 @@ def agent(messages: list) -> str:
 No `tools=` yet, so the `for call` branch never fires until Segment 4.
 
 **What just moved:** the assistant message is stored before anything else, so
-the next `completion()` sees what the model proposed. The `max_steps` fallthrough
-returns instead of raising, so the REPL survives.
+the next create sees what the model proposed. Append that raw dict. Do not
+rebuild `tool_calls`. The `max_steps` fallthrough returns instead of raising,
+so the REPL survives.
 
 ## Segment 3 — `tool_from_fn`
 
@@ -196,8 +204,8 @@ def tool_from_fn(fn):
 ```
 
 Adapt the parser to your taste, but keep the contract: **(schema, run)**,
-validation errors as strings, tool exceptions as strings. Do not use
-`litellm.utils.function_to_dict`. Do not add a `Returns:` block to tool
+validation errors as strings, tool exceptions as strings. Do not add a
+`Returns:` block to tool
 docstrings unless the parser skips section headers — a line like
 `Returns: ...` would be treated as a fake parameter named `Returns`.
 
@@ -274,33 +282,34 @@ last_usage = {"prompt_tokens": 0, "completion_tokens": 0}
 def agent(messages: list) -> str:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
+    client = OpenAI(api_key=API_KEY, base_url=API_BASE)
     for step in range(MAX_STEPS):
-        resp = completion(
+        raw = client.with_raw_response.chat.completions.create(
             model=MODEL,
-            api_key=API_KEY,
             messages=messages,
             tools=SCHEMAS,
         )
-        usage = getattr(resp, "usage", None)
-        last_usage["prompt_tokens"] = getattr(usage, "prompt_tokens", 0) or 0
-        last_usage["completion_tokens"] += getattr(usage, "completion_tokens", 0) or 0
-        msg = resp.choices[0].message
-        messages.append(
-            msg.model_dump(exclude_none=True) if hasattr(msg, "model_dump") else msg
-        )  # plain dicts only — never the raw Message object
-        if not msg.tool_calls:
-            return msg.content or ""
-        for call in msg.tool_calls:
-            run = TOOLS.get(call.function.name)
+        body = json.loads(raw.text)
+        usage = body.get("usage") or {}
+        last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
+        last_usage["completion_tokens"] += usage.get("completion_tokens") or 0
+        msg = body["choices"][0]["message"]
+        messages.append(msg)  # raw dict — do not rebuild tool_calls
+        calls = msg.get("tool_calls") or []
+        if not calls:
+            return msg.get("content") or ""
+        for call in calls:
+            name = call["function"]["name"]
+            run = TOOLS.get(name)
             if run:
-                content = run(call.function.arguments)
-                print(f"|Tools Used: `{call.function.name}`|")
+                content = run(call["function"]["arguments"])
+                print(f"|Tools Used: `{name}`|")
             else:
-                content = f"Unknown tool: {call.function.name}"
+                content = f"Unknown tool: {name}"
             messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": call.id,
+                    "tool_call_id": call["id"],
                     "content": content,
                 }
             )
@@ -309,13 +318,12 @@ def agent(messages: list) -> str:
 
 Reset `last_usage` at the start of each turn. `prompt_tokens` is the last
 call only (`In`). `completion_tokens` sums across steps (`Out`). A read
-turn is two `completion()` calls — summing `prompt_tokens` would count the
-prompt twice. Print `|Tools Used: `{name}`|` **after** a successful
-run, not before, and not for unknown tools. History stores the assistant
-message as a plain dict via `msg.model_dump(exclude_none=True)` — appending
-the raw LiteLLM `Message` object triggers Pydantic
-`PydanticSerializationUnexpectedValue` warnings on the next `completion()`
-when `tool_calls` are present.
+turn is two create calls — summing `prompt_tokens` would count the prompt
+twice. Print `|Tools Used: `{name}`|` **after** a successful run, not
+before, and not for unknown tools. History stores the assistant message as
+the raw JSON object from the response body. Do not `model_dump` it. Do not
+rebuild `tool_calls`. A Gemini thought signature rides in that dict if the
+server sent one. Do not parse it.
 
 **Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see
 `|Tools Used: `read`|`. Numbered contents go to the model as `role: "tool"`;
@@ -372,7 +380,7 @@ tool names, sandbox path, last `prompt_tokens` (`In`), summed
 
 ```
 ---
-Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 398 In | 12 Out | 1.7
 ---
@@ -399,7 +407,7 @@ and exits cleanly — stop.
 2. What is appended for every assistant reply, even one with `tool_calls`?
 3. What happens to a `ValidationError`? To `max_steps`?
 4. What does the model see of `read` — the Python or something else?
-5. Why does `exit` never reach `completion()`?
+5. Why does `exit` never reach `chat.completions.create`?
 
 Answers: (1) in the REPL, once, before `agent`; (2) the assistant message
 itself, once; (3) both become strings returned to the user / model — the loop

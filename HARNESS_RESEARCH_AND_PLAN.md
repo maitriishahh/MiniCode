@@ -20,7 +20,7 @@ One shape, no doubles:
 ```
 REPL appends the user message once
 agent:
-  msg = completion(messages, tools)
+  msg = chat.completions.create(messages, tools)
   append the assistant message        # always, once
   if no tool_calls:
     return msg text
@@ -32,10 +32,12 @@ max_steps reached:
   return a message the user can act on (never raise)
 ```
 
-`exit` / `quit` / `bye` leave before any `completion()` call. The REPL owns
-the user message; `agent` never appends it again. One `completion()` site
-in the whole codebase. The function is `agent` in `agent.py`, not
-`run_agent`.
+`exit` / `quit` / `bye` leave before any `chat.completions.create` call. The
+REPL owns the user message; `agent` never appends it again. One
+`chat.completions.create` site in the whole codebase. The function is
+`agent` in `agent.py`, not `run_agent`. The assistant message appended is
+the raw JSON object from the response body, not an SDK object and not a
+rebuilt `tool_calls` list.
 
 This is the same shape as Pi, Claude Code, Codex, and OpenCode: prompt →
 model → tool calls → results → repeat. One node with a self-loop, not a graph.
@@ -58,8 +60,8 @@ cannot be added through it.
 
 | Topic | Call |
 |---|---|
-| Loop | Hand-written, sync, LiteLLM `completion()` |
-| LiteLLM | Transport only. We own the model registry |
+| Loop | Hand-written, sync, OpenAI `chat.completions.create` |
+| Transport | `openai` package. `base_url` selects the server. We own the registry |
 | Tools | Own `tool_from_fn`: Google-style docstring + type hints → schema + `pydantic.create_model` validation |
 | Errors | Tool failures and `ValidationError` return as `role: "tool"` content so the model self-corrects |
 | `max_steps` | Return a usable message. Never raise (raising kills the REPL) |
@@ -79,49 +81,49 @@ cannot be added through it.
 Free-tier Gemini is rate-limited for long agentic loops. Zen-style gateways and
 local models exist for exactly that reason. The fix is structural: never store
 just a model *string*. Own a **Model record** that turns a definition into
-whatever `completion()` needs.
+the kwargs `chat.completions.create` needs.
 
-OpenCode's shape, adapted:
+OpenCode's shape, adapted, without the catalog:
 
-- Model ids look like `provider/model` (`gemini/gemini-3.5-flash-lite`,
-  `ollama_chat/qwen3-coder`, `openai/<id>` with a custom `api_base`).
+- The id is the server's id (`gemini-3.5-flash-lite`, `qwen3-coder`). No
+  `provider/` prefix. The base URL selects the server.
 - Credentials live in env (later a `0600` auth file). Never in the model
   config that gets committed.
-- A custom provider is `api_base` + key + model map. Zen is just another entry
-  (`https://opencode.ai/zen/v1/...` + key). Ollama is
-  `http://127.0.0.1:11434/v1`. llama.cpp is its `/v1` endpoint.
-- Switching models mid-session changes the next `completion(model=...)` call.
-  History stays as Chat Completions messages, which LiteLLM already
-  normalizes across providers.
+- A provider is `api_base` + key + id. Gemini's base is
+  `https://generativelanguage.googleapis.com/v1beta/openai/`. Ollama is
+  `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
+  Zen is `https://opencode.ai/zen/v1/...`. llama.cpp is its `/v1` endpoint.
+  A later entry is one dict, not a new client.
+- Switching models mid-session changes the next create's `model` and
+  `base_url`. History stays Chat Completions dicts: the raw assistant
+  message from the response JSON, so extra fields round-trip. A Gemini
+  thought signature rides in that dict. Do not parse it.
 
-LiteLLM is **not** the limit here — it already speaks Gemini, Ollama
-(`ollama_chat/` prefix for `/api/chat` + tool calling), any OpenAI-compatible
-endpoint (`openai/<name>` + `api_base`), OpenRouter, Anthropic, and more. What
-LiteLLM does not give you is the product layer: a typed catalogue, context
-windows, pricing, cache flags, `/connect`, `/models`. The Model record is that
-layer, built to the size actually needed:
+The `openai` package is the transport, not a provider catalog. What it does
+not give you is the product layer: a typed catalogue, context windows,
+pricing, cache flags, `/connect`, `/models`. The Model record is that layer,
+built to the size actually needed:
 
 ```
-id, provider, api_base (optional), api_key_env,
+id, api_base, api_key_env,
 context_window, max_tokens,
 cost {input, output, cache_read, cache_write} (0 for local),
 capabilities {tools, caching}
 ```
 
-Start with 2–3 entries in a dict (later TOML). Adding Zen later is one entry,
-not a new loop. No models.dev scrape, no 75 providers, no OAuth in v0.
+`api_base` is required. Start with 2 entries in a dict (later TOML). No
+models.dev scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per
+provider.
 
-**Day one:** Gemini via `.env` (`GEMINI_MODEL`, `GEMINI_API_KEY`).
+**Day one:** Gemini via `.env` (`GEMINI_MODEL`, `GEMINI_API_KEY`) and the
+Gemini base URL on the record.
 **Layer 2:** registry + `/model` + status line shows the active id. Prove the
-shape with one OpenAI-compatible endpoint (Ollama or llama.cpp alongside
-Gemini).
+shape with one local `/v1` endpoint (Ollama) alongside Gemini.
 
 **Caching — planned, not faked:**
 
-- Cloud: LiteLLM already surfaces cache-read tokens in `usage` where the
-  provider supports it. Anthropic needs explicit cache breakpoints (system
-  prompt + last stable prefix); Gemini/OpenAI are mostly automatic. No custom
-  cache code until a second provider actually needs it.
+- Cloud: `usage` may include cache-read tokens where the provider sends them.
+  No custom cache code until a second provider actually needs it.
 - Local (Ollama / llama.cpp): prefix KV-cache hits require the **prompt
   prefix to stay byte-identical**. Do not shuffle old messages, and do not
   compact by rewriting history, until this is understood. Stability of the
@@ -151,9 +153,9 @@ one) → schema and validation in one step. Bad JSON from the model becomes a
 `ValidationError` string returned as tool output, never an exception out of
 the loop.
 
-Do not use `litellm.utils.function_to_dict` (numpy-docstring-specific, not
-this convention). Do not hand-maintain an `if/elif` dispatch chain forever —
-the registry (`name → {schema, fn}`) replaces it once the second tool lands.
+Do not hand-write the schema. Do not hand-maintain an `if/elif` dispatch
+chain forever — the registry (`name → {schema, fn}`) replaces it once the
+second tool lands.
 
 **v0 tools (no shell):** `read`, then `write`, `edit`. Shell (PowerShell on
 this machine) arrives after file tools are boring — it is needed for tests and
@@ -243,7 +245,7 @@ stdout. After the model's reply, a status block:
 
 ```
 ---
-Model: gemini/gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 398 In | 12 Out | 1.7
 ---
@@ -261,7 +263,7 @@ network wait, and summed `total_tokens` counts the prompt once per step.
 | Enabled tool names | | Sessions / resume |
 | `In` / `Out` / elapsed | | |
 
-LiteLLM `usage` is enough for Gemini token counts —
+The response `usage` object is enough for token counts —
 no tiktoken needed. Cost and cache-hit display wait for the Model registry to
 carry pricing and cache flags. Edit diffs: a short unified-diff print in the
 REPL when `edit` lands is useful for testing and is not a viewer; the viewer
@@ -343,7 +345,8 @@ before.
 - Tool code never raises out of the loop.
 - Unknown tool name → string, not crash.
 - Paths outside the sandbox → string error.
-- One `completion()` site. Provider quirks stay in LiteLLM.
+- One `chat.completions.create` site. A new server is `api_base` plus an id,
+  not a new client.
 - No invisible behavior. Config is env first; every key inspectable later.
 - Secrets never in committed config.
 
@@ -351,8 +354,9 @@ before.
 
 ## 12. Stack
 
-Python ≥3.13, **uv**, `litellm`, `pydantic`, `python-dotenv`.
-Not: LangGraph, LangChain, deepagents, LlamaIndex, Rich, pi-agent-core.
+Python ≥3.13, **uv**, `openai`, `pydantic`, `python-dotenv`.
+Not: LiteLLM, one SDK per provider, LangGraph, LangChain, deepagents,
+LlamaIndex, Rich, pi-agent-core.
 
 ## 13. Sources
 
@@ -362,8 +366,8 @@ Not: LangGraph, LangChain, deepagents, LlamaIndex, Rich, pi-agent-core.
 - Pi docs (pi.dev): sessions, compaction, session format.
 - OpenCode docs: providers, Zen, config, models, agents (plan/build),
   permissions (`allow`/`ask`/`deny`, `external_directory`).
-- LiteLLM docs: function calling, Ollama (`ollama_chat/`), OpenAI-compatible
-  endpoints.
+- OpenAI Python SDK; Groq OpenAI compatibility; Ollama `/v1`; Google's
+  OpenAI-compatible Gemini endpoint.
 - AgenticRoadmap (`docs/`, `AGENTS.md`, Phase 2 raw loop) — docs-first,
   growing-file guide structure.
 - Armin Ronacher, "Agent Design Is Still Hard" — own the loop, reinforcement
