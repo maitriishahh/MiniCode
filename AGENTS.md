@@ -13,6 +13,10 @@ A small Python coding harness. Docs first, then the `.py` from the doc.
 When a session locks a new convention, write it into `AGENTS.md` in the same
 pass. A new session must not need prior chat history.
 
+The next guide is the file named in `docs/STATUS.md`. Write that guide
+before any code. Do not implement the next layer in the same pass as
+writing it unless the user says implement.
+
 ## What this is
 
 A minimal coding agent: hand-written tool loop over the OpenAI client, `read`
@@ -54,7 +58,8 @@ the registry, and the one `chat.completions.create` site live in `agent.py`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
-`user >>`, `|Tools Used: \`name\`|`, and `{In} | {Out} | {elapsed}`.
+`user >>`, `|Tools Used: \`name\`|`, and
+`{In} | {Out} | Elapsed: {elapsed:.1f}s`.
 No Tok/s. Future guides must not say `from litellm import completion`,
 `ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
 `api_key_env` as the record key, or that the code still imports LiteLLM.

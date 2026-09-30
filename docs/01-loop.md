@@ -365,7 +365,7 @@ def main() -> None:
             f"---"
             f"\nModel: {MODEL} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {elapsed:.1f}\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s\n"
             f"---"
         )
 
@@ -382,12 +382,13 @@ tool names, sandbox path, last `prompt_tokens` (`In`), summed
 ---
 Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
-398 In | 12 Out | 1.7
+398 In | 12 Out | Elapsed: 1.7s
 ---
 ```
 
-Context % waits for Layer 2's Model registry (`usage` ÷ `context_window`).
-Cost waits for pricing on the record. Don't fake either here.
+Context `%` is appended only when `context_window` is set. Leave it `None`
+until the number is verified. Don't invent one. Cost waits for pricing on
+the record.
 
 ## Your finished module
 

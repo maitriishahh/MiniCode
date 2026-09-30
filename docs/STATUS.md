@@ -12,19 +12,13 @@
   `docs/01-loop.md`, `.env.example`, `.gitignore`.
 - [x] `docs/00-setup.md` — venv, `.env`, Gemini reachable. Guide now
   targets the OpenAI client.
-- [x] `docs/01-loop.md` / Layer 0: `src/minicode/__main__.py` — clean loop,
-  `tool_from_fn`, sandbox, `read`, REPL, tool-executed line, status block
-  (model / mode / tools / summed tokens / Tok/s).
-- [x] `docs/02-file-tools.md` / Layer 1: `write`, `edit`, one-shot
-  unified diff — implemented in `__main__.py`.
-- [x] Hardening pass on the loop: assistant history stored as
-  `msg.model_dump(exclude_none=True)` dicts (fixes Pydantic
-  `PydanticSerializationUnexpectedValue` warnings on tool-call turns);
-  `SYSTEM` routes `write` (whole-file create/overwrite) vs `edit`
-  (one exact unique span, `read` first for partial changes; add/append
-  preserves existing content); diff headers `a/{path} (before)` /
-  `b/{path} (after)` printed as `---\nDiff: {path}\n{diff}---`;
-  per-tool `---\nTools Used: \`name\`\n---` line and `---`-wrapped answer.
+- [x] `docs/01-loop.md` / Layer 0: loop in `agent.py`, REPL in
+  `__main__.py`. Status is `In | Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+- [x] `docs/02-file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
+  Registry in `agent.py`.
+- [x] History is the raw assistant message dict from the response JSON.
+  Not `model_dump`. Tool line is `|Tools Used: \`name\`|`. `SYSTEM`
+  routes whole-file `write` vs one-span `edit`.
 - [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
   block carries a `Sandbox: {SANDBOX}` line.
 - [x] `uv.lock` staged for commit (pins exact versions).
@@ -50,9 +44,12 @@
 
 ## Next
 
-1. Flip the default workspace from the dev `sandbox/` fence to the
-   launch cwd (product behavior, Pi/OpenCode). Keep `--sandbox path`.
-2. Then one capped search tool (`grep` or `find`). Not a shell.
+1. Write `docs/04-workspace.md` first. Do not implement until that guide
+   exists. Flip the default workspace from the dev `sandbox/` fence to the
+   launch cwd. Keep `--sandbox path`. The change is in `resolve_path.py`.
+   Do not touch the registry.
+2. Then write the search-tool guide (`grep` or `find`, capped). Not a
+   shell. Do not implement it in the workspace pass.
 
 ## Deferred (do not start)
 

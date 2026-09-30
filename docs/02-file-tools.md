@@ -196,19 +196,20 @@ looks up `TOOLS.get(call["function"]["name"])`. Status `Tools Loaded:` is
 it will show `read,write,edit` with no REPL edits.
 
 Do **not** add `if/elif` on tool names. Do **not** merge `write` and `edit`.
-Do not change `In | Out | elapsed`. The only prompt change in this layer is
+Do not change `In | Out | Elapsed: {elapsed:.1f}s`. The only prompt change in this layer is
 the `SYSTEM` routing rule from Segment 2.
 
 ## Your finished module
 
-Same file as Layer 0, plus `SYSTEM` routing rule, `write`, `edit`,
-`difflib` in `tools/edit.py`. Still no further split —
-the file is not awkward yet.
+`write` and `edit` live in `tools/`. `SYSTEM` and the registry live in
+`agent.py`. `difflib` lives in `tools/edit.py`. Do not merge these back
+into `__main__.py`.
 
 ## Don't add yet
 
 shell, plan/build swap (`/plan` dropping `write`/`edit`), permissions UI,
-Rich, streaming, sessions, compaction, cost, diff **viewer**, `/model`.
+Rich, streaming, sessions, compaction, cost, diff **viewer**. `/model` is
+Layer 2 and is done.
 Plan mode without a restricted tool list is still later — but now there is
 something to restrict, which is why this layer comes first.
 

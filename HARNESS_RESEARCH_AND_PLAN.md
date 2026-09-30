@@ -186,8 +186,8 @@ denied even inside the sandbox.
 The code's current default is a root `sandbox/` dir, not cwd. That is the
 dev fence while the harness is being built, so tool tests cannot overwrite
 `src/`. It is not the product rule. A real repo today is
-`--sandbox <that repo>`. Flipping the default to cwd is its own later pass,
-after file tools are boring — not part of the model registry.
+`--sandbox <that repo>`. The flip is `docs/04-workspace.md`, written before
+any code. Not part of the model registry.
 
 YOLO is fine inside that box for now. Pi's argument stands: once an agent can
 write and run code, permission prompts are mostly theater — but the sandbox
@@ -248,7 +248,7 @@ stdout. After the model's reply, a status block:
 ---
 Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
-398 In | 12 Out | 1.7
+398 In | 12 Out | Elapsed: 1.7s
 ---
 ```
 
@@ -316,13 +316,14 @@ print. Still no shell.
 Checkpoint: the agent edits a local file correctly; a mismatched `old_text`
 returns a tool error and the model retries.
 
-**Layer 2 — model registry.** Model records, `/model` mid-session switch,
-Gemini + one OpenAI-compatible endpoint to prove the shape.
-Checkpoint: `/model` to another entry, next turn uses it, status shows it.
+**Layer 2 — model registry.** Done. `_SERVERS`, `/model`, OpenAI client.
+Ids from `.env`. Bases in code.
 
-**Then, for real work (order may slip):** flip the default workspace from
-the dev `sandbox/` fence to launch cwd → one capped search tool (`grep` or
-`find`, not a shell) → plan/build via tool-list swap → `shell` →
+**Next:** write `docs/04-workspace.md` before code. Flip the default
+workspace from the dev `sandbox/` fence to launch cwd. Then a separate
+guide for one capped search tool (`grep` or `find`, not a shell). Do not
+implement it in the workspace pass. After that: plan/build via tool-list
+swap → `shell` →
 permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that
 leaves a coherent session → sessions/resume → cache control → cost → diff
 viewer → `AGENTS.md` injection into the system prompt. Search before shell:
