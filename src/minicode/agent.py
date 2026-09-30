@@ -40,6 +40,7 @@ for id_env, key_env, base in _SERVERS:
 
 default_id = os.getenv("GEMINI_MODEL")
 active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)}
+print(MODELS)
 
 SYSTEM = (
     "You are a concise coding assistant. Use tools when they help. Be brief. "
@@ -75,6 +76,7 @@ def agent(messages:list) -> str:
 
     for step in range(MAX_STEPS):
         try:
+            print(f"\n~~Thinking...\n")
             resp = client.with_raw_response.chat.completions.create(
                 model=record["id"],
                 messages=messages,
@@ -97,7 +99,7 @@ def agent(messages:list) -> str:
             run = TOOLS.get(name)
             if run:
                content = run(call["function"]["arguments"])
-               print(f"|Tools Used: `{name}`|")
+               print(f"\n|Tools Used: `{name}`|\n")
             else:
                 content = f"Unknown tool: {name}"
 
