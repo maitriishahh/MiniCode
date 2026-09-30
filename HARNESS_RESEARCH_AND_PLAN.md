@@ -85,15 +85,15 @@ the kwargs `chat.completions.create` needs.
 
 OpenCode's shape, adapted, without the catalog:
 
-- The id is the server's id (`gemini-3.5-flash-lite`, `qwen3-coder`). No
-  `provider/` prefix. The base URL selects the server.
+- The id is the server's id, from `.env` (`GEMINI_MODEL`, `OLLAMA_MODEL`).
+  No `provider/` prefix. No hardcoded tag. The base URL selects the server.
 - Credentials live in env (later a `0600` auth file). Never in the model
   config that gets committed.
 - A provider is `api_base` + key + id. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`. Ollama is
   `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
   Zen is `https://opencode.ai/zen/v1/...`. llama.cpp is its `/v1` endpoint.
-  A later entry is one dict, not a new client.
+  A later entry is one `_SERVERS` tuple plus two env lines, not a new client.
 - Switching models mid-session changes the next create's `model` and
   `base_url`. History stays Chat Completions dicts: the raw assistant
   message from the response JSON, so extra fields round-trip. A Gemini
@@ -105,20 +105,21 @@ pricing, cache flags, `/connect`, `/models`. The Model record is that layer,
 built to the size actually needed:
 
 ```
-id, api_base, api_key_env,
+id, api_base, api_key,
 context_window, max_tokens,
 cost {input, output, cache_read, cache_write} (0 for local),
 capabilities {tools, caching}
 ```
 
-`api_base` is required. Start with 2 entries in a dict (later TOML). No
-models.dev scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per
-provider.
+`api_key` holds the env name, not the secret. `api_base` is required.
+Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
+scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per provider.
 
 **Day one:** Gemini via `.env` (`GEMINI_MODEL`, `GEMINI_API_KEY`) and the
 Gemini base URL on the record.
-**Layer 2:** registry + `/model` + status line shows the active id. Prove the
-shape with one local `/v1` endpoint (Ollama) alongside Gemini.
+**Layer 2:** implemented. `_SERVERS` plus `/model`. Startup default is
+`default_id` from `GEMINI_MODEL`. `/model <id>` changes `active["id"]` for
+the session only. Ollama is the second tuple; its id is `OLLAMA_MODEL`.
 
 **Caching — planned, not faked:**
 

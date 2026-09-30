@@ -1,18 +1,45 @@
+import json
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from litellm import completion
+from openai import OpenAI
 
 from minicode.schema_generator import tool_from_fn
 from minicode.tools.read import read
 from minicode.tools.write import write
 from minicode.tools.edit import edit
 
-MODEL = os.getenv("GEMINI_MODEL")
-API_KEY = os.getenv("GEMINI_API_KEY")
 MAX_STEPS = 8
+
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai/"
+OLLAMA_BASE = "http://127.0.0.1:11434/v1"
+
+_SERVERS = (
+    ("GEMINI_MODEL", "GEMINI_API_KEY", GEMINI_BASE),
+    ("OLLAMA_MODEL", "OLLAMA_API_KEY", OLLAMA_BASE),
+)
+
+def _entry(model_id, api_key_env, api_base, context_window=None, max_tokens=None):
+    return {
+        "id": model_id,
+        "api_key": api_key_env,
+        "api_base": api_base,
+        "context_window": context_window,
+        "max_tokens": max_tokens,
+        "cost": {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0},
+        "tools": True,
+    }
+
+MODELS = {}
+for id_env, key_env, base in _SERVERS:
+    model_id = os.getenv(id_env)
+    if model_id:
+        MODELS[model_id] = _entry(model_id, key_env, base)
+
+default_id = os.getenv("GEMINI_MODEL")
+active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)}
 
 SYSTEM = (
     "You are a concise coding assistant. Use tools when they help. Be brief. "
@@ -35,35 +62,49 @@ last_usage = {"prompt_tokens": 0, "completion_tokens": 0}
 def agent(messages:list) -> str:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
+    record = MODELS[active["id"]]
+    api_key = os.getenv(record["api_key"])
+    base = record["api_base"]
+    if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
+        api_key = "ollama"
+
+    try:
+        client = OpenAI(api_key=api_key, base_url=base)
+    except Exception as exc:
+        return f"Model Error: {exc}"
 
     for step in range(MAX_STEPS):
-        resp = completion(
-            model=MODEL,
-            api_key=API_KEY,
-            messages=messages,
-            tools=SCHEMAS
-        )
-        usage = getattr(resp,"usage", None)
-        last_usage["prompt_tokens"] = getattr(usage,"prompt_tokens",0) or 0
-        last_usage["completion_tokens"] += getattr(usage,"completion_tokens",0) or 0
-        msg = resp.choices[0].message
-        messages.append(
-            msg.model_dump(exclude_none=True) if hasattr(msg,"model_dump") else msg
-        )
-        if not msg.tool_calls:
-            return msg.content or ""
-        for call in msg.tool_calls:
-            run = TOOLS.get(call.function.name)
+        try:
+            resp = client.with_raw_response.chat.completions.create(
+                model=record["id"],
+                messages=messages,
+                tools=SCHEMAS
+            )
+            body = json.loads(resp.text)
+        except Exception as exc:
+            return f"Model Error: {exc}"
+
+        usage = body.get("usage") or {}
+        last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
+        last_usage["completion_tokens"] += usage.get("completion_tokens") or 0
+        msg = body["choices"][0]["message"]
+        messages.append(msg)
+        calls = msg.get("tool_calls") or []
+        if not calls:
+            return msg.get("content") or ""
+        for call in calls:
+            name = call["function"]["name"]
+            run = TOOLS.get(name)
             if run:
-               content = run(call.function.arguments)
-               print(f"|Tools Used: `{str(call.function.name)}`|")
+               content = run(call["function"]["arguments"])
+               print(f"|Tools Used: `{name}`|")
             else:
-                content = f"Unknown tool: {call.function.name}"
+                content = f"Unknown tool: {name}"
 
             messages.append(
                 {
                     "role":"tool",
-                    "tool_call_id":call.id,
+                    "tool_call_id":call["id"],
                     "content":content,
                 }
             )

@@ -56,7 +56,8 @@ The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
 `user >>`, `|Tools Used: \`name\`|`, and `{In} | {Out} | {elapsed}`.
 No Tok/s. Future guides must not say `from litellm import completion`,
-`ollama_chat/`, or a `gemini/` prefix.
+`ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
+`api_key_env` as the record key, or that the code still imports LiteLLM.
 
 ## Conventions (do not break)
 
@@ -107,18 +108,24 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   once at startup, and the status block carries a `Sandbox: {SANDBOX}` line.
 - `load_dotenv()` runs once in `agent.py`, before any `os.getenv`. No
   `LITELLM_LOG`.
-- Model id is the server's id. `os.getenv("GEMINI_MODEL")` with no Python
-  default — `.env` supplies it (`GEMINI_MODEL=gemini-3.5-flash-lite`). No
-  `gemini/` or `ollama_chat/` prefix. Every record has a required
-  `api_base`. Gemini's is
-  `https://generativelanguage.googleapis.com/v1beta/openai/`. A missing
-  local key on `127.0.0.1` or `localhost` becomes `"ollama"`. A missing
-  Gemini key still fails.
+- Servers live in `_SERVERS`: `(id_env, key_env, base)`. The id comes from
+  `.env`. The base stays in code. A new server is one tuple plus two env
+  lines. Do not hardcode an id. Do not put the catalog in `.env`. The
+  record field is `api_key`, and its value is the env name, not the secret.
+  Lookup is `os.getenv(record["api_key"])`. `default_id` is
+  `os.getenv("GEMINI_MODEL")` once. That is the startup choice. `/model <id>`
+  changes `active["id"]` for the session only. Restart restores
+  `default_id`. An unset id env skips that server. An empty key on
+  `127.0.0.1` or `localhost` becomes `"ollama"`. A missing Gemini key still
+  fails. A raised call returns `Model Error:`. No `gemini/` or
+  `ollama_chat/` prefix. Gemini's base is
+  `https://generativelanguage.googleapis.com/v1beta/openai/`.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
   After a successful tool run, print `|Tools Used: `{name}`|`. Unknown tools
   stay silent on stdout. Status block after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
-  `{prompt:,} In | {out:,} Out | {elapsed:.1f}` (elapsed is seconds).
+  `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. Context `%` is
+  appended only when `context_window` is set.
 - `last_usage` resets at the start of each turn. `prompt_tokens` is the last
   call only (overwrite) — that is `In`. `completion_tokens` **sums** across
   steps — that is `Out`. No Tok/s. A wall-clock rate is network wait, not

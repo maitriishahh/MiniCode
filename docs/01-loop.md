@@ -1,9 +1,9 @@
 # 01 — Loop + sandbox + read + status
 
 The layer was built in one file, then split. It was also built on LiteLLM.
-The live call is the OpenAI client. Snippets below are the live locations.
-A new guide names the file — see `AGENTS.md`. Do not grow `__main__.py`
-with the loop.
+The `agent()` snippets below are the pre-registry shape. Do not paste them
+over `agent.py`. The live call is `docs/03-models.md`. A new guide names
+the file — see `AGENTS.md`. Do not grow `__main__.py` with the loop.
 
 Do first: `docs/00-setup.md` (venv, `.env`, Gemini reachable).
 

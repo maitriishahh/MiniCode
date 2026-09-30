@@ -38,11 +38,9 @@
 - [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
   "\n---\n"` — closing `---` always lands on its own line.
 
-- [x] `docs/03-models.md` — rewritten for the OpenAI client (record, required
-  `api_base`, `/model`, Gemini + one Ollama `/v1` entry). Not implemented.
-  Code still imports LiteLLM until that pass. Do not add a new LiteLLM call.
-- [x] Transport convention locked in `AGENTS.md`: `openai` package, one
-  `chat.completions.create`, raw message dict, no provider prefix.
+- [x] Layer 2: OpenAI client, `_SERVERS` registry, `/model`, raw message
+  dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
+  Status elapsed is `Elapsed: {elapsed:.1f}s`. No Tok/s. No LiteLLM.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
   Status is last prompt (`In`) + summed output tokens (`Out`) + elapsed
@@ -52,12 +50,9 @@
 
 ## Next
 
-1. Implement `docs/03-models.md`: swap `litellm` for `openai` in the same
-   pass. Registry and the create call in `agent.py`; `/model` and the
-   status id in `__main__.py`. Do not change `SANDBOX`.
-2. Then flip the default workspace from the dev `sandbox/` fence to the
+1. Flip the default workspace from the dev `sandbox/` fence to the
    launch cwd (product behavior, Pi/OpenCode). Keep `--sandbox path`.
-3. Then one capped search tool (`grep` or `find`). Not a shell.
+2. Then one capped search tool (`grep` or `find`). Not a shell.
 
 ## Deferred (do not start)
 

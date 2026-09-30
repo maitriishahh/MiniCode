@@ -59,12 +59,16 @@ Open `.env` and set your key from [AI Studio](https://aistudio.google.com)
 ```
 GEMINI_API_KEY=paste-your-key-here
 GEMINI_MODEL=gemini-3.5-flash-lite
+OLLAMA_MODEL=
+OLLAMA_API_KEY=
 ```
 
 `.env` is never committed (see `.gitignore`). The model id has no `gemini/`
-prefix. The base URL lives on the model record, not in `.env`. If an old
-`.env` still has `gemini/` or `LITELLM_LOG`, delete both or the first call
-404s. `load_dotenv()` runs once in `agent.py`, before any `os.getenv`.
+prefix. The base URL lives on the server tuple, not in `.env`. An empty
+`OLLAMA_MODEL` skips that server. Leave `OLLAMA_API_KEY` empty; a loopback
+call uses the dummy `"ollama"`. If an old `.env` still has `gemini/` or
+`LITELLM_LOG`, delete both or the first call 404s. `load_dotenv()` runs
+once in `agent.py`, before any `os.getenv`.
 
 ## 5. Verify (one throwaway check, not a project file)
 
