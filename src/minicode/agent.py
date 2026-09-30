@@ -40,7 +40,6 @@ for id_env, key_env, base in _SERVERS:
 
 default_id = os.getenv("GEMINI_MODEL")
 active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)}
-print(MODELS)
 
 SYSTEM = (
     "You are a concise coding assistant. Use tools when they help. Be brief. "
