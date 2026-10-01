@@ -6,7 +6,7 @@ def _sandbox_root() -> Path:
         i = sys.argv.index("--sandbox")
         if i + 1 < len(sys.argv):
             return Path(sys.argv[i + 1]).resolve()
-    return Path(__file__).resolve().parents[2] / "sandbox"
+    return Path.cwd().resolve()
 
 SANDBOX = _sandbox_root()
 SANDBOX.mkdir(parents=True, exist_ok=True)

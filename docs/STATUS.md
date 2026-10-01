@@ -44,10 +44,12 @@
 
 ## Next
 
-1. Write `docs/04-workspace.md` first. Do not implement until that guide
-   exists. Flip the default workspace from the dev `sandbox/` fence to the
-   launch cwd. Keep `--sandbox path`. The change is in `resolve_path.py`.
-   Do not touch the registry.
+1. `docs/04-workspace.md` is written, not implemented. Implement it next
+   into `src/minicode/resolve_path.py` only: default workspace becomes the
+   launch cwd, `--sandbox path` stays as the override. Dev fence is
+   `uv run python -m minicode --sandbox sandbox`. Do not touch the
+   registry. Then update `AGENTS.md` + `HARNESS_RESEARCH_AND_PLAN.md` §5
+   in that same pass.
 2. Then write the search-tool guide (`grep` or `find`, capped). Not a
    shell. Do not implement it in the workspace pass.
 
