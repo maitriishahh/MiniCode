@@ -102,15 +102,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   raises.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
-  Product workspace is the launch cwd, like Pi and OpenCode. The current
-  default is the root-level `sandbox/` dir
-  (`_sandbox_root()`: `Path(__file__).resolve().parents[2] / "sandbox"`,
-  auto-created at startup, `--sandbox path` overrides it). That default is
-  the dev fence so tool tests cannot overwrite harness source in `src/`.
-  It is not the product rule. Point at a real repo today with
-  `--sandbox <that repo>`. Do not flip the default to cwd in the model
-  registry layer. `sandbox/` is gitignored. REPL prints `Sandbox: {SANDBOX}`
-  once at startup, and the status block carries a `Sandbox: {SANDBOX}` line.
+  Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
+  `--sandbox path` overrides it, auto-created at startup). The old default
+  was the root-level `sandbox/` dir — that was the dev fence so tool tests
+  could not overwrite harness source in `src/`. It is now the dev override:
+  `uv run python -m minicode --sandbox sandbox`. `sandbox/` is gitignored.
+  REPL prints `Sandbox: {SANDBOX}` once at startup, and the status block
+  carries a `Sandbox: {SANDBOX}` line.
 - `load_dotenv()` runs once in `agent.py`, before any `os.getenv`. No
   `LITELLM_LOG`.
 - Servers live in `_SERVERS`: `(id_env, key_env, base)`. The id comes from

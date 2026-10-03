@@ -41,8 +41,9 @@ before anything else writes.
 File: `src/minicode/resolve_path.py`.
 
 The sandbox gate is already correct (paths resolve against `SANDBOX`, no
-`..` escape, no `.env*`). The current default is the dev `sandbox/` dir,
-not cwd — see `AGENTS.md`. Only the error string is `read`-specific.
+`..` escape, no `.env*`). At Layer 1 the default was the dev `sandbox/` dir
+— Layer 3 flipped it to the launch cwd, see `AGENTS.md`. Only the error
+string is `read`-specific.
 Replace it:
 
 ```python

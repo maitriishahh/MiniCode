@@ -215,10 +215,10 @@ Sandbox: `src/minicode/resolve_path.py`. `read`: `src/minicode/tools/read.py`.
 Registry and `agent`: `src/minicode/agent.py`.
 
 Paths resolve inside a root-level `sandbox/` directory and never escape.
-`.env` files stay denied even inside it. This default is the dev fence
-(not cwd, not `src/`) so tool tests cannot overwrite the harness. Product
-workspace is the launch cwd, like Pi and OpenCode; flipping the default is
-a later pass. `--sandbox path` overrides it:
+`.env` files stay denied even inside it. At Layer 0 that default was the dev
+fence (not cwd, not `src/`) so tool tests could not overwrite the harness.
+Layer 3 (`docs/04-workspace.md`) flipped the default to the launch cwd;
+`--sandbox path` overrides it:
 
 ```python
 import sys
@@ -233,7 +233,6 @@ def _sandbox_root() -> Path:
 
 SANDBOX = _sandbox_root()
 SANDBOX.mkdir(parents=True, exist_ok=True)
-
 def _resolve(path: str) -> Path:
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
     if p != SANDBOX and SANDBOX not in p.parents:
@@ -257,6 +256,9 @@ def read(path: str, offset: int = 1, limit: int = 2000) -> str:
     numbered = [f"{start + i + 1}: {line}" for i, line in enumerate(picked)]
     return "\n".join(numbered) if numbered else "(empty file)"
 ```
+
+The `_sandbox_root` in this segment is the Layer-0 shape. Do not paste it
+over `resolve_path.py` — the live root is `docs/04-workspace.md`.
 
 Why `offset=1`: files and editors are 1-indexed, so 1 is the first line and
 omitting it starts at the top. `limit` caps how much of a huge file enters

@@ -22,19 +22,18 @@
 - [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
   block carries a `Sandbox: {SANDBOX}` line.
 - [x] `uv.lock` staged for commit (pins exact versions).
-- [x] Dedicated `sandbox/` dir at the project root: `_sandbox_root()`
-  (`Path(__file__).resolve().parents[2] / "sandbox"`, auto-created,
-  `--sandbox path` overrides). This is the **dev fence**, not the product
-  workspace: tool tests must not overwrite harness source in `src/`.
-  Product intent (Pi/OpenCode) is the launch cwd. A real repo today is
-  `--sandbox <that repo>`. `sandbox/` is gitignored; REPL startup + status
-  block show the path.
+- [x] Dedicated `sandbox/` dir at the project root is the dev override:
+  `uv run python -m minicode --sandbox sandbox` (`sandbox/` is gitignored).
+  REPL startup + status block show the path.
 - [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
   "\n---\n"` — closing `---` always lands on its own line.
 
 - [x] Layer 2: OpenAI client, `_SERVERS` registry, `/model`, raw message
   dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
   Status elapsed is `Elapsed: {elapsed:.1f}s`. No Tok/s. No LiteLLM.
+- [x] Layer 3 (`docs/04-workspace.md`): default workspace is the launch cwd
+  (`Path.cwd().resolve()` in `resolve_path.py`). `--sandbox path`
+  overrides. Dev fence is `uv run python -m minicode --sandbox sandbox`.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
   Status is last prompt (`In`) + summed output tokens (`Out`) + elapsed
@@ -44,14 +43,9 @@
 
 ## Next
 
-1. `docs/04-workspace.md` is written, not implemented. Implement it next
-   into `src/minicode/resolve_path.py` only: default workspace becomes the
-   launch cwd, `--sandbox path` stays as the override. Dev fence is
-   `uv run python -m minicode --sandbox sandbox`. Do not touch the
-   registry. Then update `AGENTS.md` + `HARNESS_RESEARCH_AND_PLAN.md` §5
-   in that same pass.
-2. Then write the search-tool guide (`grep` or `find`, capped). Not a
-   shell. Do not implement it in the workspace pass.
+1. Write the search-tool guide (`docs/05-search.md`: `grep` or `find`,
+   capped) first. Not a shell. Do not implement it in the same pass as
+   writing it.
 
 ## Deferred (do not start)
 

@@ -183,11 +183,12 @@ Product workspace is the launch directory, like Pi and OpenCode: cwd, or
 and **reject** escapes (`..`, absolute paths outside). `.env` files stay
 denied even inside the sandbox.
 
-The code's current default is a root `sandbox/` dir, not cwd. That is the
-dev fence while the harness is being built, so tool tests cannot overwrite
-`src/`. It is not the product rule. A real repo today is
-`--sandbox <that repo>`. The flip is `docs/04-workspace.md`, written before
-any code. Not part of the model registry.
+The default workspace is the launch directory (`_sandbox_root()`:
+`Path.cwd().resolve()`, `--sandbox path` overrides it). That is the
+product rule. The old default was the root-level `sandbox/` dir — the dev
+fence while the harness was being built, so tool tests could not overwrite
+`src/`. It is now the dev override:
+`uv run python -m minicode --sandbox sandbox`. `sandbox/` is gitignored.
 
 YOLO is fine inside that box for now. Pi's argument stands: once an agent can
 write and run code, permission prompts are mostly theater — but the sandbox
@@ -319,9 +320,10 @@ returns a tool error and the model retries.
 **Layer 2 — model registry.** Done. `_SERVERS`, `/model`, OpenAI client.
 Ids from `.env`. Bases in code.
 
-**Next:** write `docs/04-workspace.md` before code. Flip the default
-workspace from the dev `sandbox/` fence to launch cwd. Then a separate
-guide for one capped search tool (`grep` or `find`, not a shell). Do not
+**Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.
+Default workspace is launch cwd. `--sandbox path` overrides.
+
+**Next:** write `docs/05-search.md` before code. One capped search tool (`grep` or `find`, not a shell). Do not
 implement it in the workspace pass. After that: plan/build via tool-list
 swap → `shell` →
 permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that

@@ -1,7 +1,7 @@
 # 04 — Workspace flip to launch cwd
 
-Do first: `docs/03-models.md`. Layer 2 is done. This layer is not implemented
-yet. Write this guide first, then implement it in `resolve_path.py`.
+Do first: `docs/03-models.md`. Layer 2 is done. This layer is implemented
+in `resolve_path.py`.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
 `agent.py`. `/model` and the status print live in `__main__.py`.
@@ -10,11 +10,12 @@ Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
 
 ## What it is
 
-One change: the default workspace becomes the launch directory. `--sandbox
+One change: the default workspace is the launch directory. `--sandbox
 path` stays as the override. That is the product rule (Pi, OpenCode): cwd,
-or `--sandbox path`. The current default is the dev fence — the root-level
-`sandbox/` dir — so tool tests cannot overwrite harness source in `src/`.
-This layer removes that fence as the default but keeps it available for dev.
+or `--sandbox path`. The old default was the dev fence — the root-level
+`sandbox/` dir — so tool tests could not overwrite harness source in `src/`.
+That fence is still available for dev via
+`uv run python -m minicode --sandbox sandbox`.
 
 ## Why it matters
 
