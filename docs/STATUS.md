@@ -40,12 +40,17 @@
   seconds. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
+- [x] `docs/05-search.md` is written, not implemented: `glob` (file names)
+  + `grep` (content, `path:line: text`) + `include` filter, one doc in
+  three segments, all capped at 50. Still no shell.
 
 ## Next
 
-1. Write the search-tool guide (`docs/05-search.md`: `grep` or `find`,
-   capped) first. Not a shell. Do not implement it in the same pass as
-   writing it.
+1. Implement `docs/05-search.md` next: `tools/glob.py`, `tools/grep.py`,
+   one registry line in `agent.py`, one `SYSTEM` routing sentence. Do not
+   touch `SANDBOX` or the registry record shape.
+2. Then write the plan/build-swap guide (tool-list swap, `/plan` dropping
+   `write`/`edit`). Not a shell. Do not implement it in the search pass.
 
 ## Deferred (do not start)
 

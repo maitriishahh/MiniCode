@@ -158,7 +158,8 @@ Do not hand-write the schema. Do not hand-maintain an `if/elif` dispatch
 chain forever — the registry (`name → {schema, fn}`) replaces it once the
 second tool lands.
 
-**v0 tools (no shell):** `read`, then `write`, `edit`. Shell (PowerShell on
+**v0 tools (no shell):** `read`, then `write`, `edit`, then capped `glob` /
+`grep` (`docs/05-search.md`). Shell (PowerShell on
 this machine) arrives after file tools are boring — it is needed for tests and
 git, which is what makes the harness real, but it is also the largest safety
 hole, so it waits its turn.
@@ -323,8 +324,8 @@ Ids from `.env`. Bases in code.
 **Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.
 Default workspace is launch cwd. `--sandbox path` overrides.
 
-**Next:** write `docs/05-search.md` before code. One capped search tool (`grep` or `find`, not a shell). Do not
-implement it in the workspace pass. After that: plan/build via tool-list
+**Next:** implement `docs/05-search.md` (one doc, three segments: `glob`,
+capped `grep`, `include` filter). After that: plan/build via tool-list
 swap → `shell` →
 permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that
 leaves a coherent session → sessions/resume → cache control → cost → diff

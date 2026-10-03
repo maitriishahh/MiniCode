@@ -44,7 +44,7 @@ src/minicode/            # package
   agent.py               # loop, SYSTEM, registry
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
-  tools/                 # read.py, write.py, edit.py
+  tools/                 # read.py, write.py, edit.py, glob.py, grep.py
 docs/                    # STATUS + setup + one build guide per layer
 .env.example             # copy to .env
 ```
@@ -100,6 +100,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - Validation errors and tool failures return as `role: "tool"` strings. Tool
   code never raises out of the loop. `max_steps` returns a message, never
   raises.
+- Search is capped: `glob` lists at most 50 paths, `grep` at most 50
+  matches, both append `... and N more — refine pattern` past the cap and
+  say `(no matches)` on empty. Both skip dot-dirs, `__pycache__`, and
+  `.venv`. Routing (`glob`, then `grep` with `include`, then `read`) lives
+  in `SYSTEM`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
