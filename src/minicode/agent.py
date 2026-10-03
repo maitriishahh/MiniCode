@@ -95,10 +95,11 @@ def agent(messages:list) -> str:
             return msg.get("content") or ""
         for call in calls:
             name = call["function"]["name"]
+            args = call["function"]["arguments"]
             run = TOOLS.get(name)
             if run:
-               content = run(call["function"]["arguments"])
-               print(f"\n|Tools Used: `{name}`|\n")
+               content = run(args)
+               print(f"\n|Tools Used: `{name}` ({args})|\n")
             else:
                 content = f"Unknown tool: {name}"
 
