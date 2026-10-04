@@ -81,10 +81,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - `write` and `edit` stay separate tools, never merged: `write` creates a new
   file or overwrites the whole file (`content` = FULL final contents);
   `edit` changes one exact unique span (insert via anchor:
-  `old_text`=anchor, `new_text`=anchor+insertion). Partial changes
-  (add/append/insert, replace X with Y) are `read` then `edit` — never
-  `write` with partial content. The routing rule lives in `SYSTEM`, not in
-  per-tool docstrings.
+  `old_text`=anchor, `new_text`=anchor+insertion). A new file is `write`
+  with no read. An existing file replaced wholesale is `read` then `write`
+  of the full file. Partial changes (add/append/insert, replace X with Y)
+  are `read` then `edit` — never `write` with partial content. The routing
+  rule lives in `SYSTEM`, not in per-tool docstrings.
 - `edit` prints a one-shot stdlib `difflib.unified_diff` to stdout with
   `fromfile=f"a/{path} (before)"`, `tofile=f"b/{path} (after)"`,
   `lineterm="\n"`. Diff input is `splitlines()` plus `\n` (`_diff_lines`),
