@@ -10,6 +10,8 @@ from minicode.schema_generator import tool_from_fn
 from minicode.tools.read import read
 from minicode.tools.write import write
 from minicode.tools.edit import edit
+from minicode.tools.glob import glob
+from minicode.tools.grep import grep
 
 MAX_STEPS = 8
 
@@ -43,8 +45,9 @@ active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)
 
 SYSTEM = (
     "You are a concise coding assistant. Use tools when they help. Be brief. "
-    "Read before mutating. `write` creates or overwrites whole files with complete content; "
-    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
+    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
+    "`write` creates or overwrites whole files with complete content, read` then `write` while overwriting a file;"
+    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit` while replacing; "
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content."
 )
@@ -52,7 +55,7 @@ SYSTEM = (
 TOOLS = {}
 SCHEMAS = []
 
-for _fn in (read,write,edit):
+for _fn in (read,write,edit,glob,grep):
     _schema, _run = tool_from_fn(_fn)
     TOOLS[_fn.__name__] = _run
     SCHEMAS.append(_schema)
