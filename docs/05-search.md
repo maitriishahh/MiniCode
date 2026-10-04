@@ -62,11 +62,13 @@ def glob(pattern: str, path: str = ".", limit: int = 50) -> str:
 Behavior the guide locks:
 
 - `path` resolves via `_resolve`. Escapes and `.env*` are tool errors,
-  never tracebacks. A missing root is a tool error, not a crash.
+  never tracebacks. A missing root, or a root that is not a directory, is a
+  tool error, not a crash.
 - `pattern` matches against file names (`Path.match`). Directories are
   walked, not listed — this tool finds files, it does not browse.
-- Skip dot-dirs, `__pycache__`, and `.venv`. Results are relative paths
-  from the sandbox, one per line, sorted.
+- Skip dot-dirs, `__pycache__`, and `.venv`. Also omit files named `.env` or
+  `.env.*` — omitted, not a failed call. Results are relative paths from the
+  sandbox, one per line, sorted.
 - Cap: at most 50 lines (hard-max even if `limit` is larger). Past the cap,
   append one line: `... and N more — refine pattern`. An empty result says
   `(no matches)`.
@@ -93,7 +95,7 @@ def grep(pattern: str, path: str = ".", limit: int = 50) -> str:
 Behavior the guide locks:
 
 - Same root rules as `glob`: `_resolve`, escapes and `.env*` denied, same
-  skip list (dot-dirs, `__pycache__`, `.venv`).
+  skip list (dot-dirs, `__pycache__`, `.venv`, `.env*`).
 - Unreadable and binary-looking files are skipped silently (read with
   `errors="replace"`, skip on `NUL` bytes). A file that cannot be read is
   never a crash — the tool returns what it found.
@@ -179,9 +181,10 @@ can name a file, find text, narrow with `include`, fail cleanly on escapes /
 Answers: (1) `for _fn in (read, write, edit, glob, grep)` → `TOOLS` /
 `SCHEMAS`; `agent` looks up `TOOLS.get(call["function"]["name"])`;
 (2) capped at 50 plus `... and N more — refine pattern`, never silent;
-(3) each tool — the loop never filters; (4) escapes / `.env` are
-`ValueError` → `Tool error: …`, bad regex is `re.error` → tool-error
-string, files unchanged; (5) `glob`, then `grep` with `include`, then
+(3) each tool — the loop never filters; (4) a `path` of `../` or `.env` is
+`ValueError` → `Tool error: …`; a walked `.env*` file is omitted, not
+returned; a non-directory root is a tool error; bad regex is `re.error` →
+tool-error string, files unchanged; (5) `glob`, then `grep` with `include`, then
 `read` — the rule lives in `SYSTEM`, since only the first docstring line
 reaches the model; (6) it filters before reading, same cap, no new registry
 entry — one finished layer, not three.

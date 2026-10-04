@@ -103,8 +103,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - Search is capped: `glob` lists at most 50 paths, `grep` at most 50
   matches, both append `... and N more — refine pattern` past the cap and
   say `(no matches)` on empty. Both skip dot-dirs, `__pycache__`, and
-  `.venv`. Routing (`glob`, then `grep` with `include`, then `read`) lives
-  in `SYSTEM`.
+  `.venv`, and omit `.env` and `.env.*` from results. A missing or
+  non-directory root is a tool error. Routing (`glob`, then `grep` with
+  `include`, then `read`) lives in `SYSTEM`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
