@@ -1,7 +1,8 @@
 # 05 — Search: glob + grep, capped
 
 Do first: `docs/04-workspace.md`. Layer 3 is done. This layer is not
-implemented yet. Write this guide first, then implement it in `tools/`.
+implemented yet. Copy the functions in Segments 1 and 3 into `tools/`.
+Do not invent the walk.
 
 All search phases live in this one doc as segments — not one doc per tool.
 Registry and the loop live in `agent.py`. Sandbox stays in
@@ -39,8 +40,8 @@ refines and retries instead.
    `re`). No new deps.
 3. Wire them: `for _fn in (read, write, edit, glob, grep):`. Status `Tools
    Loaded:` picks them up with no REPL edits.
-4. Extend `SYSTEM` with one routing sentence: locate with `glob`, confirm
-   with `grep`, then `read` before mutating.
+4. `SYSTEM` is the string in Segment 4. The locate sentence is its own
+   sentence. Do not concatenate it onto the `write` rule.
 5. Do not touch `SANDBOX`, the registry record shape, or `__main__.py`.
 
 ## Segment 1 — `glob` (file names)
@@ -49,6 +50,10 @@ File: `src/minicode/tools/glob.py`. Google-style docstring, no `Returns:`
 block. Only the first line reaches the model.
 
 ```python
+from pathlib import Path
+
+from minicode.resolve_path import SANDBOX, _resolve
+
 def glob(pattern: str, path: str = ".", limit: int = 50) -> str:
     """List files under the sandbox whose names match a glob pattern.
 
@@ -57,6 +62,30 @@ def glob(pattern: str, path: str = ".", limit: int = 50) -> str:
         path: Subtree root, relative to the sandbox
         limit: Maximum paths to return
     """
+    root = _resolve(path)
+    if not root.is_dir():
+        raise ValueError(f"Not a directory: {path}")
+    found: list[str] = []
+    for dirpath, dirnames, filenames in root.walk():
+        dirnames[:] = [
+            name for name in dirnames
+            if not name.startswith(".") and name not in ("__pycache__", ".venv")
+        ]
+        for name in filenames:
+            if name == ".env" or name.startswith(".env."):
+                continue
+            if not Path(name).match(pattern):
+                continue
+            rel = (Path(dirpath) / name).relative_to(SANDBOX).as_posix()
+            found.append(rel)
+    found.sort()
+    if not found:
+        return "(no matches)"
+    cap = min(max(limit, 0), 50)
+    shown = found[:cap]
+    if len(found) > cap:
+        shown.append(f"... and {len(found) - cap} more — refine pattern")
+    return "\n".join(shown)
 ```
 
 Behavior the guide locks:
@@ -80,6 +109,8 @@ list. `../secret` or `.env` → tool-error string the model acknowledges.
 
 File: `src/minicode/tools/grep.py`. Same docstring rules. `re` search, not
 a shell call.
+
+Segment 3 replaces this signature. Copy the Segment 3 function, not this one.
 
 ```python
 def grep(pattern: str, path: str = ".", limit: int = 50) -> str:
@@ -114,6 +145,11 @@ string, model retries.
 Same file: `src/minicode/tools/grep.py`. No new tool — one more parameter:
 
 ```python
+import re
+from pathlib import Path
+
+from minicode.resolve_path import SANDBOX, _resolve
+
 def grep(pattern: str, path: str = ".", include: str = "*", limit: int = 50) -> str:
     """Search file contents under the sandbox for a regex pattern.
 
@@ -123,6 +159,41 @@ def grep(pattern: str, path: str = ".", include: str = "*", limit: int = 50) -> 
         include: Only search files whose names match this glob, e.g. *.py
         limit: Maximum matches to return
     """
+    root = _resolve(path)
+    if not root.is_dir():
+        raise ValueError(f"Not a directory: {path}")
+    regex = re.compile(pattern)
+    hits: list[tuple[str, int, str]] = []
+    for dirpath, dirnames, filenames in root.walk():
+        dirnames[:] = [
+            name for name in dirnames
+            if not name.startswith(".") and name not in ("__pycache__", ".venv")
+        ]
+        for name in filenames:
+            if name == ".env" or name.startswith(".env."):
+                continue
+            if not Path(name).match(include):
+                continue
+            file = Path(dirpath) / name
+            try:
+                text = file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if "\0" in text:
+                continue
+            rel = file.relative_to(SANDBOX).as_posix()
+            for i, line in enumerate(text.splitlines(), 1):
+                if regex.search(line):
+                    hits.append((rel, i, line))
+    if not hits:
+        return "(no matches)"
+    hits.sort()
+    found = [f"{rel}:{i}: {line}" for rel, i, line in hits]
+    cap = min(max(limit, 0), 50)
+    shown = found[:cap]
+    if len(found) > cap:
+        shown.append(f"... and {len(found) - cap} more — refine pattern")
+    return "\n".join(shown)
 ```
 
 - `include` filters file names exactly like Segment 1's `pattern`
@@ -143,10 +214,18 @@ for _fn in (read, write, edit, glob, grep):
     SCHEMAS.append(_schema)
 ```
 
-Extend `SYSTEM` with one sentence (keep the existing routing rule intact):
+`SYSTEM` in `agent.py` is this string. The locate sentence is already
+applied. Do not smash it into the `write` rule.
 
-```
-"Locate with `glob`, confirm with `grep`, then `read` before mutating."
+```python
+SYSTEM = (
+    "You are a concise coding assistant. Use tools when they help. Be brief. "
+    "Read before mutating. `write` creates or overwrites whole files with complete content; "
+    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
+    "add/append means insert while preserving all existing content — never delete or rewrite it; "
+    "never `write` with partial content. "
+    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
+)
 ```
 
 Do **not** add `if/elif` on tool names. Do not change `In | Out |

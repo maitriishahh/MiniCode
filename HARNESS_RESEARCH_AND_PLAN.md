@@ -324,8 +324,9 @@ Ids from `.env`. Bases in code.
 **Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.
 Default workspace is launch cwd. `--sandbox path` overrides.
 
-**Next:** implement `docs/05-search.md` (one doc, three segments: `glob`,
-capped `grep`, `include` filter). After that: plan/build via tool-list
+**Next:** copy the functions in `docs/05-search.md` Segments 1 and 3 into
+`tools/glob.py` and `tools/grep.py`. Registry and the locate sentence are
+already in `agent.py`. After that: plan/build via tool-list
 swap → `shell` →
 permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that
 leaves a coherent session → sessions/resume → cache control → cost → diff

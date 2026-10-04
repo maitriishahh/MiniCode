@@ -45,11 +45,11 @@ active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)
 
 SYSTEM = (
     "You are a concise coding assistant. Use tools when they help. Be brief. "
-    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
-    "`write` creates or overwrites whole files with complete content, read` then `write` while overwriting a file;"
-    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit` while replacing; "
+    "Read before mutating. `write` creates or overwrites whole files with complete content; "
+    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
-    "never `write` with partial content."
+    "never `write` with partial content. "
+    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
 )
 
 TOOLS = {}
