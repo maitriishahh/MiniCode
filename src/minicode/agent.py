@@ -56,7 +56,7 @@ SYSTEM = (
 TOOLS = {}
 SCHEMAS = []
 
-for _fn in (read,write,edit,glob,grep):
+for _fn in (read, write, edit, glob, grep):
     _schema, _run = tool_from_fn(_fn)
     TOOLS[_fn.__name__] = _run
     SCHEMAS.append(_schema)
