@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from minicode.resolve_path import SANDBOX, _resolve
 
@@ -19,7 +18,7 @@ def glob(pattern:str, path:str=".", limit:int=50) -> str:
     for dirpath, dirnames, filenames in root.walk():
         dirnames[:] = [
             name for name in dirnames
-            if not name.startswith(".") and name not in ("__pychache__", ".venv")
+            if not name.startswith(".") and name not in ("__pycache__", ".venv")
         ]
         for name in filenames:
             if name == ".env" or name.startswith(".env."):
@@ -28,11 +27,11 @@ def glob(pattern:str, path:str=".", limit:int=50) -> str:
                 continue
             rel = (Path(dirpath) / name).relative_to(SANDBOX).as_posix()
             found.append(rel)
-        found.sort()
-        if not found:
-            return "(no matches)"
-        cap = min(max(limit,0),50)
-        shown = found[:cap]
-        if len(found) > cap:
-            shown.append(f"...and {len(found) - cap} more matches")
-        return "\n".join(shown)
+    found.sort()
+    if not found:
+        return "(no matches)"
+    cap = min(max(limit,0),50)
+    shown = found[:cap]
+    if len(found) > cap:
+        shown.append(f"...and {len(found) - cap} more — refine pattern")
+    return "\n".join(shown)
