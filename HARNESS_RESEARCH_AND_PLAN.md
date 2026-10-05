@@ -324,15 +324,15 @@ Ids from `.env`. Bases in code.
 **Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.
 Default workspace is launch cwd. `--sandbox path` overrides.
 
-**Next:** copy the functions in `docs/05-search.md` Segments 1 and 3 into
-`tools/glob.py` and `tools/grep.py`. Registry and the locate sentence are
-already in `agent.py`. After that: plan/build via tool-list
-swap → `shell` →
+**Layer 4 — search.** Done. `docs/05-search.md` implemented in
+`tools/glob.py` and `tools/grep.py`.
+
+**Next:** write the plan/build-swap guide (tool-list swap, `/plan` dropping
+`write`/`edit`). Do not implement it in that pass. After that: `shell` →
 permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that
 leaves a coherent session → sessions/resume → cache control → cost → diff
-viewer → `AGENTS.md` injection into the system prompt. Search before shell:
-`read` of a known path cannot find anything in a large tree, and shell is
-still the safety hole.
+viewer → `AGENTS.md` injection into the system prompt. Shell is still
+the safety hole, so it waits its turn.
 
 ---
 

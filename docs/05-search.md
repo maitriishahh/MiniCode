@@ -1,8 +1,7 @@
 # 05 — Search: glob + grep, capped
 
-Do first: `docs/04-workspace.md`. Layer 3 is done. This layer is not
-implemented yet. Copy the functions in Segments 1 and 3 into `tools/`.
-Do not invent the walk.
+Do first: `docs/04-workspace.md`. Layer 3 is done. This layer is implemented
+in `tools/glob.py` and `tools/grep.py`.
 
 All search phases live in this one doc as segments — not one doc per tool.
 Registry and the loop live in `agent.py`. Sandbox stays in

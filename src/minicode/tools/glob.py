@@ -33,5 +33,5 @@ def glob(pattern:str, path:str=".", limit:int=50) -> str:
     cap = min(max(limit,0),50)
     shown = found[:cap]
     if len(found) > cap:
-        shown.append(f"...and {len(found) - cap} more — refine pattern")
+        shown.append(f"... and {len(found) - cap} more — refine pattern")
     return "\n".join(shown)

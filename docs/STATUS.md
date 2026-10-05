@@ -40,16 +40,15 @@
   seconds. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
-- [x] `docs/05-search.md` has the copy-ready `glob` and `grep` functions.
-  Registry is wired. `SYSTEM` has the locate sentence as its own sentence.
-  `tools/glob.py` and `tools/grep.py` are still stubs. Still no shell.
+- [x] Layer 4 (`docs/05-search.md`): `glob` and `grep` in `tools/`. Capped
+  at 50, `.env*` omitted, non-directory root is a tool error. Registry is
+  wired. `SYSTEM` has the locate sentence as its own sentence. Still no
+  shell.
 
 ## Next
 
-1. Copy Segment 1 into `tools/glob.py` and Segment 3 into `tools/grep.py`.
-   Do not touch `SANDBOX`, the registry, `__main__.py`, or the args print.
-2. Then write the plan/build-swap guide (tool-list swap, `/plan` dropping
-   `write`/`edit`). Not a shell. Do not implement it in the search pass.
+1. Write the plan/build-swap guide (tool-list swap, `/plan` dropping
+   `write`/`edit`). Not a shell. Do not implement it in the same pass.
 
 ## Deferred (do not start)
 
