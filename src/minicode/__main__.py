@@ -1,12 +1,12 @@
 import time
 
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS
+from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS, mode, active_names, PLAN_SYSTEM
 
-MODE = "build"
 
 def main() -> None:
     print(f"Sandbox: {SANDBOX}")
+    print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
     messages = [
         {
             "role":"system",
@@ -25,6 +25,16 @@ def main() -> None:
             continue
 
         stripped = text.strip()
+        if stripped == "/plan" or stripped == "/build":
+            want = stripped[1:]
+            if mode["name"] != want:
+                mode["name"] = want
+                if want == "plan":
+                    messages[0]["content"] = SYSTEM + " " + PLAN_SYSTEM
+                else:
+                    messages[0]["content"] = SYSTEM
+            print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
+            continue
         if stripped == "/model" or stripped.startswith("/model "):
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:
@@ -39,7 +49,6 @@ def main() -> None:
                     active["id"] = chosen
                     print(f"Model: {active["id"]}")
             continue
-
 
         messages.append(
             {
@@ -58,7 +67,7 @@ def main() -> None:
         ctx = f" | {prompt_tokens / window:.1%} context" if window else ""
         print(
             f"---"
-            f"\nModel: {active['id']} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
+            f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
             f"\nSandbox: {SANDBOX}"
             f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s{ctx}\n"
             f"---"

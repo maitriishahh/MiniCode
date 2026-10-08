@@ -13,7 +13,7 @@ from minicode.tools.edit import edit
 from minicode.tools.glob import glob
 from minicode.tools.grep import grep
 
-MAX_STEPS = 8
+MAX_STEPS = 16
 
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OLLAMA_BASE = "http://127.0.0.1:11434/v1"
@@ -53,8 +53,37 @@ SYSTEM = (
     "Locate with `glob`, confirm with `grep`, then `read` before mutating."
 )
 
+
+mode = {"name":"build"}
+PLAN_DENIED = ("write", "edit")
+PLAN_SYSTEM = (
+    "You are in plan mode. Read, search, and reason. "
+    "Do not create or modify files. Propose steps and wait for approval. "
+    "Ask for approval or changes once the plan is proposed and ask user to run /build for applying those changes."
+    "In plan or build mode never name internal tools. Speak in user actions: 'I will edit...', 'I checked...', not 'Use edit/glob/grep'. Propose file + change + reason."
+    "Batch independent reads in one turn with parallel tool calls. After glob, read all candidates together, don't stop after one."
+    "To build, the user runs /build."
+)
+
+
 TOOLS = {}
 SCHEMAS = []
+
+def active_schemas() -> list:
+    """
+    Return the schemas for the current code.
+    """
+    if mode["name"] != "plan":
+        return SCHEMAS
+    return [s for s in SCHEMAS if s["function"]["name"] not in PLAN_DENIED]
+
+def active_names() -> list[str]:
+    """
+    Return the tool names for the current mode.
+    """
+    if mode["name"] != "plan":
+        return list(TOOLS)
+    return [n for n in TOOLS if n not in PLAN_DENIED]
 
 for _fn in (read, write, edit, glob, grep):
     _schema, _run = tool_from_fn(_fn)
@@ -83,7 +112,7 @@ def agent(messages:list) -> str:
             resp = client.with_raw_response.chat.completions.create(
                 model=record["id"],
                 messages=messages,
-                tools=SCHEMAS
+                tools=active_schemas()
             )
             body = json.loads(resp.text)
         except Exception as exc:
@@ -100,13 +129,15 @@ def agent(messages:list) -> str:
         for call in calls:
             name = call["function"]["name"]
             args = call["function"]["arguments"]
-            run = TOOLS.get(name)
-            if run:
-               content = run(args)
-               print(f"\n|Tools Used: `{name}` ({args})|\n")
+            if mode["name"] == "plan" and name in PLAN_DENIED:
+                content = f"Plan mode: `{name}` is disabled. Propose the change and ask to run /build."
             else:
-                content = f"Unknown tool: {name}"
-
+                run = TOOLS.get(name)
+                if run:
+                    content = run(args)
+                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+                else:
+                    content = f"Unknown tool: {name}"
             messages.append(
                 {
                     "role":"tool",
