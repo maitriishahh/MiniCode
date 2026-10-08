@@ -41,7 +41,7 @@ reference).
 ```
 src/minicode/            # package
   __main__.py            # REPL only
-  agent.py               # loop, SYSTEM, registry
+  agent.py               # loop, SYSTEM, mode, registry
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
   tools/                 # read.py, write.py, edit.py, glob.py, grep.py
@@ -58,7 +58,7 @@ the registry, and the one `chat.completions.create` site live in `agent.py`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
-`user >>`, `|Tools Used: \`name\`|`, and
+`user >>`, `|Tools Used: \`name\` ({args})|`, and
 `{In} | {Out} | Elapsed: {elapsed:.1f}s`.
 No Tok/s. Future guides must not say `from litellm import completion`,
 `ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
@@ -107,6 +107,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `.venv`, and omit `.env` and `.env.*` from results. A missing or
   non-directory root is a tool error. Routing (`glob`, then `grep` with
   `include`, then `read`) lives in `SYSTEM`.
+- Plan and build are one session. `mode = {"name": "build"}` lives in
+  `agent.py`. `/plan` and `/build` are handled in `__main__.py` before any
+  model call. Plan drops `write` and `edit` from `tools=`
+  (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
+  `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
+  `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
+  No batching sentence. No `PLAN.md`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
@@ -131,8 +138,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
-  After a successful tool run, print `|Tools Used: `{name}`|`. Unknown tools
-  stay silent on stdout. Status block after the answer, wrapped in `---`:
+  After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
+  including in plan. Unknown tools stay silent on stdout. Status block
+  after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. Context `%` is
   appended only when `context_window` is set.

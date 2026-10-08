@@ -44,14 +44,18 @@
   at 50, `.env*` omitted, non-directory root is a tool error. Registry is
   wired. `SYSTEM` has the locate sentence as its own sentence. Still no
   shell.
+- [x] Layer 5 (`docs/06-plan-build.md`): `/plan` and `/build` on one
+  session. Plan drops `write`/`edit` from `tools=` and denies them at
+  dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
+  `16`. Still no shell.
 
 ## Next
 
-1. Write the plan/build-swap guide (tool-list swap, `/plan` dropping
-   `write`/`edit`). Not a shell. Do not implement it in the same pass.
+1. Write the shell guide. Not permissions, not sessions. Do not implement
+   it in the same pass.
 
 ## Deferred (do not start)
 
-shell, plan/build swap, permissions, streaming/abort, sessions, cache
+shell, permissions, streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, tests (with
 `tool_from_fn`), README, models.dev import, `/connect`, variants.

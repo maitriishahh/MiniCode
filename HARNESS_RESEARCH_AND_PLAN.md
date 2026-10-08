@@ -327,12 +327,15 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 **Layer 4 — search.** Done. `docs/05-search.md` implemented in
 `tools/glob.py` and `tools/grep.py`.
 
-**Next:** write the plan/build-swap guide (tool-list swap, `/plan` dropping
-`write`/`edit`). Do not implement it in that pass. After that: `shell` →
-permissions (`ask`/`deny`, `external_directory`) → streaming + Ctrl+C that
-leaves a coherent session → sessions/resume → cache control → cost → diff
-viewer → `AGENTS.md` injection into the system prompt. Shell is still
-the safety hole, so it waits its turn.
+**Layer 5 — plan/build.** Done. `docs/06-plan-build.md` implemented in
+`agent.py` and `__main__.py`. Plan drops `write`/`edit` from `tools=`
+and denies them at dispatch.
+
+**Next:** write the shell guide. Do not implement it in that pass. After
+that: permissions (`ask`/`deny`, `external_directory`) → streaming +
+Ctrl+C that leaves a coherent session → sessions/resume → cache control
+→ cost → diff viewer → `AGENTS.md` injection into the system prompt.
+Shell is still the safety hole, so it waits its turn.
 
 ---
 
