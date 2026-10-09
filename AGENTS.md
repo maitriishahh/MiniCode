@@ -17,6 +17,15 @@ The next guide is the file named in `docs/STATUS.md`. Write that guide
 before any code. Do not implement the next layer in the same pass as
 writing it unless the user says implement.
 
+## When the user questions a shipped choice
+
+Do not defend it from this file, `docs/STATUS.md`, a build guide, or
+`HARNESS_RESEARCH_AND_PLAN.md`. Those files record what was built. They are
+not evidence it is the right shape. Compare it to a named project (OpenCode,
+Pi, Aider, Claude Code) or that project's docs. Cite the mechanism. "It is
+locked" is not a reason. If it still wins, say why in that comparison. If it
+loses, say what to change.
+
 ## What this is
 
 A minimal coding agent: hand-written tool loop over the OpenAI client, `read`
@@ -138,6 +147,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   fails. A raised call returns `Model Error:`. No `gemini/` or
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
+  `/connect` is not this layer. It arrives with the catalog (models.dev
+  import, `/models`). The later auth file is a user data dir, mode `0600`,
+  not the project `.env`. Do not write the secret into the record. Do not
+  replace `os.getenv`. A key-only command is not its own phase. Ollama local
+  stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
   After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
   including in plan. Unknown tools stay silent on stdout. Status block
@@ -156,7 +170,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 ## Do not
 
 - Promote a deferred topic (shell, MCP, subagents, compaction, sessions,
-  Rich, models.dev import …) into the current layer without an explicit ask.
+  Rich, models.dev import, `/connect` …) into the current layer without an
+  explicit ask.
 - Add a feature without finishing it: unknown tools, escapes, and bad args
   must all behave before the layer is done.
 - Send `exit`, secrets, or half-built scaffolding to the model.

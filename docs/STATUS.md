@@ -58,4 +58,5 @@
 
 shell, permissions, streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, tests (with
-`tool_from_fn`), README, models.dev import, `/connect`, variants.
+`tool_from_fn`), README, models.dev import, `/connect` (with that catalog;
+user `0600` auth file, not project `.env`; not a key-only phase), variants.

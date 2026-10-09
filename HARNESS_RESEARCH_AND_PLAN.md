@@ -87,8 +87,10 @@ OpenCode's shape, adapted, without the catalog:
 
 - The id is the server's id, from `.env` (`GEMINI_MODEL`, `OLLAMA_MODEL`).
   No `provider/` prefix. No hardcoded tag. The base URL selects the server.
-- Credentials live in env (later a `0600` auth file). Never in the model
-  config that gets committed.
+- Credentials live in env. Later, a `0600` auth file in the user data dir
+  (OpenCode: `~/.local/share/opencode/auth.json`). Not the project `.env`.
+  Never in the model record. `api_key` stays the env name. Lookup stays
+  `os.getenv`.
 - A provider is `api_base` + key + id. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`. Ollama is
   `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
@@ -114,6 +116,11 @@ capabilities {tools, caching}
 `api_key` holds the env name, not the secret. `api_base` is required.
 Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
 scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per provider.
+`/connect` waits with that catalog. It is not a key-writer on `_SERVERS`,
+and a name→base dict does not remove the tuple-plus-two-env-lines edit
+until a command looks the name up. Ollama local is a base URL, not a login.
+Do not add Groq until asked. When asked, it is one tuple plus two env lines,
+not a registry redesign.
 
 **Day one:** Gemini via `.env` (`GEMINI_MODEL`, `GEMINI_API_KEY`) and the
 Gemini base URL on the record.
@@ -335,15 +342,18 @@ and denies them at dispatch.
 that: permissions (`ask`/`deny`, `external_directory`) → streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
-Shell is still the safety hole, so it waits its turn.
+Shell is still the safety hole, so it waits its turn. `/connect` is not in
+this chain. It waits with the catalog.
 
 ---
 
 ## 10. Deferred until the gap hurts
 
 Subagents, MCP, skills, LSP, LangGraph, LlamaIndex, RAG/Chroma, background
-bash, models.dev bulk import, Rich/Textual, web UI, compaction, JSONL session
-tree, granular approvals. Each gets promoted only after the missing piece is
+bash, models.dev bulk import, `/connect` (with that catalog; user `0600`
+auth file, not project `.env`; not a key-only phase), Rich/Textual, web UI,
+compaction, JSONL session tree, granular approvals. Each gets promoted only
+after the missing piece is
 felt — and every promotion must leave the harness as finished as it was
 before.
 
