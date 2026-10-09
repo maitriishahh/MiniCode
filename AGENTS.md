@@ -113,7 +113,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
   `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
   `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
-  No batching sentence. No `PLAN.md`.
+  Plan mode may tell the model to read every `glob` match in one response.
+  No batching sentence in `SYSTEM`. No `PLAN.md`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
