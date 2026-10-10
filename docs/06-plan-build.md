@@ -72,8 +72,8 @@ PLAN_SYSTEM = (
 ```
 
 `mode` starts `"build"` so existing behavior is unchanged.
-`PLAN_DENIED` is the whole guarantee: later `shell` joins this tuple,
-nothing else changes. `PLAN_SYSTEM` is a separate sentence block. Do not
+`PLAN_DENIED` is the whole guarantee: `docs/07-shell.md` adds `shell` to
+this tuple. Do not add it from this file. Nothing else changes. `PLAN_SYSTEM` is a separate sentence block. Do not
 concatenate it onto the `write`/`edit` routing rule and do not edit
 per-tool docstrings (only the first docstring line reaches the model).
 `MAX_STEPS` is `16`. Do not raise it per mode. The only batching sentence

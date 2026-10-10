@@ -48,15 +48,18 @@
   session. Plan drops `write`/`edit` from `tools=` and denies them at
   dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
   `16`. Still no shell.
+- [x] `docs/07-shell.md` written. Not implemented. `shell` is PowerShell,
+  `cwd` is `SANDBOX`, and the implement pass adds it to `PLAN_DENIED`.
+  Still no permissions.
 
 ## Next
 
-1. Write the shell guide. Not permissions, not sessions. Do not implement
-   it in the same pass.
+1. Implement `docs/07-shell.md`. Not permissions, not sessions. Do not add
+   Git Bash, a timeout parameter, or a `workdir` parameter in that pass.
 
 ## Deferred (do not start)
 
-shell, permissions, streaming/abort, sessions, cache
+permissions, streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, tests (with
 `tool_from_fn`), README, models.dev import, `/connect` (with that catalog;
 user `0600` auth file, not project `.env`; not a key-only phase), variants.

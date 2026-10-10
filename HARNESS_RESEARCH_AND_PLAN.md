@@ -165,11 +165,16 @@ Do not hand-write the schema. Do not hand-maintain an `if/elif` dispatch
 chain forever — the registry (`name → {schema, fn}`) replaces it once the
 second tool lands.
 
-**v0 tools (no shell):** `read`, then `write`, `edit`, then capped `glob` /
-`grep` (`docs/05-search.md`). Shell (PowerShell on
-this machine) arrives after file tools are boring — it is needed for tests and
-git, which is what makes the harness real, but it is also the largest safety
-hole, so it waits its turn.
+**v0 tools:** `read`, then `write`, `edit`, then capped `glob` /
+`grep` (`docs/05-search.md`). Shell is specified in `docs/07-shell.md` and
+not implemented. The tool is `shell`, not `bash`. The interpreter is
+`powershell.exe`. OpenCode names its tool `bash` and on Windows looks up
+Git Bash (`OPENCODE_GIT_BASH_PATH`); its Windows docs prefer WSL. Pi's tool
+is `bash` in the session directory, keeps the tail, and still returns a
+non-zero exit's output. Claude Code's persistent shell needs the Ctrl+C
+layer. MiniCode starts a fresh process in `SANDBOX`, 120s, 8000-character
+tail, prints the finished output once, and denies `shell` in plan. No Git
+Bash lookup. No `workdir`. No timeout parameter. No background process.
 
 **`read(path, offset=1, limit=2000)`.** Offset is 1 because files and editors
 are 1-indexed: `offset=1` is the first line, and omitting it starts at the
@@ -218,7 +223,8 @@ You know OpenCode's version: two primary agents, Tab to switch. **Plan** runs
 with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 **Build** has the full toolset. Same session, same files. The guarantee is the
 **tool list / permission**, not a prompt asking nicely. MiniCode implements
-that: plan mode drops `write` / `edit` (later `shell`) from `tools=`.
+that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
+adds `shell` to that deny set. Until that pass, plan does not deny `shell`.
 `/plan` and `/build` switch, and the status line shows which is active.
 
 Pi's `PLAN.md` is a different, smaller thing — worth understanding because it
@@ -338,12 +344,14 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `agent.py` and `__main__.py`. Plan drops `write`/`edit` from `tools=`
 and denies them at dispatch.
 
-**Next:** write the shell guide. Do not implement it in that pass. After
+**Layer 6 — shell.** Guide written: `docs/07-shell.md`. Not implemented.
+
+**Next:** implement that guide. Do not add permissions in that pass. After
 that: permissions (`ask`/`deny`, `external_directory`) → streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
-Shell is still the safety hole, so it waits its turn. `/connect` is not in
-this chain. It waits with the catalog.
+Shell is still the safety hole until that implement pass. `/connect` is not
+in this chain. It waits with the catalog.
 
 ---
 
