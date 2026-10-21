@@ -124,15 +124,17 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
   Plan mode may tell the model to read every `glob` match in one response.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
-- Shell is specified in `docs/07-shell.md` and not implemented. The tool is
-  `shell`, not `bash`. Interpreter is `powershell.exe -NoProfile
-  -NonInteractive -Command`. `cwd` is `SANDBOX`. Timeout is 120s, not a
-  parameter. Output is capped at 8000 characters, tail kept. A non-zero exit
-  returns `exit {code}` plus output, and that string is printed once. `.env`
-  in the command text is a tool error. The implement pass adds `shell` to
-  `PLAN_DENIED`. No Git Bash lookup, no `workdir`, no background process, no
-  persistent session. Do not point `cwd` at the repo root to bypass
-  `--sandbox`.
+- Shell is specified in `docs/07-shell.md` and not implemented. One
+  function in `tools/shell.py`, resolved once at import. Windows: Git Bash,
+  then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
+  then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
+  or `powershell`, set before `tool_from_fn`. `PLAN_DENIED` gains both
+  names. `SYSTEM` does not name a dialect. `cwd` is `SANDBOX`. Timeout is
+  120s, not a parameter. Output is capped at 8000 characters, tail kept. A
+  non-zero exit returns `exit {code}` plus output, and that string is
+  printed once. `.env` in the command text is a tool error. No `workdir`,
+  no background process, no persistent session. Do not point `cwd` at the
+  repo root to bypass `--sandbox`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,

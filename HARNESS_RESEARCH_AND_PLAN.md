@@ -167,14 +167,16 @@ second tool lands.
 
 **v0 tools:** `read`, then `write`, `edit`, then capped `glob` /
 `grep` (`docs/05-search.md`). Shell is specified in `docs/07-shell.md` and
-not implemented. The tool is `shell`, not `bash`. The interpreter is
-`powershell.exe`. OpenCode names its tool `bash` and on Windows looks up
-Git Bash (`OPENCODE_GIT_BASH_PATH`); its Windows docs prefer WSL. Pi's tool
-is `bash` in the session directory, keeps the tail, and still returns a
-non-zero exit's output. Claude Code's persistent shell needs the Ctrl+C
-layer. MiniCode starts a fresh process in `SANDBOX`, 120s, 8000-character
-tail, prints the finished output once, and denies `shell` in plan. No Git
-Bash lookup. No `workdir`. No timeout parameter. No background process.
+not implemented. One function, resolved once. Windows prefers Git Bash,
+then PowerShell. Unix prefers bash, then `sh`. The registered name matches
+the winner (`bash` or `powershell`) so the model does not speak bash into
+PowerShell. Pi keeps those as two tools and does not fall through. OpenCode
+falls through to `cmd.exe` and can launch the WSL shim via `SHELL`. Claude
+Code uses PowerShell only when Git Bash is absent; on Linux `pwsh` is an
+opt-in, not the missing-bash fallback. MiniCode starts a fresh process in
+`SANDBOX`, 120s, 8000-character tail, prints the finished output once, and
+denies both names in plan. No `cmd.exe`. No `System32\bash.exe`. No
+`workdir`. No timeout parameter. No background process.
 
 **`read(path, offset=1, limit=2000)`.** Offset is 1 because files and editors
 are 1-indexed: `offset=1` is the first line, and omitting it starts at the
@@ -224,7 +226,10 @@ with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 **Build** has the full toolset. Same session, same files. The guarantee is the
 **tool list / permission**, not a prompt asking nicely. MiniCode implements
 that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
-adds `shell` to that deny set. Until that pass, plan does not deny `shell`.
+adds `bash` and `powershell` to that deny set. Until that pass, plan does
+not deny either name. When permissions land, plan keeps both in the tool
+list and `ask`/`deny` restricts them. Not a stricter prompt. Not in the
+shell implement pass.
 `/plan` and `/build` switch, and the status line shows which is active.
 
 Pi's `PLAN.md` is a different, smaller thing — worth understanding because it
@@ -347,7 +352,9 @@ and denies them at dispatch.
 **Layer 6 — shell.** Guide written: `docs/07-shell.md`. Not implemented.
 
 **Next:** implement that guide. Do not add permissions in that pass. After
-that: permissions (`ask`/`deny`, `external_directory`) → streaming +
+that: permissions (`ask`/`deny`, `external_directory`; plan keeps `bash`
+and `powershell` in the tool list, rules restrict them, not a stricter
+prompt) → streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
 Shell is still the safety hole until that implement pass. `/connect` is not

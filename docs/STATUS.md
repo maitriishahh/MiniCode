@@ -48,14 +48,15 @@
   session. Plan drops `write`/`edit` from `tools=` and denies them at
   dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
   `16`. Still no shell.
-- [x] `docs/07-shell.md` written. Not implemented. `shell` is PowerShell,
-  `cwd` is `SANDBOX`, and the implement pass adds it to `PLAN_DENIED`.
-  Still no permissions.
+- [x] `docs/07-shell.md` written. Not implemented. Windows: Git Bash, then
+  PowerShell. Unix: bash, then `sh`. Registered name is `bash` or
+  `powershell`. `cwd` is `SANDBOX`. Still no permissions.
 
 ## Next
 
 1. Implement `docs/07-shell.md`. Not permissions, not sessions. Do not add
-   Git Bash, a timeout parameter, or a `workdir` parameter in that pass.
+   a shell-path env, a timeout parameter, or a `workdir` parameter in that
+   pass.
 
 ## Deferred (do not start)
 
