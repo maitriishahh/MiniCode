@@ -61,6 +61,8 @@
 ## Deferred (do not start)
 
 permissions, streaming/abort, sessions, cache
-control, cost, diff viewer, `AGENTS.md` injection, tests (with
-`tool_from_fn`), README, models.dev import, `/connect` (with that catalog;
-user `0600` auth file, not project `.env`; not a key-only phase), variants.
+control, cost, diff viewer, `AGENTS.md` injection, compaction (context gap
+on a real codebase; do not start it), tests (with `tool_from_fn`), README,
+models.dev import, `/connect` (with that catalog; user `0600` auth file,
+not project `.env`; not a key-only phase), variants (reasoning effort;
+fetched with the catalog, not a create flag).

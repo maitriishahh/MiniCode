@@ -159,7 +159,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
   `/connect` is not this layer. It arrives with the catalog (models.dev
-  import, `/models`). The later auth file is a user data dir, mode `0600`,
+  import, `/models`, variants). Variants are reasoning effort. Do not pass
+  them on the current create call. A Console model is a tuple only if its
+  endpoint is `chat/completions`. Do not add a second transport. The later
+  auth file is a user data dir, mode `0600`,
   not the project `.env`. Do not write the secret into the record. Do not
   replace `os.getenv`. A key-only command is not its own phase. Ollama local
   stays a base URL plus an empty key, not a login.

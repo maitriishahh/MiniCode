@@ -94,8 +94,12 @@ OpenCode's shape, adapted, without the catalog:
 - A provider is `api_base` + key + id. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`. Ollama is
   `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
-  Zen is `https://opencode.ai/zen/v1/...`. llama.cpp is its `/v1` endpoint.
-  A later entry is one `_SERVERS` tuple plus two env lines, not a new client.
+  llama.cpp is its `/v1` endpoint. A later entry is one `_SERVERS` tuple
+  plus two env lines, not a new client. OpenCode Console is not one base.
+  `https://opencode.ai/zen/v1/` is stale. A Console model is a tuple only
+  when its endpoint is `https://opencode.ai/inference/openai/v1/chat/completions`.
+  GPT, Claude, Grok, and Gemini there use Responses, Anthropic messages, or
+  native Google. Do not add a second transport for those.
 - Switching models mid-session changes the next create's `model` and
   `base_url`. History stays Chat Completions dicts: the raw assistant
   message from the response JSON, so extra fields round-trip. A Gemini
@@ -118,7 +122,10 @@ Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
 scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per provider.
 `/connect` waits with that catalog. It is not a key-writer on `_SERVERS`,
 and a name→base dict does not remove the tuple-plus-two-env-lines edit
-until a command looks the name up. Ollama local is a base URL, not a login.
+until a command looks the name up. `/model` lists ids from `.env` only.
+Fetching the list, cost, and context is `/models`. Variants are reasoning
+effort (`high`, `max`). They are not a flag on the current create call.
+Ollama local is a base URL, not a login.
 Do not add Groq until asked. When asked, it is one tuple plus two env lines,
 not a registry redesign.
 
@@ -357,8 +364,11 @@ and `powershell` in the tool list, rules restrict them, not a stricter
 prompt) → streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
-Shell is still the safety hole until that implement pass. `/connect` is not
-in this chain. It waits with the catalog.
+Shell is still the safety hole until that implement pass. Do not reorder
+abort ahead of permissions. Compaction is the context gap on a real
+codebase. It stays deferred until that gap hurts. It is not the next layer.
+`/connect` is not in this chain. It waits with the catalog. Variants wait
+there too.
 
 ---
 
@@ -367,7 +377,8 @@ in this chain. It waits with the catalog.
 Subagents, MCP, skills, LSP, LangGraph, LlamaIndex, RAG/Chroma, background
 bash, models.dev bulk import, `/connect` (with that catalog; user `0600`
 auth file, not project `.env`; not a key-only phase), Rich/Textual, web UI,
-compaction, JSONL session tree, granular approvals. Each gets promoted only
+compaction (the context gap on a real codebase; still not a layer),
+JSONL session tree, granular approvals. Each gets promoted only
 after the missing piece is
 felt — and every promotion must leave the harness as finished as it was
 before.
