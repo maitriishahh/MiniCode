@@ -12,6 +12,7 @@ from minicode.tools.write import write
 from minicode.tools.edit import edit
 from minicode.tools.glob import glob
 from minicode.tools.grep import grep
+from minicode.tools.shell import shell
 
 MAX_STEPS = 16
 
@@ -51,11 +52,12 @@ SYSTEM = (
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
     "Locate with `glob`, confirm with `grep`, then `read` before mutating."
+    "Run tests and git with the shell tool in the tool list. Do not use it to read or search files."
 )
 
 
 mode = {"name":"build"}
-PLAN_DENIED = ("write", "edit")
+PLAN_DENIED = ("write", "edit","bash","powershell")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
     "Do not create or modify files. Propose steps and wait for approval. "
@@ -84,7 +86,7 @@ def active_names() -> list[str]:
         return list(TOOLS)
     return [n for n in TOOLS if n not in PLAN_DENIED]
 
-for _fn in (read, write, edit, glob, grep):
+for _fn in (read, write, edit, glob, grep, shell):
     _schema, _run = tool_from_fn(_fn)
     TOOLS[_fn.__name__] = _run
     SCHEMAS.append(_schema)
