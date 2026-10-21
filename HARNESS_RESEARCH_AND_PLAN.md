@@ -96,10 +96,11 @@ OpenCode's shape, adapted, without the catalog:
   `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
   llama.cpp is its `/v1` endpoint. A later entry is one `_SERVERS` tuple
   plus two env lines, not a new client. OpenCode Console is not one base.
-  `https://opencode.ai/zen/v1/` is stale. A Console model is a tuple only
-  when its endpoint is `https://opencode.ai/inference/openai/v1/chat/completions`.
-  GPT, Claude, Grok, and Gemini there use Responses, Anthropic messages, or
-  native Google. Do not add a second transport for those.
+  `https://opencode.ai/zen/v1/` is stale. A Console model is a tuple today
+  only when its endpoint is
+  `https://opencode.ai/inference/openai/v1/chat/completions`. GPT, Claude,
+  Grok, and Gemini there use Responses, Anthropic messages, or native
+  Google. Those wait for the transport tag below. Do not add them now.
 - Switching models mid-session changes the next create's `model` and
   `base_url`. History stays Chat Completions dicts: the raw assistant
   message from the response JSON, so extra fields round-trip. A Gemini
@@ -119,13 +120,29 @@ capabilities {tools, caching}
 
 `api_key` holds the env name, not the secret. `api_base` is required.
 Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
-scrape, no 75 providers, no OAuth, no LiteLLM, no SDK per provider.
+scrape, no 75 providers, no OAuth yet, no LiteLLM, no SDK per brand.
 `/connect` waits with that catalog. It is not a key-writer on `_SERVERS`,
 and a name→base dict does not remove the tuple-plus-two-env-lines edit
 until a command looks the name up. `/model` lists ids from `.env` only.
 Fetching the list, cost, and context is `/models`. Variants are reasoning
 effort (`high`, `max`). They are not a flag on the current create call.
 Ollama local is a base URL, not a login.
+
+The catalog phase adds one field, not a client per brand. The tuple becomes
+`(id_env, key_env, base, transport)`. `agent()` keeps one call site. One
+function, the same idea as `tool_from_fn`, picks the body from the tag.
+Four tags cover the wires: `chat` (today's `chat.completions`, including
+Gemini's OpenAI URL, Groq, Ollama, and Console DeepSeek), `responses`
+(same `openai` package; Console GPT and Grok), `anthropic` (messages body;
+Console Claude), `google` (native Gemini; the current Gemini base does not
+need it). No installed SDK per brand.
+
+OAuth is not a fifth tag. `/connect` pastes a key or runs a browser login,
+then writes a bearer token to the user auth file, mode `0600`. OpenCode
+does this for ChatGPT Plus. A Grok subscription is that same kind of login,
+not a new server. The record still holds a name, not the secret. Lookup
+stays one function. An API key and a login both end as that token. Do not
+build the tag or `/connect` in the permissions guide.
 Do not add Groq until asked. When asked, it is one tuple plus two env lines,
 not a registry redesign.
 
@@ -367,16 +384,18 @@ Ctrl+C that leaves a coherent session → sessions/resume → cache control
 Shell can still leave the sandbox. That is the permissions layer. Do not reorder
 abort ahead of permissions. Compaction is the context gap on a real
 codebase. It stays deferred until that gap hurts. It is not the next layer.
-`/connect` is not in this chain. It waits with the catalog. Variants wait
-there too.
+`/connect` is not in this chain. It waits with the catalog, including the
+transport tag and OAuth logins. Variants wait there too.
 
 ---
 
 ## 10. Deferred until the gap hurts
 
 Subagents, MCP, skills, LSP, LangGraph, LlamaIndex, RAG/Chroma, background
-bash, models.dev bulk import, `/connect` (with that catalog; user `0600`
-auth file, not project `.env`; not a key-only phase), Rich/Textual, web UI,
+bash, models.dev bulk import, `/connect` (with that catalog; transport tag
+on the tuple, not a client per brand; API key or OAuth writes a bearer
+token to a user `0600` auth file, not project `.env`; not a key-only
+phase), Rich/Textual, web UI,
 compaction (the context gap on a real codebase; still not a layer),
 JSONL session tree, granular approvals. Each gets promoted only
 after the missing piece is
@@ -400,7 +419,7 @@ before.
 ## 12. Stack
 
 Python ≥3.13, **uv**, `openai`, `pydantic`, `python-dotenv`.
-Not: LiteLLM, one SDK per provider, LangGraph, LangChain, deepagents,
+Not: LiteLLM, one installed SDK per brand, LangGraph, LangChain, deepagents,
 LlamaIndex, Rich, pi-agent-core.
 
 ## 13. Sources

@@ -160,12 +160,15 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
   `/connect` is not this layer. It arrives with the catalog (models.dev
-  import, `/models`, variants). Variants are reasoning effort. Do not pass
-  them on the current create call. A Console model is a tuple only if its
-  endpoint is `chat/completions`. Do not add a second transport. The later
-  auth file is a user data dir, mode `0600`,
-  not the project `.env`. Do not write the secret into the record. Do not
-  replace `os.getenv`. A key-only command is not its own phase. Ollama local
+  import, `/models`, variants, a transport tag). Variants are reasoning
+  effort. Do not pass them on the current create call. Today a Console
+  model is a tuple only if its endpoint is `chat/completions`. The later
+  tuple is `(id_env, key_env, base, transport)` with tags `chat`,
+  `responses`, `anthropic`, `google`. One call site. Not an SDK per brand.
+  `/connect` pastes a key or runs a browser login and writes a bearer token
+  to a user data dir, mode `0600`, not the project `.env`. Do not write the
+  secret into the record. Do not replace `os.getenv`. A key-only command is
+  not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
   After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
@@ -190,4 +193,6 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - Add a feature without finishing it: unknown tools, escapes, and bad args
   must all behave before the layer is done.
 - Send `exit`, secrets, or half-built scaffolding to the model.
-- LiteLLM, or one SDK per provider. Transport is the `openai` package.
+- LiteLLM, or one installed SDK per brand. Today the transport is the
+  `openai` package. The catalog's transport tag is later. It is not an SDK
+  per brand.
