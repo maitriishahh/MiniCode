@@ -52,7 +52,7 @@ SYSTEM = (
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
     "Locate with `glob`, confirm with `grep`, then `read` before mutating."
-    "Run tests and git with the shell tool in the tool list. Do not use it to read or search files."
+    "Run tests and git with `bash` or `powershell`, whichever is in the tool list. Do not use it to read or search files."
 )
 
 

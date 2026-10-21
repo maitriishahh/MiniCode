@@ -129,7 +129,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
   then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
   or `powershell`, set before `tool_from_fn`. `PLAN_DENIED` gains both
-  names. `SYSTEM` does not name a dialect. `cwd` is `SANDBOX`. Timeout is
+  names. `SYSTEM` names `bash` or `powershell`, whichever is loaded. It does
+  not name `&&` or a semicolon. `cwd` is `SANDBOX`. Timeout is
   120s, not a parameter. Output is capped at 8000 characters, tail kept. A
   non-zero exit returns `exit {code}` plus output, and that string is
   printed once. `.env` in the command text is a tool error. No `workdir`,

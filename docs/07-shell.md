@@ -40,7 +40,8 @@ that leaves a coherent turn. That layer is later.
 MiniCode keeps one function. The name the model sees is the winner, because
 a static `shell` that sometimes runs PowerShell is how the model speaks
 bash into the wrong interpreter. `PLAN_DENIED` lists both names so plan
-blocks a guess of either. `SYSTEM` does not name a dialect. The first
+blocks a guess of either. `SYSTEM` names `bash` or `powershell`, not the
+dialect. `&&` and the semicolon stay in the first docstring line. The first
 docstring line does, and only that line plus `Args:` reach the model.
 
 `cwd` is `SANDBOX`, not a `workdir` argument. OpenCode can run outside the
@@ -67,7 +68,8 @@ root to "fix" that. The product soak launches in the repo, with no
 3. Replace: `PLAN_DENIED` gains `"bash"` and `"powershell"`. The registry
    loop gains `shell`. `tool_from_fn` reads `__name__`, which this module
    sets before the loop runs. `SYSTEM` gains one sentence. Do not smash it
-   onto the locate sentence. Do not name `bash` or `powershell` in it.
+   onto the locate sentence. Name `bash` or `powershell`. Do not name `&&`
+   or a semicolon.
 4. Do not edit `PLAN_SYSTEM`. Do not special-case the plan-denied message.
    The existing backstop already says `Plan mode: \`bash\` is disabled`.
 5. Do not catch `KeyboardInterrupt`. `tool_from_fn` catches `Exception`
@@ -362,9 +364,9 @@ for _fn in (read, write, edit, glob, grep, shell):
 ```
 
 `SYSTEM` is this string. The new sentence is its own sentence. The locate
-line keeps its trailing space so the strings do not smash. Do not write
-`` `bash` `` or `` `powershell` `` here. The schema name is the winner, and
-this sentence must stay true on both.
+line keeps its trailing space so the strings do not smash. Name both
+tools. Do not write `&&` or a semicolon here. The docstring carries the
+dialect. The sentence stays true whichever name was registered.
 
 ```python
 SYSTEM = (
@@ -375,7 +377,7 @@ SYSTEM = (
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
     "Locate with `glob`, confirm with `grep`, then `read` before mutating. "
-    "Run tests and git with the shell tool in the tool list. Do not use it to read or search files."
+    "Run tests and git with `bash` or `powershell`, whichever is in the tool list. Do not use it to read or search files."
 )
 ```
 
