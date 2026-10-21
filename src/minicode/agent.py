@@ -56,7 +56,7 @@ SYSTEM = (
 )
 
 
-mode = {"name":"build"}
+mode = {"name":"plan"}
 PLAN_DENIED = ("write", "edit","bash","powershell")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
