@@ -95,12 +95,11 @@ OpenCode's shape, adapted, without the catalog:
   `https://generativelanguage.googleapis.com/v1beta/openai/`. Ollama is
   `http://127.0.0.1:11434/v1`. Groq is `https://api.groq.com/openai/v1`.
   llama.cpp is its `/v1` endpoint. A later entry is one `_SERVERS` tuple
-  plus two env lines, not a new client. OpenCode Console is not one base.
-  `https://opencode.ai/zen/v1/` is stale. A Console model is a tuple today
-  only when its endpoint is
-  `https://opencode.ai/inference/openai/v1/chat/completions`. GPT, Claude,
-  Grok, and Gemini there use Responses, Anthropic messages, or native
-  Google. Those wait for the transport tag below. Do not add them now.
+  plus two env lines, not a new client. Do not add an OpenCode Console free
+  model. Since 18 September 2026 the free tier returns `403 FreeTierError`
+  unless the caller is the official client. A maintainer said that limit is
+  the free tier only. Do not fake client headers. A paid chat-completions
+  id is still one tuple if asked. It is not the free backup.
 - Switching models mid-session changes the next create's `model` and
   `base_url`. History stays Chat Completions dicts: the raw assistant
   message from the response JSON, so extra fields round-trip. A Gemini
@@ -131,11 +130,11 @@ Ollama local is a base URL, not a login.
 The catalog phase adds one field, not a client per brand. The tuple becomes
 `(id_env, key_env, base, transport)`. `agent()` keeps one call site. One
 function, the same idea as `tool_from_fn`, picks the body from the tag.
-Four tags cover the wires: `chat` (today's `chat.completions`, including
-Gemini's OpenAI URL, Groq, Ollama, and Console DeepSeek), `responses`
-(same `openai` package; Console GPT and Grok), `anthropic` (messages body;
-Console Claude), `google` (native Gemini; the current Gemini base does not
-need it). No installed SDK per brand.
+Four tags cover the wires: `chat` (today's `chat.completions`: Gemini's
+OpenAI URL, Groq, Ollama), `responses` (same `openai` package), `anthropic`
+(messages body), `google` (native Gemini; the current Gemini base does not
+need it). No installed SDK per brand. Console free ids are not an example.
+They are refused outside the official client.
 
 OAuth is not a fifth tag. `/connect` pastes a key or runs a browser login,
 then writes a bearer token to the user auth file, mode `0600`. OpenCode

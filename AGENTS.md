@@ -161,8 +161,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
   `/connect` is not this layer. It arrives with the catalog (models.dev
   import, `/models`, variants, a transport tag). Variants are reasoning
-  effort. Do not pass them on the current create call. Today a Console
-  model is a tuple only if its endpoint is `chat/completions`. The later
+  effort. Do not pass them on the current create call. Do not add an
+  OpenCode Console free model. Since 18 September 2026 that tier returns
+  `403 FreeTierError` outside the official client. Do not fake client
+  headers. The later
   tuple is `(id_env, key_env, base, transport)` with tags `chat`,
   `responses`, `anthropic`, `google`. One call site. Not an SDK per brand.
   `/connect` pastes a key or runs a browser login and writes a bearer token
