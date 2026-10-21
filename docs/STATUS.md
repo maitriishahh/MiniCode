@@ -48,15 +48,15 @@
   session. Plan drops `write`/`edit` from `tools=` and denies them at
   dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
   `16`. Still no shell.
-- [x] `docs/07-shell.md` written. Not implemented. Windows: Git Bash, then
-  PowerShell. Unix: bash, then `sh`. Registered name is `bash` or
-  `powershell`. `cwd` is `SANDBOX`. Still no permissions.
+- [x] Layer 6 (`docs/07-shell.md`): `shell` in `tools/shell.py`. Windows:
+  Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
+  `bash` or `powershell`. Plan denies both. `cwd` is `SANDBOX`. Still no
+  permissions.
 
 ## Next
 
-1. Implement `docs/07-shell.md`. Not permissions, not sessions. Do not add
-   a shell-path env, a timeout parameter, or a `workdir` parameter in that
-   pass.
+1. Write the permissions guide. Not streaming, not sessions. Do not
+   implement it in that pass.
 
 ## Deferred (do not start)
 

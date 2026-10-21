@@ -173,8 +173,8 @@ chain forever — the registry (`name → {schema, fn}`) replaces it once the
 second tool lands.
 
 **v0 tools:** `read`, then `write`, `edit`, then capped `glob` /
-`grep` (`docs/05-search.md`). Shell is specified in `docs/07-shell.md` and
-not implemented. One function, resolved once. Windows prefers Git Bash,
+`grep` (`docs/05-search.md`). Shell is implemented in `docs/07-shell.md`.
+One function, resolved once. Windows prefers Git Bash,
 then PowerShell. Unix prefers bash, then `sh`. The registered name matches
 the winner (`bash` or `powershell`) so the model does not speak bash into
 PowerShell. Pi keeps those as two tools and does not fall through. OpenCode
@@ -233,10 +233,9 @@ with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 **Build** has the full toolset. Same session, same files. The guarantee is the
 **tool list / permission**, not a prompt asking nicely. MiniCode implements
 that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
-adds `bash` and `powershell` to that deny set. Until that pass, plan does
-not deny either name. When permissions land, plan keeps both in the tool
-list and `ask`/`deny` restricts them. Not a stricter prompt. Not in the
-shell implement pass.
+adds `bash` and `powershell` to that deny set. That pass is done. Plan
+denies both. When permissions land, plan keeps both in the tool list and
+`ask`/`deny` restricts them. Not a stricter prompt.
 `/plan` and `/build` switch, and the status line shows which is active.
 
 Pi's `PLAN.md` is a different, smaller thing — worth understanding because it
@@ -356,15 +355,16 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `agent.py` and `__main__.py`. Plan drops `write`/`edit` from `tools=`
 and denies them at dispatch.
 
-**Layer 6 — shell.** Guide written: `docs/07-shell.md`. Not implemented.
+**Layer 6 — shell.** Done. `docs/07-shell.md` implemented in
+`tools/shell.py` and `agent.py`. Plan denies `bash` and `powershell`.
 
-**Next:** implement that guide. Do not add permissions in that pass. After
-that: permissions (`ask`/`deny`, `external_directory`; plan keeps `bash`
-and `powershell` in the tool list, rules restrict them, not a stricter
-prompt) → streaming +
+**Next:** write the permissions guide. Do not implement it in that pass.
+After that: permissions (`ask`/`deny`, `external_directory`; plan keeps
+`bash` and `powershell` in the tool list, rules restrict them, not a
+stricter prompt) → streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
-Shell is still the safety hole until that implement pass. Do not reorder
+Shell can still leave the sandbox. That is the permissions layer. Do not reorder
 abort ahead of permissions. Compaction is the context gap on a real
 codebase. It stays deferred until that gap hurts. It is not the next layer.
 `/connect` is not in this chain. It waits with the catalog. Variants wait

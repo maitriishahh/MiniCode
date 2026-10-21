@@ -1,7 +1,8 @@
 # 07 — Shell
 
-Do first: `docs/06-plan-build.md`. Layer 5 is done. This layer is not
-implemented. Copy it in the next pass. Do not add permissions in that pass.
+Do first: `docs/06-plan-build.md`. Layer 5 is done. This layer is
+implemented in `tools/shell.py` and `agent.py`. Do not add permissions
+from this file.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
 `agent.py`. A new tool is `tools/shell.py` plus one registry line. Do not
@@ -424,8 +425,9 @@ The fence is still for file tools:
 uv run python -m minicode --sandbox sandbox
 ```
 
-The process starts in `sandbox/`. `git status` will not describe the repo.
-That is not a bug. Do not add a second root.
+The process starts in `sandbox/`. `git status` still describes the parent
+repo, because git walks up to `.git`. That is not a file-tool escape. Do
+not point `cwd` at the repo root to change it. Do not add a second root.
 
 The Unix branch is the same `-c` call with a different binary. It cannot be
 proved from this Windows machine. Do not add a CI job for it.

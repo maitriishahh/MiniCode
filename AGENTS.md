@@ -53,7 +53,7 @@ src/minicode/            # package
   agent.py               # loop, SYSTEM, mode, registry
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
-  tools/                 # read.py, write.py, edit.py, glob.py, grep.py
+  tools/                 # read.py, write.py, edit.py, glob.py, grep.py, shell.py
 docs/                    # STATUS + setup + one build guide per layer
 .env.example             # copy to .env
 ```
@@ -124,7 +124,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
   Plan mode may tell the model to read every `glob` match in one response.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
-- Shell is specified in `docs/07-shell.md` and not implemented. One
+- Shell is implemented in `docs/07-shell.md`. One
   function in `tools/shell.py`, resolved once at import. Windows: Git Bash,
   then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
   then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
