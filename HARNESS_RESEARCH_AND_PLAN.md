@@ -233,12 +233,13 @@ write and run code, permission prompts are mostly theater — but the sandbox
 still bounds *where* files land, which is the accident class that matters
 first.
 
-Later, researched as needed (OpenCode's model): `allow` / `ask` / `deny` per
-tool, glob rules with last-match-wins, and an `external_directory` gate so
-reads outside the sandbox (Desktop, other checkouts) ask first instead of
-being silently allowed or silently impossible. That is how OpenCode navigates
-outside the project safely. Containerization stays the real boundary for
-untrusted work.
+The permissions guide is `docs/08-permissions.md`. It is not implemented.
+OpenCode's actions are `allow` / `ask` / `deny`, last matching rule wins.
+Inside the sandbox, reads and edits allow. `shell` asks, because this
+project does not parse the command. `external_directory` asks, so a path
+outside the sandbox is a prompt instead of a hard error. `.env` stays
+denied. `always` is exact and dies with the process. No config file. No
+scanner. Containerization stays the real boundary for untrusted work.
 
 ---
 
@@ -249,9 +250,10 @@ with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 **Build** has the full toolset. Same session, same files. The guarantee is the
 **tool list / permission**, not a prompt asking nicely. MiniCode implements
 that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
-adds `bash` and `powershell` to that deny set. That pass is done. Plan
-denies both. When permissions land, plan keeps both in the tool list and
-`ask`/`deny` restricts them. Not a stricter prompt.
+adds `bash` and `powershell` to that deny set. That pass is done.
+`docs/08-permissions.md` puts both names back in the tool list. The same
+`shell` ask used in build restricts them. It does not force-deny them, and
+it is not a stricter prompt. `write` / `edit` stay dropped from the schema.
 `/plan` and `/build` switch, and the status line shows which is active.
 
 Pi's `PLAN.md` is a different, smaller thing — worth understanding because it
@@ -374,13 +376,13 @@ and denies them at dispatch.
 **Layer 6 — shell.** Done. `docs/07-shell.md` implemented in
 `tools/shell.py` and `agent.py`. Plan denies `bash` and `powershell`.
 
-**Next:** write the permissions guide. Do not implement it in that pass.
-After that: permissions (`ask`/`deny`, `external_directory`; plan keeps
-`bash` and `powershell` in the tool list, rules restrict them, not a
-stricter prompt) → streaming +
+**Next:** implement `docs/08-permissions.md`. Do not start streaming in
+that pass.
+After that: streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.
-Shell can still leave the sandbox. That is the permissions layer. Do not reorder
+A shell command can still `cd` out. Permissions asks before the command
+runs. It does not parse the command. Do not reorder
 abort ahead of permissions. Compaction is the context gap on a real
 codebase. It stays deferred until that gap hurts. It is not the next layer.
 `/connect` is not in this chain. It waits with the catalog, including the

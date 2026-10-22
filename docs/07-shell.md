@@ -321,7 +321,8 @@ else:
 - `.env` in the command text is a string check, the same refusal as
   `_resolve`. It is not a sandbox. `cat .env` and `Get-Content .ENV` are
   caught. `$env:GEMINI_API_KEY` is not. The child inherits the process env.
-  Do not scrub it. That hole belongs to permissions.
+  Do not scrub it. It is not an allow/ask/deny rule.
+  `docs/08-permissions.md` does not close it.
 - Do not run the command through `_resolve`. Do not copy `grep`'s skip of
   `.venv`. `uv` needs it.
 - Print the same string the model gets, once, when the process returns.
@@ -434,9 +435,9 @@ proved from this Windows machine. Do not add a CI job for it.
 
 ## Don't add yet
 
-Later, in order, not in the implement pass: permissions (`ask` / `deny`,
-`external_directory`), streaming and a Ctrl+C that leaves a coherent turn,
-sessions. Background bash is deferred until it hurts. It is not in that
+Later, in order, not in the implement pass: permissions
+(`docs/08-permissions.md`), streaming and a Ctrl+C that leaves a coherent
+turn, sessions. Background bash is deferred until it hurts. It is not in that
 chain. `/connect` stays with the catalog.
 
 Not scheduled. Do not add them as a follow-up: a shell-path env, `cmd.exe`,

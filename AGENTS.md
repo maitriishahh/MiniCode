@@ -128,14 +128,25 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   function in `tools/shell.py`, resolved once at import. Windows: Git Bash,
   then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
   then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
-  or `powershell`, set before `tool_from_fn`. `PLAN_DENIED` gains both
-  names. `SYSTEM` names `bash` or `powershell`, whichever is loaded. It does
+  or `powershell`, set before `tool_from_fn`. Shipped `PLAN_DENIED` lists
+  both names. `docs/08-permissions.md` removes them. After that implement
+  pass, do not put them back. `SYSTEM` names `bash` or `powershell`,
+  whichever is loaded. It does
   not name `&&` or a semicolon. `cwd` is `SANDBOX`. Timeout is
   120s, not a parameter. Output is capped at 8000 characters, tail kept. A
   non-zero exit returns `exit {code}` plus output, and that string is
   printed once. `.env` in the command text is a tool error. No `workdir`,
   no background process, no persistent session. Do not point `cwd` at the
   repo root to bypass `--sandbox`.
+- Permissions are specified in `docs/08-permissions.md` and are not
+  implemented. The implement pass adds `permissions.py`. It does not add a
+  config file, a shell scanner, env scrubbing, or a transport tag. Defaults:
+  `read` / `glob` / `grep` / `edit` allow (`edit` gates `write` and `edit`);
+  `shell` ask (gates `bash` and `powershell`); `external_directory` ask.
+  Last matching rule wins. `*` matches any character, including `/`. `always`
+  is in-memory and exact. A missing prompt denies. `.env` stays a hard
+  refuse. Plan keeps `write` / `edit` out of the schema. Shell stays in the
+  schema and asks. Do not parse the command. Do not force-deny shell in plan.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,

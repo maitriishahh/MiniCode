@@ -52,15 +52,15 @@
   Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
   `bash` or `powershell`. Plan denies both. `cwd` is `SANDBOX`. Still no
   permissions.
+- [x] `docs/08-permissions.md` written. Not implemented.
 
 ## Next
 
-1. Write the permissions guide. Not streaming, not sessions. Do not
-   implement it in that pass.
+1. Implement `docs/08-permissions.md`. Not streaming, not sessions.
 
 ## Deferred (do not start)
 
-permissions, streaming/abort, sessions, cache
+streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, compaction (context gap
 on a real codebase; do not start it), tests (with `tool_from_fn`), README,
 models.dev import, `/connect` (with that catalog; transport tag on the
