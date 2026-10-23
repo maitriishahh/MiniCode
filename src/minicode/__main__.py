@@ -2,7 +2,22 @@ import time
 
 from minicode.resolve_path import SANDBOX
 from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS, mode, active_names, PLAN_SYSTEM
+from minicode.permissions import ask as permission_ask
 
+def _permission(key:str, value:str) -> str:
+    print(f"\nPermission: {key} | {value}")
+    try:
+        answer = input("[o]nce / [a]lways / [d]eny: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return "deny"
+    if answer in ("o", "once"):
+        return "once"
+    if answer in ("a", "always"):
+        return "always"
+    return "deny"
+
+permission_ask["fn"] = _permission
 
 def main() -> None:
     print(f"Sandbox: {SANDBOX}")

@@ -13,6 +13,8 @@ from minicode.tools.edit import edit
 from minicode.tools.glob import glob
 from minicode.tools.grep import grep
 from minicode.tools.shell import shell
+from minicode.permissions import decide
+from minicode.resolve_path import classify, approve, clear_approved
 
 MAX_STEPS = 16
 
@@ -57,7 +59,7 @@ SYSTEM = (
 
 
 mode = {"name":"plan"}
-PLAN_DENIED = ("write", "edit","bash","powershell")
+PLAN_DENIED = ("write", "edit")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
     "Do not create or modify files. Propose steps and wait for approval. "
@@ -69,6 +71,51 @@ PLAN_SYSTEM = (
 
 TOOLS = {}
 SCHEMAS = []
+KEYS = {
+    "read": "read",
+    "write": "edit",
+    "edit": "edit",
+    "glob": "glob",
+    "grep": "grep",
+    "bash": "shell",
+    "powershell": "shell",
+}
+
+def _value(key: str, parsed: dict) -> str | None:
+    if key in ("shell", "glob", "grep"):
+        field = "command" if key == "shell" else "pattern"
+        raw = parsed.get(field)
+        return raw if isinstance(raw, str) else None
+    raw = parsed.get("path")
+    return raw if isinstance(raw, str) else None
+
+
+def _permit(name: str, raw: str) -> str | None:
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    path = parsed.get("path")
+    if isinstance(path, str) and name in ("read", "write", "edit", "glob", "grep"):
+        kind, resolved = classify(path)
+        if kind == "dotenv":
+            return "Refusing to access .env files"
+        if kind == "external":
+            shown = resolved.as_posix()
+            if decide("external_directory", shown) == "deny":
+                return f"Permission denied: external_directory {shown}"
+            approve(resolved)
+    key = KEYS.get(name)
+    if key is None:
+        return None
+    value = _value(key, parsed)
+    if value is None:
+        return None
+    if decide(key, value) == "deny":
+        return f"Permission denied: {key} {value}"
+    return None
 
 def active_schemas() -> list:
     """
@@ -135,8 +182,15 @@ def agent(messages:list) -> str:
             else:
                 run = TOOLS.get(name)
                 if run:
-                    content = run(args)
-                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+                    denied = _permit(name, args)
+                    try:
+                        if denied is not None:
+                            content = denied
+                        else:
+                            content = run(args)
+                            print(f"\n|Tools Used: `{name}` ({args})|\n")
+                    finally:
+                        clear_approved()
                 else:
                     content = f"Unknown tool: {name}"
             messages.append(
