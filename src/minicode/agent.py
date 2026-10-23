@@ -14,7 +14,7 @@ from minicode.tools.glob import glob
 from minicode.tools.grep import grep
 from minicode.tools.shell import shell
 from minicode.permissions import decide
-from minicode.resolve_path import classify, approve, clear_approved
+from minicode.resolve_path import SANDBOX, classify, approve, clear_approved
 
 MAX_STEPS = 16
 
@@ -53,8 +53,10 @@ SYSTEM = (
     "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
-    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
-    "Run tests and git with `bash` or `powershell`, whichever is in the tool list. Do not use it to read or search files."
+    f"Workspace is {SANDBOX}. A path may be absolute. Outside it asks permission. "
+    "A path the user already named is read with `read`, not `glob` and not the shell. "
+    "Locate an unknown file with `glob`, then `grep`, then `read`. "
+    f"Run tests and git with `{shell.__name__}`. Do not use it to read or search files."
 )
 
 
@@ -65,7 +67,8 @@ PLAN_SYSTEM = (
     "Do not create or modify files. Propose steps and wait for approval. "
     "Never name internal tools. Speak in user actions: 'I will edit...', 'I checked...', not 'Use edit/glob/grep'. "
     "Propose file + change + reason. To build, the user runs /build. "
-    "After `glob` returns, read every matching file in that same response. Do not read one file per turn."
+    "After `glob` returns, read every matching file in that same response. Do not read one file per turn. "
+    "If the user named a file, read that path; do not glob first."
 )
 
 

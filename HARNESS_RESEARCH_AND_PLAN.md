@@ -217,9 +217,19 @@ stable handle.
 ## 5. Sandbox and permissions
 
 Product workspace is the launch directory, like Pi and OpenCode: cwd, or
-`--sandbox path`. `read` / `write` / `edit` resolve every path against it
-and **reject** escapes (`..`, absolute paths outside). `.env` files stay
-denied even inside the sandbox.
+`--sandbox path`. `read` / `write` / `edit` / `glob` / `grep` accept an
+absolute path or a workspace-relative one. An absolute path outside the
+workspace is not silently rejected: it triggers `external_directory`.
+`.env` files stay denied even inside the workspace.
+
+Permissions are implemented (Layer 7, `docs/08-permissions.md`): `allow` /
+`ask` / `deny`, last matching rule wins, `*` crosses `/`. Defaults are
+`read` / `glob` / `grep` / `edit` allow, `shell` ask, `external_directory`
+ask. `ask` is a REPL prompt (`once` / `always` / `deny`); `always` is
+in-memory and exact. No config file, no command scanner, no env scrubbing.
+`always` does not outlive the process; that waits with sessions. `glob` and
+`grep` return absolute forward-slash paths for a root outside the workspace,
+and workspace-relative paths for an inside root.
 
 The default workspace is the launch directory (`_sandbox_root()`:
 `Path.cwd().resolve()`, `--sandbox path` overrides it). That is the
@@ -233,13 +243,14 @@ write and run code, permission prompts are mostly theater — but the sandbox
 still bounds *where* files land, which is the accident class that matters
 first.
 
-The permissions guide is `docs/08-permissions.md`. It is not implemented.
-OpenCode's actions are `allow` / `ask` / `deny`, last matching rule wins.
-Inside the sandbox, reads and edits allow. `shell` asks, because this
-project does not parse the command. `external_directory` asks, so a path
-outside the sandbox is a prompt instead of a hard error. `.env` stays
-denied. `always` is exact and dies with the process. No config file. No
-scanner. Containerization stays the real boundary for untrusted work.
+The permissions guide is `docs/08-permissions.md`, implemented in
+`permissions.py`, `agent.py`, and `__main__.py`. OpenCode's actions are
+`allow` / `ask` / `deny`, last matching rule wins. Inside the sandbox, reads
+and edits allow. `shell` asks, because this project does not parse the
+command. `external_directory` asks, so a path outside the sandbox is a
+prompt instead of a hard error. `.env` stays denied. `always` is exact and
+dies with the process. No config file. No scanner. Containerization stays
+the real boundary for untrusted work.
 
 ---
 
@@ -376,8 +387,12 @@ and denies them at dispatch.
 **Layer 6 — shell.** Done. `docs/07-shell.md` implemented in
 `tools/shell.py` and `agent.py`. Plan denies `bash` and `powershell`.
 
-**Next:** implement `docs/08-permissions.md`. Do not start streaming in
-that pass.
+**Layer 7 — permissions.** Done. `docs/08-permissions.md` implemented in
+`permissions.py`, the dispatch gate in `agent.py`, and the prompt in
+`__main__.py`. Plan keeps `bash` / `powershell` in the tool list; rules
+restrict them, not a stricter prompt.
+
+**Next:** write the streaming/abort guide. Do not implement it in that pass.
 After that: streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
 → cost → diff viewer → `AGENTS.md` injection into the system prompt.

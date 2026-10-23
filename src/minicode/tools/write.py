@@ -5,7 +5,7 @@ def write(path:str, content:str) -> str:
    Create a new file or overwrite an entire existing file with complete content.
 
     Args:
-        path: Path to the file
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         content: FULL final file contents — replaces everything
     """
     target = _resolve(path)

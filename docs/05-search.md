@@ -12,9 +12,8 @@ Registry and the loop live in `agent.py`. Sandbox stays in
 
 Two capped tools, three segments, one layer:
 
-1. `glob` — file-name search under the sandbox, up to 50 paths.
-2. `grep` — content search under the sandbox, up to 50 matches as
-   `path:line: text`.
+1. `glob` — file-name search, up to 50 paths.
+2. `grep` — content search, up to 50 matches as `path:line: text`.
 3. `include` — a glob filter on `grep` (e.g. `*.py`), same 50-match cap.
 
 Still no shell.
@@ -54,16 +53,17 @@ from pathlib import Path
 from minicode.resolve_path import SANDBOX, _resolve
 
 def glob(pattern: str, path: str = ".", limit: int = 50) -> str:
-    """List files under the sandbox whose names match a glob pattern.
+    """List files whose names match a glob pattern.
 
     Args:
         pattern: Glob pattern, e.g. *.py or test_*
-        path: Subtree root, relative to the sandbox
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         limit: Maximum paths to return
     """
     root = _resolve(path)
     if not root.is_dir():
         raise ValueError(f"Not a directory: {path}")
+    inside = root == SANDBOX or SANDBOX in root.parents
     found: list[str] = []
     for dirpath, dirnames, filenames in root.walk():
         dirnames[:] = [
@@ -75,8 +75,9 @@ def glob(pattern: str, path: str = ".", limit: int = 50) -> str:
                 continue
             if not Path(name).match(pattern):
                 continue
-            rel = (Path(dirpath) / name).relative_to(SANDBOX).as_posix()
-            found.append(rel)
+            file = Path(dirpath) / name
+            shown = file.relative_to(SANDBOX).as_posix() if inside else file.as_posix()
+            found.append(shown)
     found.sort()
     if not found:
         return "(no matches)"
@@ -95,8 +96,11 @@ Behavior the guide locks:
 - `pattern` matches against file names (`Path.match`). Directories are
   walked, not listed — this tool finds files, it does not browse.
 - Skip dot-dirs, `__pycache__`, and `.venv`. Also omit files named `.env` or
-  `.env.*` — omitted, not a failed call. Results are relative paths from the
-  sandbox, one per line, sorted.
+  `.env.*` — omitted, not a failed call. One path per line, sorted. An inside
+  root returns workspace-relative paths; an outside root (after permission)
+  returns absolute forward-slash paths. Never call
+  `relative_to(SANDBOX)` on an outside hit — that raises, and the turn only
+  sees `Tool error:`.
 - Cap: at most 50 lines (hard-max even if `limit` is larger). Past the cap,
   append one line: `... and N more — refine pattern`. An empty result says
   `(no matches)`.
@@ -113,11 +117,11 @@ Segment 3 replaces this signature. Copy the Segment 3 function, not this one.
 
 ```python
 def grep(pattern: str, path: str = ".", limit: int = 50) -> str:
-    """Search file contents under the sandbox for a regex pattern.
+    """Search file contents for a regex pattern.
 
     Args:
         pattern: Regex pattern to search for
-        path: Subtree root, relative to the sandbox
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         limit: Maximum matches to return
     """
 ```
@@ -150,17 +154,18 @@ from pathlib import Path
 from minicode.resolve_path import SANDBOX, _resolve
 
 def grep(pattern: str, path: str = ".", include: str = "*", limit: int = 50) -> str:
-    """Search file contents under the sandbox for a regex pattern.
+    """Search file contents for a regex pattern.
 
     Args:
         pattern: Regex pattern to search for
-        path: Subtree root, relative to the sandbox
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         include: Only search files whose names match this glob, e.g. *.py
         limit: Maximum matches to return
     """
     root = _resolve(path)
     if not root.is_dir():
         raise ValueError(f"Not a directory: {path}")
+    inside = root == SANDBOX or SANDBOX in root.parents
     regex = re.compile(pattern)
     hits: list[tuple[str, int, str]] = []
     for dirpath, dirnames, filenames in root.walk():
@@ -180,14 +185,14 @@ def grep(pattern: str, path: str = ".", include: str = "*", limit: int = 50) -> 
                 continue
             if "\0" in text:
                 continue
-            rel = file.relative_to(SANDBOX).as_posix()
+            shown = file.relative_to(SANDBOX).as_posix() if inside else file.as_posix()
             for i, line in enumerate(text.splitlines(), 1):
                 if regex.search(line):
-                    hits.append((rel, i, line))
+                    hits.append((shown, i, line))
     if not hits:
         return "(no matches)"
     hits.sort()
-    found = [f"{rel}:{i}: {line}" for rel, i, line in hits]
+    found = [f"{path}:{i}: {line}" for path, i, line in hits]
     cap = min(max(limit, 0), 50)
     shown = found[:cap]
     if len(found) > cap:
@@ -198,6 +203,9 @@ def grep(pattern: str, path: str = ".", include: str = "*", limit: int = 50) -> 
 - `include` filters file names exactly like Segment 1's `pattern`
   (`Path.match`), before contents are read. Default `*` keeps Segment 2
   behavior. The 50-match cap and truncation line are unchanged.
+- Same outside-root rule as `glob`: an inside root returns workspace-relative
+  paths; an outside root (after permission) returns absolute forward-slash
+  paths. `relative_to(SANDBOX)` is only for inside hits.
 - Docstring rule still holds: only the first line plus `Args:` entries reach
   the model — the `glob`-then-`grep`-then-`read` routing stays in `SYSTEM`,
   not in per-tool docstrings.
@@ -213,20 +221,12 @@ for _fn in (read, write, edit, glob, grep):
     SCHEMAS.append(_schema)
 ```
 
-`SYSTEM` in `agent.py` is this string. The locate sentence is already
-applied. Do not smash it into the `write` rule.
-
-```python
-SYSTEM = (
-    "You are a concise coding assistant. Use tools when they help. Be brief. "
-    "`write` creates a new file, or overwrites an existing file with complete content. "
-    "To overwrite, `read` then `write` the full file. "
-    "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
-    "add/append means insert while preserving all existing content — never delete or rewrite it; "
-    "never `write` with partial content. "
-    "Locate with `glob`, confirm with `grep`, then `read` before mutating."
-)
-```
+The locate sentence is its own sentence. Do not smash it into the `write`
+rule. Later layers grew `SYSTEM`: the workspace line, the absolute-path
+rule, the user-named-file read rule, the `glob` → `grep` → `read` order, and
+the loaded-shell sentence (`docs/06-plan-build.md`, `docs/07-shell.md`,
+`docs/08-permissions.md`). The live string is in `agent.py`; do not copy a
+historical snippet from this guide.
 
 Do **not** add `if/elif` on tool names. Do not change `In | Out |
 Elapsed: {elapsed:.1f}s`. Status `Tools Loaded:` becomes
@@ -240,10 +240,11 @@ these back into `__main__.py`.
 
 ## Don't add yet
 
-Shell, plan/build swap (`/plan` dropping `write`/`edit`), permissions UI,
-Rich, streaming, sessions, compaction, cost, diff **viewer**, recursive
-`exclude` rules, case-insensitive flags, context lines (`-C`). If the agent
-can name a file, find text, narrow with `include`, fail cleanly on escapes /
+Shell, plan/build swap (`/plan` dropping `write`/`edit`), Rich, streaming,
+sessions, compaction, cost, diff **viewer**, recursive `exclude` rules,
+case-insensitive flags, context lines (`-C`). Permissions and the
+outside-root output rule arrived later (`docs/08-permissions.md`). If the
+agent can name a file, find text, narrow with `include`, fail cleanly on
 `.env` / bad regex, and stay capped — stop.
 
 ## Checkpoint
@@ -260,10 +261,11 @@ can name a file, find text, narrow with `include`, fail cleanly on escapes /
 Answers: (1) `for _fn in (read, write, edit, glob, grep)` → `TOOLS` /
 `SCHEMAS`; `agent` looks up `TOOLS.get(call["function"]["name"])`;
 (2) capped at 50 plus `... and N more — refine pattern`, never silent;
-(3) each tool — the loop never filters; (4) a `path` of `../` or `.env` is
-`ValueError` → `Tool error: …`; a walked `.env*` file is omitted, not
-returned; a non-directory root is a tool error; bad regex is `re.error` →
-tool-error string, files unchanged; (5) `glob`, then `grep` with `include`, then
+(3) each tool — the loop never filters; (4) a `.env` is `ValueError` →
+`Tool error: …`; since permissions, an outside `path` asks first and only
+still errors if denied; a walked `.env*` file is omitted, not returned; a
+non-directory root is a tool error; bad regex is `re.error` → tool-error
+string, files unchanged; (5) `glob`, then `grep` with `include`, then
 `read` — the rule lives in `SYSTEM`, since only the first docstring line
 reaches the model; (6) it filters before reading, same cap, no new registry
 entry — one finished layer, not three.

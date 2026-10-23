@@ -1,10 +1,10 @@
 from minicode.resolve_path import _resolve
 
 def read(path: str, offset: int = 1, limit: int = 2000) -> str:
-    """Read line-numbered text from a file in the sandbox. Always to be used before editing or writing to any file.
+    """Read line-numbered text from a file. Always to be used before editing or writing to any file.
 
     Args:
-        path: Path to the file, relative to the sandbox
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         offset: First line to read (1-indexed)
         limit: Maximum lines to return
     """

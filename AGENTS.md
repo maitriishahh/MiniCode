@@ -53,6 +53,7 @@ src/minicode/            # package
   agent.py               # loop, SYSTEM, mode, registry
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
+  permissions.py         # allow / ask / deny gate
   tools/                 # read.py, write.py, edit.py, glob.py, grep.py, shell.py
 docs/                    # STATUS + setup + one build guide per layer
 .env.example             # copy to .env
@@ -86,7 +87,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - Tool functions use Google-style docstrings. Only the first line becomes the
   model-visible description and `Args:` entries become parameter docs;
   extra scope sentences in the docstring body are invisible to the model.
-  `tool_from_fn` compiles schema + validation.
+  `tool_from_fn` compiles schema + validation. `path` docs on `read`,
+  `write`, `edit`, `glob`, `grep` say absolute or workspace-relative;
+  outside the workspace asks permission. Do not say "in/under the sandbox"
+  or "relative to the sandbox" — that taught the model to try `.` and `..`.
 - `write` and `edit` stay separate tools, never merged: `write` creates a new
   file or overwrites the whole file (`content` = FULL final contents);
   `edit` changes one exact unique span (insert via anchor:
@@ -115,40 +119,56 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   say `(no matches)` on empty. Both skip dot-dirs, `__pycache__`, and
   `.venv`, and omit `.env` and `.env.*` from results. A missing or
   non-directory root is a tool error. Routing (`glob`, then `grep` with
-  `include`, then `read`) lives in `SYSTEM`.
+  `include`, then `read`) lives in `SYSTEM`. A root inside the workspace
+  returns workspace-relative paths; a root outside returns absolute
+  forward-slash paths. Never `relative_to(SANDBOX)` an outside hit — that
+  raised, and the turn learned nothing.
 - Plan and build are one session. `mode = {"name": "build"}` lives in
   `agent.py`. `/plan` and `/build` are handled in `__main__.py` before any
   model call. Plan drops `write` and `edit` from `tools=`
   (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
   `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
   `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
-  Plan mode may tell the model to read every `glob` match in one response.
+  Plan mode may tell the model to read every `glob` match in one response,
+  and it says a user-named file is read directly without a `glob` first.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
 - Shell is implemented in `docs/07-shell.md`. One
   function in `tools/shell.py`, resolved once at import. Windows: Git Bash,
   then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
   then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
   or `powershell`, set before `tool_from_fn`. Shipped `PLAN_DENIED` lists
-  both names. `docs/08-permissions.md` removes them. After that implement
-  pass, do not put them back. `SYSTEM` names `bash` or `powershell`,
-  whichever is loaded. It does
+  both names. Permissions are implemented. Never put both in `PLAN_DENIED`
+  again. `SYSTEM` names only the loaded winner, `bash` or `powershell`
+  (`shell.__name__`), never both. It does
   not name `&&` or a semicolon. `cwd` is `SANDBOX`. Timeout is
   120s, not a parameter. Output is capped at 8000 characters, tail kept. A
   non-zero exit returns `exit {code}` plus output, and that string is
   printed once. `.env` in the command text is a tool error. No `workdir`,
   no background process, no persistent session. Do not point `cwd` at the
   repo root to bypass `--sandbox`.
-- Permissions are specified in `docs/08-permissions.md` and are not
-  implemented. The implement pass adds `permissions.py`. It does not add a
-  config file, a shell scanner, env scrubbing, or a transport tag. Defaults:
-  `read` / `glob` / `grep` / `edit` allow (`edit` gates `write` and `edit`);
-  `shell` ask (gates `bash` and `powershell`); `external_directory` ask.
-  Last matching rule wins. `*` matches any character, including `/`. `always`
-  is in-memory and exact. A missing prompt denies. `.env` stays a hard
-  refuse. Plan keeps `write` / `edit` out of the schema. Shell stays in the
-  schema and asks. Do not parse the command. Do not force-deny shell in plan.
+- Permissions are implemented in `docs/08-permissions.md`,
+  `permissions.py`, the dispatch gate in `agent.py`, and the prompt in
+  `__main__.py`. No config file, no shell scanner, no env scrubbing, no
+  transport tag. Defaults: `read` / `glob` / `grep` / `edit` allow (`edit`
+  gates `write` and `edit`); `shell` ask (gates `bash` and `powershell`);
+  `external_directory` ask. Last matching rule wins. `*` matches any
+  character, including `/`. `always` is in-memory and exact. A missing
+  prompt denies. `.env` stays a hard refuse. Plan keeps `write` / `edit` out
+  of the schema. Shell stays in the schema and asks. Do not parse the
+  command. Do not force-deny shell in plan. `agent.py` holds
+  `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
+  `Permission denied: {key} {value}` as `role: "tool"`, with no
+  `|Tools Used|` line.
+- `SYSTEM` states the workspace root, that a path may be absolute, that a
+  path the user already named is read with `read` (not `glob` and not the
+  shell), and the locate order (`glob` → `grep` → `read`). It names only the
+  loaded shell. `PLAN_SYSTEM` appends: if the user named a file, read that
+  path; do not glob first.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
-- Paths resolve inside the sandbox; escapes and `.env` files are tool errors.
+- Paths may be absolute or workspace-relative. A path outside the workspace
+  triggers `external_directory`: allow runs, ask prompts, deny returns
+  `Permission denied: external_directory {path}`. `.env` files stay a hard
+  tool error, inside or outside.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
   `--sandbox path` overrides it, auto-created at startup). The old default
   was the root-level `sandbox/` dir — that was the dev fence so tool tests

@@ -3,17 +3,18 @@ from minicode.resolve_path import SANDBOX, _resolve
 
 def glob(pattern:str, path:str=".", limit:int=50) -> str:
     """
-    List files under sandbox whose names match a glob pattern.
+    List files whose names match a glob pattern.
 
     Args:
         pattern: glob pattern, e.g. *.py or test_*
-        path: subtree root, relative to the sandbox
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         limit: maximum paths to return
     """
 
     root = _resolve(path)
     if not root.is_dir():
         raise ValueError(f"Not a directory: {path}")
+    inside = root == SANDBOX or SANDBOX in root.parents
     found: list[str] = []
     for dirpath, dirnames, filenames in root.walk():
         dirnames[:] = [
@@ -25,8 +26,9 @@ def glob(pattern:str, path:str=".", limit:int=50) -> str:
                 continue
             if not Path(name).match(pattern):
                 continue
-            rel = (Path(dirpath) / name).relative_to(SANDBOX).as_posix()
-            found.append(rel)
+            file = Path(dirpath) / name
+            shown = file.relative_to(SANDBOX).as_posix() if inside else file.as_posix()
+            found.append(shown)
     found.sort()
     if not found:
         return "(no matches)"

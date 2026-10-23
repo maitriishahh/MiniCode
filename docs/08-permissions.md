@@ -1,14 +1,16 @@
 # 08 — Permissions
 
-Do first: `docs/07-shell.md`. Layer 6 is done. This layer is not implemented.
-Implement this file. Do not start streaming in that pass. Do not add a
-config file, a shell scanner, or env scrubbing from this file.
+Do first: `docs/07-shell.md`. Layer 6 is done. This layer is implemented in
+`permissions.py`, the dispatch gate in `agent.py`, and the prompt in
+`__main__.py`. Do not start streaming in this pass. Do not add a config
+file, a shell scanner, or env scrubbing.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
 `agent.py`. The ask prompt lives in `__main__.py`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox math stays in `resolve_path.py`. Do not grow
-`__main__.py` with the loop. Do not touch the tool files. Do not edit
-`SYSTEM` or `PLAN_SYSTEM`.
+`__main__.py` with the loop. The gate does not live in the tool files; the
+post-pass below touches their path docs and `glob` / `grep` output, and it
+edits `SYSTEM` / `PLAN_SYSTEM`. That is the only exception.
 
 ## What it is
 
@@ -78,8 +80,26 @@ Same sentence for `edit`. Do not prompt. Do not print `|Tools Used|`.
 
 `bash` and `powershell` stay in the schema in plan. Plan uses the same
 `shell` ask as build. A rule denial is `Permission denied: …`, not
-"disabled." Do not force-deny shell because the mode is plan. Do not edit
-`PLAN_SYSTEM`.
+"disabled." Do not force-deny shell because the mode is plan.
+
+## Post-pass — absolute paths and outside hits
+
+Implemented after the first permissions pass. File-tool docstrings now say
+`path` is absolute or workspace-relative and that outside asks permission;
+`read` / `glob` / `grep` no longer say "in/under the sandbox". `SYSTEM`
+states the workspace root, allows absolute paths, says a user-named file is
+read with `read`, gives `glob` → `grep` → `read`, and names only the loaded
+shell. `PLAN_SYSTEM` adds: if the user named a file, read that path; do not
+glob first.
+
+`glob` and `grep` also changed. After an outside root is approved, they no
+longer call `file.relative_to(SANDBOX)` — that raised for a Desktop hit and
+became `Tool error:`, which looked like success. If the root is outside, the
+result is the file's absolute path with forward slashes; an inside root stays
+workspace-relative. Same cap, same skips. `read` already returns the file.
+
+This is a search-output fix, not a permission-model change. The approved
+`Path` still bounds the walk.
 
 ## Skeleton
 
@@ -236,10 +256,11 @@ Import:
 import json
 
 from minicode.permissions import decide
-from minicode.resolve_path import classify, approve, clear_approved
+from minicode.resolve_path import SANDBOX, classify, approve, clear_approved
 ```
 
-`json` is already imported. Do not import it twice.
+`json` is already imported. Do not import it twice. `SANDBOX` is for
+`SYSTEM` (the workspace line in the post-pass), not for the gate.
 
 Replace the denied set. Do not rename it. Do not filter `TOOLS`.
 
@@ -253,7 +274,7 @@ the map is not a permission check. Unknown tools stay on the existing
 string.
 
 ```python
-_KEYS = {
+KEYS = {
     "read": "read",
     "write": "edit",
     "edit": "edit",
@@ -290,7 +311,7 @@ def _permit(name: str, raw: str) -> str | None:
             if decide("external_directory", shown) == "deny":
                 return f"Permission denied: external_directory {shown}"
             approve(resolved)
-    key = _KEYS.get(name)
+    key = KEYS.get(name)
     if key is None:
         return None
     value = _value(key, parsed)

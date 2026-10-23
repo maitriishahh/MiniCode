@@ -30,7 +30,7 @@ def edit(path:str, old_text:str, new_text:str) -> str:
     Read the file first for exact text. Never rewrite the whole file; use `write` instead.
 
     Args:
-        path: Path to the file
+        path: Absolute path, or path relative to the workspace. Outside the workspace asks permission.
         old_text: Exact text to find (must match once)
         new_text: Replacement text
     """

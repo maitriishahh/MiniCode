@@ -52,11 +52,25 @@
   Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
   `bash` or `powershell`. Plan denies both. `cwd` is `SANDBOX`. Still no
   permissions.
-- [x] `docs/08-permissions.md` written. Not implemented.
+- [x] Layer 7 (`docs/08-permissions.md`): `permissions.py`, dispatch gate,
+  and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
+  gates `write` and `edit`); `shell` asks; `external_directory` asks.
+  `always` is in-memory and exact. Plan keeps `write` / `edit` out of the
+  schema; `bash` / `powershell` stay in and ask.
+- [x] Absolute-path fix: `read` / `write` / `edit` / `glob` / `grep` path
+  docs say absolute or workspace-relative; outside asks permission. `glob`
+  and `grep` return absolute forward-slash paths for an outside root, and
+  keep workspace-relative paths for an inside root. No more
+  `relative_to(SANDBOX)` crash on an outside hit.
+- [x] `SYSTEM` names the workspace, allows absolute paths, says a
+  user-named file is read with `read`, gives the locate order, and names
+  only the loaded shell. `PLAN_SYSTEM` adds: if the user named a file, read
+  that path; do not glob first.
 
 ## Next
 
-1. Implement `docs/08-permissions.md`. Not streaming, not sessions.
+1. Write the streaming/abort guide. Do not implement it in that pass.
+   Not sessions.
 
 ## Deferred (do not start)
 
