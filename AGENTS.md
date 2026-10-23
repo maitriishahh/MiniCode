@@ -69,7 +69,7 @@ The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
 `user >>`, `|Tools Used: \`name\` ({args})|`, and
-`{In} | {Out} | {Session} | Elapsed: {elapsed:.1f}s`.
+`{In} | {Out} | {Session} | Elapsed: {_elapsed}`.
 No Tok/s. Future guides must not say `from litellm import completion`,
 `ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
 `api_key_env` as the record key, or that the code still imports LiteLLM.
@@ -208,8 +208,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   including in plan. Unknown tools stay silent on stdout. Status block
   after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
-  `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {elapsed:.1f}s`.
-  Context `%` is appended only when `context_window` is set.
+  `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.
+  `_elapsed` lives in `__main__.py`. Under 60s it keeps one decimal (`45.2s`,
+  and `60.0` rolls to `1m`). After that it shows the two largest units from
+  `s`, `m`, `h`, `d`, `w`, `y`, and drops a zero remainder. A week is 7 days.
+  A year is 365 days. No months. `1433.8` is `23m 54s`. `10` days is `1w 3d`.
+  `400` days is `1y 5w`. Context `%` is appended only when `context_window`
+  is set.
 - `last_usage` resets at the start of each turn. `prompt_tokens` is the last
   call only (overwrite) — that is `In`. `completion_tokens` **sums** across
   steps — that is `Out`. `session_usage` is not cleared. It sums

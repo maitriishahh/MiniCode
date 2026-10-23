@@ -367,7 +367,7 @@ def main() -> None:
             f"---"
             f"\nModel: {MODEL} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {_elapsed(elapsed)}\n"
             f"---"
         )
 
@@ -378,13 +378,14 @@ if __name__ == "__main__":
 Now you can run `uv run python -m minicode` from the repo root. It prints
 `Sandbox: {SANDBOX}` once at startup. Status block: model id, mode, enabled
 tool names, sandbox path, last `prompt_tokens` (`In`), summed
-`completion_tokens` (`Out`), elapsed seconds. No Tok/s.
+`completion_tokens` (`Out`), elapsed via `_elapsed`. No Tok/s.
+The live line also has `Session`. Do not restore `{elapsed:.1f}s`.
 
 ```
 ---
 Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
-398 In | 12 Out | Elapsed: 1.7s
+398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
 ```
 

@@ -197,7 +197,7 @@ looks up `TOOLS.get(call["function"]["name"])`. Status `Tools Loaded:` is
 it will show `read,write,edit` with no REPL edits.
 
 Do **not** add `if/elif` on tool names. Do **not** merge `write` and `edit`.
-Do not change `In | Out | Elapsed: {elapsed:.1f}s`. The only prompt change in this layer is
+Do not change the status line. Live elapsed is `_elapsed`, not `{elapsed:.1f}s`. The only prompt change in this layer is
 the `SYSTEM` routing rule from Segment 2.
 
 ## Your finished module

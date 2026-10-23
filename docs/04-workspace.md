@@ -30,7 +30,7 @@ flip: point at the fence when you want it, point at a real repo otherwise.
 
 1. Keep: tools, `SYSTEM`, message flow, `_resolve`, `.env` denial, escape
    error, startup `Sandbox: {SANDBOX}` print, status block
-   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Replace: `_sandbox_root()` in `src/minicode/resolve_path.py` — default
    becomes `Path.cwd().resolve()`. `--sandbox path` still wins.
 3. Keep: `SANDBOX = _sandbox_root()` plus

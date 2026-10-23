@@ -15,7 +15,8 @@ One tool, resolved once at import. Windows prefers Git Bash, then
 PowerShell. Unix prefers bash, then `sh`. The registered name matches the
 winner: `bash` or `powershell`. A fresh process, `cwd` = `SANDBOX`, 120
 seconds, output capped at 8000 characters. The finished output prints once,
-then returns to the model. Plan drops both names.
+then returns to the model. This layer drops both names from plan.
+`docs/08-permissions.md` puts them back. Do not drop them again.
 
 ## Why this shape
 
@@ -62,7 +63,7 @@ root to "fix" that. The product soak launches in the repo, with no
 1. Keep: message flow, the raw assistant dict append, `MAX_STEPS = 16`,
    `PLAN_SYSTEM`, `__main__.py`, `SANDBOX`, `_resolve`, the tool line
    `|Tools Used: \`name\` ({args})|`, status
-   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `src/minicode/tools/shell.py`. Stdlib only (`os`, `shutil`,
    `subprocess`, `sys`, `pathlib`). No new dep. No `shell=True`. No
    `-ExecutionPolicy Bypass`. No `cmd.exe`.

@@ -310,7 +310,9 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
 `completion_tokens` for the turn. `Session` is summed `completion_tokens`
 for the process. It is not cleared on `/plan` or `/model`. Do not add
-`prompt_tokens` into it. Elapsed is seconds. No Tok/s — a wall-clock rate is
+`prompt_tokens` into it. Elapsed is `_elapsed` in `__main__.py`: under 60s
+one decimal, then the two largest of `s m h d w y`. A week is 7 days. A year
+is 365 days. No months. No Tok/s — a wall-clock rate is
 network wait, and summed `total_tokens` counts the prompt once per step.
 `AGENTS.md` wins if this section and the REPL ever disagree.
 

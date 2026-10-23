@@ -1,5 +1,9 @@
 # STATUS.md — MiniCode
 
+Current code: layers 0–7 are in. Plan drops `write` / `edit` only.
+`bash` / `powershell` stay in the list and ask. Status line is
+`In | Out | Session | Elapsed: {_elapsed}`. Next is the streaming guide.
+
 ## Done
 
 - [x] Research pass: Pi design posts, Pi session/compaction docs, OpenCode
@@ -13,7 +17,7 @@
 - [x] `docs/00-setup.md` — venv, `.env`, Gemini reachable. Guide now
   targets the OpenAI client.
 - [x] `docs/01-loop.md` / Layer 0: loop in `agent.py`, REPL in
-  `__main__.py`. Status is `In | Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+  `__main__.py`. Live status is `In | Out | Session | Elapsed: {_elapsed}`. No Tok/s.
 - [x] `docs/02-file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
   Registry in `agent.py`.
 - [x] History is the raw assistant message dict from the response JSON.
@@ -30,28 +34,28 @@
 
 - [x] Layer 2: OpenAI client, `_SERVERS` registry, `/model`, raw message
   dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
-  Status elapsed is `Elapsed: {elapsed:.1f}s`. No Tok/s. No LiteLLM.
+  Status elapsed is `_elapsed`, not raw seconds. No Tok/s. No LiteLLM.
 - [x] Layer 3 (`docs/04-workspace.md`): default workspace is the launch cwd
   (`Path.cwd().resolve()` in `resolve_path.py`). `--sandbox path`
   overrides. Dev fence is `uv run python -m minicode --sandbox sandbox`.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
-  Status is last prompt (`In`) + summed output tokens (`Out`) + elapsed
-  seconds. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
+  Status is last prompt (`In`) + summed output tokens (`Out`) + `Session`
+  + `_elapsed`. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
 - [x] Layer 4 (`docs/05-search.md`): `glob` and `grep` in `tools/`. Capped
   at 50, `.env*` omitted, non-directory root is a tool error. Registry is
-  wired. `SYSTEM` has the locate sentence as its own sentence. Still no
-  shell.
+  wired. `SYSTEM` has the locate sentence as its own sentence. Shell is
+  layer 6.
 - [x] Layer 5 (`docs/06-plan-build.md`): `/plan` and `/build` on one
   session. Plan drops `write`/`edit` from `tools=` and denies them at
   dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
-  `16`. Still no shell.
+  `16`. Shell is layer 6.
 - [x] Layer 6 (`docs/07-shell.md`): `shell` in `tools/shell.py`. Windows:
   Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
-  `bash` or `powershell`. Plan denies both. `cwd` is `SANDBOX`. Still no
-  permissions.
+  `bash` or `powershell`. This layer denied both in plan. Layer 7 puts
+  them back and adds permissions. `cwd` is `SANDBOX`.
 - [x] Layer 7 (`docs/08-permissions.md`): `permissions.py`, dispatch gate,
   and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
   gates `write` and `edit`); `shell` asks; `external_directory` asks.
@@ -68,6 +72,9 @@
   that path; do not glob first.
 - [x] Status line adds `Session`: process sum of `completion_tokens`.
   `In` and `Out` are unchanged. Prompt tokens are not added.
+- [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one
+  decimal. Then two largest of `s m h d w y`. Week is 7 days. Year is 365
+  days. No months.
 
 ## Next
 

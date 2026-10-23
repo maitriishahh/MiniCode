@@ -34,7 +34,7 @@ gate, no lifecycle.
 
 1. Keep: tools, `SYSTEM`, message flow, `_resolve`, `.env` denial, escape
    error, tool line `|Tools Used: \`name\` ({args})|`, status block
-   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `agent.py` keeps `mode = {"name": "build"}` (same dict pattern as
    `active` and `last_usage` so `main()` reassigns without `global`),
    `PLAN_DENIED`, `PLAN_SYSTEM`, `active_schemas()`, `active_names()`.
@@ -172,7 +172,7 @@ What this locks:
 ## Segment 3 — `/plan` / `/build` + system swap + status
 
 File: `src/minicode/__main__.py`. Keep the loop, `/model`, `exit`,
-`Sandbox: {SANDBOX}` startup print, `In | Out | Elapsed: {elapsed:.1f}s`.
+`Sandbox: {SANDBOX}` startup print, `In | Out | Session | Elapsed: {_elapsed}`.
 No Tok/s.
 
 Replace the import line:
@@ -238,7 +238,7 @@ def main() -> None:
             f"---"
             f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s{ctx}\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {_elapsed(elapsed)}{ctx}\n"
             f"---"
         )
 ```
@@ -271,7 +271,7 @@ minicode >> I found the loop in agent.py:12: def agent... Propose: 1) ... Run /b
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep
 Sandbox: C:\Users\hp\Desktop\PyCharm Projects\MiniCode
-398 In | 12 Out | Elapsed: 1.7s
+398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
 user >> /build
 Mode: build
@@ -291,7 +291,8 @@ restores full tools with no restart. `/model` still lists/switches ids.
 `agent.py` holds `mode`, `PLAN_DENIED`, `PLAN_SYSTEM`,
 `active_schemas()`, `active_names()`, and the one filtered create site.
 `__main__.py` holds `/plan` / `/build`, the `messages[0]` swap, and the
-`Mode:` / `Tools Loaded:` status. Still no shell, no permissions UI, no
+`Mode:` / `Tools Loaded:` status. Shell and permissions are later layers.
+Live plan keeps `bash` / `powershell` and asks. No
 `PLAN.md` convention, no new package dirs.
 
 ## Don't add yet

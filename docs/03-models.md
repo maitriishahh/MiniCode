@@ -52,7 +52,7 @@ only reason to touch that append.
 5. `__main__.py` handles `/model` and `/model <id>` before appending a user
    message, same as `exit`. Never sent to the model.
 6. Status shows `active["id"]`. Context `%` is appended only when
-   `context_window` is set. Elapsed is `Elapsed: {elapsed:.1f}s`.
+   `context_window` is set. Elapsed is `_elapsed`, not `{elapsed:.1f}s`.
 
 ## Segment 1 — Record + registry
 
@@ -213,7 +213,7 @@ print(
     f"---"
     f"\nModel: {active['id']} | Mode: {MODE} | Tools Loaded: {', '.join(TOOLS)}"
     f"\nSandbox: {SANDBOX}"
-    f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s{ctx}\n"
+    f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {_elapsed(elapsed)}{ctx}\n"
     f"---"
 )
 ```

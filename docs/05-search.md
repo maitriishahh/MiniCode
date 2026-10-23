@@ -32,7 +32,7 @@ refines and retries instead.
 
 1. Keep: tools, `SYSTEM` routing for `write`/`edit`, message flow,
    `_resolve`, `.env` denial, escape error, tool line, status block
-   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `src/minicode/tools/glob.py` (Segment 1), then
    `src/minicode/tools/grep.py` (Segments 2–3). Stdlib only (`pathlib`,
    `re`). No new deps.
@@ -228,8 +228,8 @@ the loaded-shell sentence (`docs/06-plan-build.md`, `docs/07-shell.md`,
 `docs/08-permissions.md`). The live string is in `agent.py`; do not copy a
 historical snippet from this guide.
 
-Do **not** add `if/elif` on tool names. Do not change `In | Out |
-Elapsed: {elapsed:.1f}s`. Status `Tools Loaded:` becomes
+Do **not** add `if/elif` on tool names. Do not change the status line.
+Live elapsed is `_elapsed`, not `{elapsed:.1f}s`. Status `Tools Loaded:` becomes
 `read,write,edit,glob,grep` with no REPL edits.
 
 ## Your finished modules

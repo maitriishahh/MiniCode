@@ -19,6 +19,29 @@ def _permission(key:str, value:str) -> str:
 
 permission_ask["fn"] = _permission
 
+def _elapsed(seconds: float) -> str:
+    if seconds < 60:
+        shown = f"{seconds:.1f}"
+        if shown == "60.0":
+            return "1m"
+        return f"{shown}s"
+    left = int(seconds + 0.5)
+    parts: list[str] = []
+    for name, size in (
+        ("y", 365 * 24 * 3600),
+        ("w", 7 * 24 * 3600),
+        ("d", 24 * 3600),
+        ("h", 3600),
+        ("m", 60),
+        ("s", 1),
+    ):
+        count, left = divmod(left, size)
+        if count:
+            parts.append(f"{count}{name}")
+        if len(parts) == 2:
+            break
+    return " ".join(parts)
+
 def main() -> None:
     print(f"Sandbox: {SANDBOX}")
     print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
@@ -85,7 +108,7 @@ def main() -> None:
             f"---"
             f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {elapsed:.1f}s{ctx}\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {_elapsed(elapsed)}{ctx}\n"
             f"---"
         )
 

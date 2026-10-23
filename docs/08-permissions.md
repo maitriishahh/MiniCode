@@ -108,7 +108,7 @@ This is a search-output fix, not a permission-model change. The approved
 1. Keep: message flow, the raw assistant dict append, `MAX_STEPS = 16`,
    `SYSTEM`, `PLAN_SYSTEM`, `TOOLS` full, tool line
    `|Tools Used: \`name\` ({args})|` after a call that actually ran, status
-   `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. No Tok/s.
+   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `src/minicode/permissions.py`. Stdlib only (`re`, `sys`). No new
    dep.
 3. Add: `classify`, `approve`, and `clear_approved` in `resolve_path.py`.
