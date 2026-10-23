@@ -69,7 +69,7 @@ The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
 `user >>`, `|Tools Used: \`name\` ({args})|`, and
-`{In} | {Out} | Elapsed: {elapsed:.1f}s`.
+`{In} | {Out} | {Session} | Elapsed: {elapsed:.1f}s`.
 No Tok/s. Future guides must not say `from litellm import completion`,
 `ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
 `api_key_env` as the record key, or that the code still imports LiteLLM.
@@ -208,11 +208,14 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   including in plan. Unknown tools stay silent on stdout. Status block
   after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
-  `{prompt:,} In | {out:,} Out | Elapsed: {elapsed:.1f}s`. Context `%` is
-  appended only when `context_window` is set.
+  `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {elapsed:.1f}s`.
+  Context `%` is appended only when `context_window` is set.
 - `last_usage` resets at the start of each turn. `prompt_tokens` is the last
   call only (overwrite) — that is `In`. `completion_tokens` **sums** across
-  steps — that is `Out`. No Tok/s. A wall-clock rate is network wait, not
+  steps — that is `Out`. `session_usage` is not cleared. It sums
+  `completion_tokens` for the process — that is `Session`. Do not add
+  `prompt_tokens` into it. A resent prompt is not new work. Input joins a
+  total when cost exists. No Tok/s. A wall-clock rate is network wait, not
   model speed, and summed `total_tokens` counts the prompt once per step.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).

@@ -303,12 +303,14 @@ stdout. After the model's reply, a status block:
 ---
 Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
-398 In | 12 Out | Elapsed: 1.7s
+398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
 ```
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
-`completion_tokens`. Elapsed is seconds. No Tok/s — a wall-clock rate is
+`completion_tokens` for the turn. `Session` is summed `completion_tokens`
+for the process. It is not cleared on `/plan` or `/model`. Do not add
+`prompt_tokens` into it. Elapsed is seconds. No Tok/s — a wall-clock rate is
 network wait, and summed `total_tokens` counts the prompt once per step.
 `AGENTS.md` wins if this section and the REPL ever disagree.
 

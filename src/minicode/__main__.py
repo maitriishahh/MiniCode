@@ -1,7 +1,7 @@
 import time
 
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS, mode, active_names, PLAN_SYSTEM
+from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, active_names, PLAN_SYSTEM
 from minicode.permissions import ask as permission_ask
 
 def _permission(key:str, value:str) -> str:
@@ -76,6 +76,7 @@ def main() -> None:
         elapsed = time.perf_counter() - start_time
         prompt_tokens = last_usage["prompt_tokens"]
         out_tokens = last_usage["completion_tokens"]
+        session_tokens = session_usage["completion_tokens"]
 
         print(f"\nminicode >> {answer}\n")
         window = MODELS[active["id"]]["context_window"]
@@ -84,7 +85,7 @@ def main() -> None:
             f"---"
             f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | Elapsed: {elapsed:.1f}s{ctx}\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {elapsed:.1f}s{ctx}\n"
             f"---"
         )
 

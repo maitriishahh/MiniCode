@@ -142,6 +142,7 @@ for _fn in (read, write, edit, glob, grep, shell):
     SCHEMAS.append(_schema)
 
 last_usage = {"prompt_tokens": 0, "completion_tokens": 0}
+session_usage = {"completion_tokens": 0}
 
 def agent(messages:list) -> str:
     last_usage["prompt_tokens"] = 0
@@ -171,7 +172,9 @@ def agent(messages:list) -> str:
 
         usage = body.get("usage") or {}
         last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
-        last_usage["completion_tokens"] += usage.get("completion_tokens") or 0
+        step_out = usage.get("completion_tokens") or 0
+        last_usage["completion_tokens"] += step_out
+        session_usage["completion_tokens"] += step_out
         msg = body["choices"][0]["message"]
         messages.append(msg)
         calls = msg.get("tool_calls") or []

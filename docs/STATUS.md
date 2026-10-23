@@ -66,6 +66,8 @@
   user-named file is read with `read`, gives the locate order, and names
   only the loaded shell. `PLAN_SYSTEM` adds: if the user named a file, read
   that path; do not glob first.
+- [x] Status line adds `Session`: process sum of `completion_tokens`.
+  `In` and `Out` are unchanged. Prompt tokens are not added.
 
 ## Next
 
