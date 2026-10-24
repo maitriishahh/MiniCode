@@ -206,11 +206,16 @@ the `SYSTEM` routing rule from Segment 2.
 `agent.py`. `difflib` lives in `tools/edit.py`. Do not merge these back
 into `__main__.py`.
 
+## Open gaps at this layer
+
+- No tests for `write` or `edit`.
+- Cost display is deferred until more models are added.
+
 ## Don't add yet
 
 shell, plan/build swap (`/plan` dropping `write`/`edit`), permissions UI,
-Rich, streaming, sessions, compaction, cost, diff **viewer**. `/model` is
-Layer 2 and is done.
+Rich, streaming, sessions, compaction, cost display, diff **viewer**.
+`/model` is Layer 2 and is done.
 Plan mode without a restricted tool list is still later — but now there is
 something to restrict, which is why this layer comes first.
 

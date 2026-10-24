@@ -294,13 +294,18 @@ still lists/switches ids. `exit` still leaves before any create.
 Live plan keeps `bash` / `powershell` and asks. No
 `PLAN.md` convention, no new package dirs.
 
+## Open gaps at this layer
+
+- Plan hides `write` / `edit` only. Shell stays in the tool list and asks.
+- Cost display is deferred until more models are added.
+
 ## Don't add yet
 
 Shell, allow/ask/deny, `external_directory` gate, streaming, sessions,
-compaction, cost, diff viewer, `PLAN.md` file lifecycle, models.dev import,
-`/connect`, variants, passing `max_tokens`, Tok/s. If plan proposes without
-writing, build writes, the switch needs no restart, and the status tells
-which is active — stop.
+compaction, cost display, diff viewer, `PLAN.md` file lifecycle, models.dev
+import, `/connect`, variants, passing `max_tokens`, Tok/s. If plan proposes
+without writing, build writes, the switch needs no restart, and the status
+tells which is active — stop.
 
 ## Checkpoint
 

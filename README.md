@@ -216,7 +216,9 @@ Sandbox: C:\path\to\project
 
 ## Not included yet
 
-Streaming and abort handling, sessions and resume, cost and context percentage,
-compaction, a diff viewer, MCP, subagents, and a graphical interface. Ctrl+C
-during a running shell command ends MiniCode rather than cancelling only that
-command.
+Streaming and abort handling, sessions and resume, cache control, cost display,
+compaction, a diff viewer, `AGENTS.md` injection, MCP, subagents, and a
+graphical interface. Context percentage stays off until a verified
+`context_window` is set. Cost display waits until more models are added.
+Ctrl+C during a running shell command ends MiniCode rather than cancelling
+only that command.

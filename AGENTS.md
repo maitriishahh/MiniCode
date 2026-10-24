@@ -220,9 +220,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   call only (overwrite) — that is `In`. `completion_tokens` **sums** across
   steps — that is `Out`. `session_usage` is not cleared. It sums
   `completion_tokens` for the process — that is `Session`. Do not add
-  `prompt_tokens` into it. A resent prompt is not new work. Input joins a
-  total when cost exists. No Tok/s. A wall-clock rate is network wait, not
-  model speed, and summed `total_tokens` counts the prompt once per step.
+  `prompt_tokens` into it. A resent prompt is not new work. Cost display is
+  deferred until more models are added; when it lands, pricing makes input
+  part of a total. No Tok/s. A wall-clock rate is network wait, not model
+  speed, and summed `total_tokens` counts the prompt once per step.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
 - Do not commit secrets, session dumps, or transcripts.

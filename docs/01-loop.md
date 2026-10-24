@@ -390,20 +390,27 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 ```
 
 Context `%` is appended only when `context_window` is set. Leave it `None`
-until the number is verified. Don't invent one. Cost waits for pricing on
-the record.
+until the number is verified. Don't invent one. Cost display is deferred
+until more models are added; it then needs pricing on the record.
 
 ## Your finished module
 
 `agent.py` holds the loop. `__main__.py` holds the REPL. `read` is
 `tools/read.py`. No `write`, `edit`, shell, modes, or config file.
 
+## Open gaps at this layer
+
+- No tests for `tool_from_fn` or `read`.
+- History is unbounded; compaction waits until the context gap hurts.
+- No streaming/abort. Ctrl+C during a model call ends the REPL.
+- Cost display is deferred until more models are added.
+
 ## Don't add yet
 
 `write`/`edit` (next guide), shell, plan/build swap, permissions UI, Rich,
-streaming, sessions, compaction, cost, diff viewer. If the REPL reads files,
-prints the tool line, survives bad args and escapes, shows the status block,
-and exits cleanly — stop.
+streaming, sessions, compaction, cost display, diff viewer. If the REPL reads
+files, prints the tool line, survives bad args and escapes, shows the status
+block, and exits cleanly — stop.
 
 ## Checkpoint
 

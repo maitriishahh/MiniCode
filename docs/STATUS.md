@@ -3,7 +3,7 @@
 Current code: layers 0–7 are in. Startup default is `plan`. Plan drops
 `write` / `edit` only. `bash` / `powershell` stay in the list and ask.
 Status line is `In | Out | Session | Elapsed: {_elapsed}`. Next is the
-streaming guide.
+streaming guide. Cost display waits until more models are added.
 
 ## Done
 
@@ -79,6 +79,23 @@ streaming guide.
 - [x] `README.md` — user install, configure, run, commands, tools,
   permissions, status line, troubleshooting, and limitations.
 
+## Open gaps
+
+Known and accepted. These are not the next layer.
+
+- No tests for `tool_from_fn` or the tools.
+- History is unbounded; compaction is deferred until the context gap hurts.
+- No streaming/abort. Ctrl+C during a model or shell call ends the REPL.
+- `context_window` is `None`, so context `%` is off.
+- Cache tokens in `usage` are not displayed.
+- Sandbox is a path boundary, not a container; shell can `cd` out and
+  inherits the process environment.
+- Plan hides `write` / `edit` only; shell stays in the tool list and asks.
+- `always` approvals are in-memory only.
+- No diff viewer.
+- `AGENTS.md` is not injected into the system prompt.
+- Cost display is deferred until more models are added.
+
 ## Next
 
 1. Write the streaming/abort guide. Do not implement it in that pass.
@@ -87,8 +104,9 @@ streaming guide.
 ## Deferred (do not start)
 
 streaming/abort, sessions, cache
-control, cost, diff viewer, `AGENTS.md` injection, compaction (context gap
-on a real codebase; do not start it), tests (with `tool_from_fn`),
+control, diff viewer, `AGENTS.md` injection, compaction (context gap
+on a real codebase; do not start it), cost (until more models are added;
+then pricing on the Model record), tests (still not written),
 models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;

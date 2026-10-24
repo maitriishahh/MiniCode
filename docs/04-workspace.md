@@ -105,12 +105,18 @@ errors under either root.
 `/model`, and the status block. Still no new package dirs. Still no shell,
 no search, no permissions change.
 
+## Open gaps at this layer
+
+- The workspace is a path boundary, not a container. A later shell command
+  can leave it.
+- Cost display is deferred until more models are added.
+
 ## Don't add yet
 
 Search tool (next guide, capped `grep` or `find` — not a shell), shell,
 plan/build swap, allow/ask/deny, `external_directory` gate, streaming,
-sessions, compaction, cost, diff viewer. If the flip works and the fence is
-still one flag away — stop.
+sessions, compaction, cost display, diff viewer. If the flip works and the
+fence is still one flag away — stop.
 
 ## Checkpoint
 

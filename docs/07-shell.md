@@ -434,6 +434,12 @@ not point `cwd` at the repo root to change it. Do not add a second root.
 The Unix branch is the same `-c` call with a different binary. It cannot be
 proved from this Windows machine. Do not add a CI job for it.
 
+## Open gaps at this layer
+
+- No streaming/abort. Ctrl+C during the wait ends the REPL.
+- The child process inherits the environment.
+- A permitted command can `cd` out of the workspace.
+
 ## Don't add yet
 
 Later, in order, not in the implement pass: permissions

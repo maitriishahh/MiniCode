@@ -51,7 +51,7 @@ it later for delegation machinery — or keep building by hand — is decided th
 on control vs convenience. Not now.
 
 LlamaIndex `FunctionAgent` hides `tool_calls`, the `role: "tool"` message, the
-loop, and the stop condition. Steering, abort, compaction, and cost tracking
+loop, and the stop condition. Steering, abort, compaction, and cost display
 cannot be added through it.
 
 ---
@@ -66,13 +66,14 @@ cannot be added through it.
 | Errors | Tool failures and `ValidationError` return as `role: "tool"` content so the model self-corrects |
 | `max_steps` | Return a usable message. Never raise (raising kills the REPL) |
 | Prompt | ~4 sentences + tool list. Prompt + schemas under ~1000 tokens |
-| Workspace | Sandbox directory. Tools cannot leave it in v0 |
+| Workspace | Launch cwd, or `--sandbox path`. Outside paths ask `external_directory` (§5) |
 | Modes | Plan and build are **separate** (§6) |
-| Permissions | YOLO inside the sandbox for now. Allow/ask/deny later (§5) |
+| Permissions | Implemented: `allow` / `ask` / `deny`, last matching rule wins (§5) |
 | UI | `input()` REPL + tool line + status block per turn (§7) |
 | Layout | `src/minicode/`, growing from one module (§8) |
 | Sync vs async | Sync until abort/streaming is actually needed |
-| Tests | After `tool_from_fn` exists — the schema compiler is the first thing worth testing without an API key |
+| Tests | Not written. Planned after `tool_from_fn`; still open |
+| Cost | Deferred until more models are added; then needs pricing on the Model record |
 
 ---
 
@@ -107,8 +108,8 @@ OpenCode's shape, adapted, without the catalog:
 
 The `openai` package is the transport, not a provider catalog. What it does
 not give you is the product layer: a typed catalogue, context windows,
-pricing, cache flags, `/connect`, `/models`. The Model record is that layer,
-built to the size actually needed:
+cache flags, `/connect`, `/models`. Pricing waits for cost display. The Model
+record is that layer, built to the size actually needed:
 
 ```
 id, api_base, api_key,
@@ -117,14 +118,18 @@ cost {input, output, cache_read, cache_write} (0 for local),
 capabilities {tools, caching}
 ```
 
+Cost fields stay zero and are not printed. Cost display is deferred until
+more models are added.
+
 `api_key` holds the env name, not the secret. `api_base` is required.
 Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
 scrape, no 75 providers, no OAuth yet, no LiteLLM, no SDK per brand.
 `/connect` waits with that catalog. It is not a key-writer on `_SERVERS`,
 and a name→base dict does not remove the tuple-plus-two-env-lines edit
 until a command looks the name up. `/model` lists ids from `.env` only.
-Fetching the list, cost, and context is `/models`. Variants are reasoning
-effort (`high`, `max`). They are not a flag on the current create call.
+Fetching the list and context is `/models`. Cost is deferred until more
+models are added. Variants are reasoning effort (`high`, `max`). They are
+not a flag on the current create call.
 Ollama local is a base URL, not a login.
 
 The catalog phase adds one field, not a client per brand. The tuple becomes
@@ -318,14 +323,15 @@ network wait, and summed `total_tokens` counts the prompt once per step.
 
 | Now | Next | Later |
 |---|---|---|
-| Active model id | Context % (last `prompt_tokens` ÷ `context_window`) | Cost (needs pricing on the Model record) |
+| Active model id | Context % (last `prompt_tokens` ÷ `context_window`) | Cost — deferred until more models are added |
 | Mode | Prompt-cache hits when `usage` reports cache tokens | Diff **viewer** UI |
 | Enabled tool names | | Sessions / resume |
 | `In` / `Out` / elapsed | | |
 
 The response `usage` object is enough for token counts —
-no tiktoken needed. Cost and cache-hit display wait for the Model registry to
-carry pricing and cache flags. Edit diffs: a short unified-diff print in the
+no tiktoken needed. Cache-hit display waits for `usage` to report cache
+tokens. Cost is deferred until more models are added; when it lands it needs
+pricing on the Model record. Edit diffs: a short unified-diff print in the
 REPL when `edit` lands is useful for testing and is not a viewer; the viewer
 itself is deferred. The numbered body of `read` is `role: "tool"` content;
 Gemini may quote it or summarize.
@@ -340,10 +346,12 @@ src/minicode/            # package
   agent.py               # loop, SYSTEM, registry
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
-  tools/                 # read.py, write.py, edit.py
+  permissions.py         # allow / ask / deny gate
+  tools/                 # read, write, edit, glob, grep, shell
 docs/                    # setup + build guides + STATUS
 AGENTS.md                # session start
 HARNESS_RESEARCH_AND_PLAN.md  # this file
+README.md                # user guide
 .env.example
 ```
 
@@ -396,10 +404,28 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `__main__.py`. Plan keeps `bash` / `powershell` in the tool list; rules
 restrict them, not a stricter prompt.
 
+**Known gaps by phase.** These are open, not new layers.
+
+| Phase | Open gap | Trigger / next |
+|---|---|---|
+| Layer 0 | `tool_from_fn` and the tools have no tests | Planned after the schema compiler; still open |
+| Layer 0 | History is unbounded; no compaction | Deferred until the context gap hurts (§10) |
+| Layer 0 | No streaming/abort; Ctrl+C during a model or shell call ends the REPL | Next guide |
+| Layer 2 | `context_window` is `None`, so context `%` stays off | Set only a verified number |
+| Layer 2 | Cache tokens in `usage` are not displayed | Cache control, after sessions |
+| Layer 3 | Sandbox is a path boundary, not a container; shell can leave it | Containerization is separate |
+| Layer 5 | Plan hides `write`/`edit` only; shell stays and asks | Tool-list restriction, not a shell deny |
+| Layer 7 | `always` approvals die with the process | Sessions/resume |
+| Layer 7 | No env scrubbing; shell inherits the process environment | Not planned |
+| After Layer 7 | Sessions/resume, cache control, diff viewer, `AGENTS.md` injection | In that order |
+| — | Cost display | Deferred until more models are added |
+
 **Next:** write the streaming/abort guide. Do not implement it in that pass.
 After that: streaming +
 Ctrl+C that leaves a coherent session → sessions/resume → cache control
-→ cost → diff viewer → `AGENTS.md` injection into the system prompt.
+→ diff viewer → `AGENTS.md` injection into the system prompt.
+Cost is not in this chain. It is deferred until more models are added;
+when it lands it needs pricing on the Model record.
 A shell command can still `cd` out. Permissions asks before the command
 runs. It does not parse the command. Do not reorder
 abort ahead of permissions. Compaction is the context gap on a real
@@ -417,10 +443,13 @@ on the tuple, not a client per brand; API key or OAuth writes a bearer
 token to a user `0600` auth file, not project `.env`; not a key-only
 phase), Rich/Textual, web UI,
 compaction (the context gap on a real codebase; still not a layer),
-JSONL session tree, granular approvals. Each gets promoted only
-after the missing piece is
+JSONL session tree, granular approvals, tests (still not written).
+Each gets promoted only after the missing piece is
 felt — and every promotion must leave the harness as finished as it was
 before.
+
+Cost is deferred for a different reason: do not add it until more models
+are added. It then needs pricing on the Model record.
 
 ---
 

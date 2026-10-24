@@ -90,9 +90,9 @@ active = {"id": default_id if default_id in MODELS else next(iter(MODELS), None)
 ```
 
 `context_window` stays `None` until you have verified the number for that
-exact model id. Do not invent one. Cost stays zeros and is not printed.
-`tools: True` is recorded, not acted on. `max_tokens` is stored and not
-passed to `create`.
+exact model id. Do not invent one. Cost stays zeros and is not printed until
+more models are added; it then needs pricing on the record. `tools: True` is
+recorded, not acted on. `max_tokens` is stored and not passed to `create`.
 
 An empty `OLLAMA_MODEL` skips that server. `/model` lists only what was
 set at startup. The Ollama id must match a local tag. The layer is done
@@ -218,7 +218,7 @@ print(
 )
 ```
 
-No cost. No fake percent. No Tok/s. Startup `Sandbox:` line stays.
+No cost line. No fake percent. No Tok/s. Startup `Sandbox:` line stays.
 
 ## Your finished modules
 
@@ -227,13 +227,19 @@ and the one `chat.completions.create`. `__main__.py` holds `/model` and the
 status id. Still no TOML. Still no new package dirs. Still no
 thought-signature parser.
 
+## Open gaps at this layer
+
+- `context_window` is `None`, so context `%` stays off.
+- Cache tokens in `usage` are not displayed.
+- Cost display is deferred until more models are added.
+
 ## Don't add yet
 
 models.dev import, `/connect`, variants, streaming, fallbacks,
 thinking-trace conversion, a signature parser, shell, grep, plan/build,
 flipping the sandbox default to cwd, a third server, passing `max_tokens`,
-a cost line, Tok/s, LiteLLM, one SDK per provider, a hardcoded model id,
-putting the catalog in `.env`.
+a cost line (wait for more models), Tok/s, LiteLLM, one SDK per provider,
+a hardcoded model id, putting the catalog in `.env`.
 
 If `/model` lists the ids that were set at startup, an unknown id does not
 switch, the next real turn uses the active record's `model` / key /

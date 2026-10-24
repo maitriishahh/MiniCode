@@ -435,6 +435,14 @@ uv run python -m minicode --sandbox sandbox
 `cwd` stays `SANDBOX`. Do not point it at the repo root. A command can
 still `cd` out after the user allows that exact command. Do not parse it.
 
+## Open gaps at this layer
+
+- `always` is in-memory and exact; it dies with the process.
+- No env scrubbing. Shell commands inherit the process environment.
+- Permissions gate calls, not effects. A permitted shell command can leave
+  the workspace or change files outside it.
+- No containerization.
+
 ## Don't add yet
 
 Later, in order, not in the implement pass: streaming and a Ctrl+C that
