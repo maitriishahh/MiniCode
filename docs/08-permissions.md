@@ -374,7 +374,7 @@ from minicode.permissions import ask as permission_ask
 
 
 def _permission(key: str, value: str) -> str:
-    print(f"\nPermission: {key}\n{value}")
+    print(f"\nPermission: {key} | {value}")
     try:
         answer = input("[o]nce / [a]lways / [d]eny: ").strip().lower()
     except (EOFError, KeyboardInterrupt):

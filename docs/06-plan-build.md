@@ -16,7 +16,7 @@ Layer 5: two modes on one session, one history. `build` keeps the full
 registry (`read,write,edit,glob,grep`). `plan` drops `write`/`edit` from
 `tools=` so the model cannot propose them, and denies them at dispatch if
 it tries anyway. `/plan` and `/build` switch. Status shows the mode.
-Startup default is `build`. Restart restores `build`.
+Startup default is `plan`. Restart restores `plan`.
 
 ## Why it matters
 
@@ -35,13 +35,13 @@ gate, no lifecycle.
 1. Keep: tools, `SYSTEM`, message flow, `_resolve`, `.env` denial, escape
    error, tool line `|Tools Used: \`name\` ({args})|`, status block
    `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
-2. Add: `agent.py` keeps `mode = {"name": "build"}` (same dict pattern as
+2. Add: `agent.py` keeps `mode = {"name": "plan"}` (same dict pattern as
    `active` and `last_usage` so `main()` reassigns without `global`),
    `PLAN_DENIED`, `PLAN_SYSTEM`, `active_schemas()`, `active_names()`.
 3. Replace: `agent` reads the record once per turn (keep), then passes
    `tools=active_schemas()` to the one `chat.completions.create`, and
    denies `PLAN_DENIED` at dispatch even if the model guesses the name.
-4. Replace: `__main__.py` drops `MODE = "build"`, imports `mode`,
+4. Replace: `__main__.py` drops the local `MODE` constant, imports `mode`,
    handles `/plan` / `/build` before appending a user message (same rule
    as `exit` and `/model`: handled locally, never sent to the model),
    swaps `messages[0]["content"]`, prints `Mode: {mode["name"]}`.
@@ -58,7 +58,7 @@ File: `src/minicode/agent.py`. Keep `SYSTEM`, `TOOLS`, `SCHEMAS`,
 `MODELS`, `active`, `last_usage`. Add this below `SYSTEM`:
 
 ```python
-mode = {"name": "build"}
+mode = {"name": "plan"}
 
 PLAN_DENIED = ("write", "edit")
 
@@ -71,7 +71,7 @@ PLAN_SYSTEM = (
 )
 ```
 
-`mode` starts `"build"` so existing behavior is unchanged.
+`mode` starts `"plan"`, so a new session cannot use `write` or `edit` until `/build`.
 `PLAN_DENIED` is the whole guarantee: `docs/07-shell.md` adds `bash` and
 `powershell` to this tuple. Do not add them from this file. Nothing else
 changes. `PLAN_SYSTEM` is a separate sentence block. Do not
@@ -181,7 +181,7 @@ Replace the import line:
 from minicode.agent import agent, TOOLS, last_usage, SYSTEM, PLAN_SYSTEM, active, MODELS, mode, active_names
 ```
 
-Delete `MODE = "build"`. `mode` in `agent.py` is the state.
+Delete the local `MODE` constant. `mode` in `agent.py` is the state.
 
 Full body of `main` after the change:
 
@@ -264,8 +264,7 @@ uv run python -m minicode
 ```
 
 ```text
-user >> /plan
-Mode: plan
+Mode: plan | Tools Loaded: read, glob, grep
 user >> add retries to agent.py
 minicode >> I found the loop in agent.py:12: def agent... Propose: 1) ... Run /build to apply.
 ---
@@ -274,17 +273,17 @@ Sandbox: C:\Users\hp\Desktop\PyCharm Projects\MiniCode
 398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
 user >> /build
-Mode: build
+Mode: build | Tools Loaded: read, write, edit, glob, grep
 ```
 
-**Expected:** `user >> /plan` prints `Mode: plan`, next status shows
-`Mode: plan` and `Tools Loaded: read, glob, grep`. Asking for an edit in
-plan proposes steps, prints `|Tools Used: \`read\||` / `|Tools Used: \`grep\||`
-on success, and never prints `|Tools Used: \`write\||` or
-`|Tools Used: \`edit\||`. A guessed `write`/`edit` call returns
-`Plan mode: … is disabled` as `role: "tool"` content. `user >> /build`
-restores full tools with no restart. `/model` still lists/switches ids.
-`exit` still leaves before any create.
+**Expected:** startup prints `Mode: plan` and
+`Tools Loaded: read, glob, grep`. Asking for an edit in plan proposes
+steps, prints
+`|Tools Used: \`read\||` / `|Tools Used: \`grep\||` on success, and never
+prints `|Tools Used: \`write\||` or `|Tools Used: \`edit\||`. A guessed
+`write`/`edit` call returns `Plan mode: … is disabled` as `role: "tool"`
+content. `user >> /build` restores full tools with no restart. `/model`
+still lists/switches ids. `exit` still leaves before any create.
 
 ## Your finished modules
 
@@ -313,7 +312,7 @@ which is active — stop.
 6. Why is there no `PLAN.md` file in this layer?
 7. Why must this layer not change `SANDBOX` or add a tool?
 
-Answers: (1) `mode = {"name": "build"}` in `agent.py`; `__main__.py`
+Answers: (1) `mode = {"name": "plan"}` in `agent.py`; `__main__.py`
 imports it — no `MODE =` copy; (2) nothing — `tools=active_schemas()`
 omits them, backstopped by the dispatch deny; (3) a `role: "tool"` string
 `Plan mode: … is disabled`, file untouched, model re-plans; (4) neither —

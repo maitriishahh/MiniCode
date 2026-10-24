@@ -301,7 +301,7 @@ stdout. After the model's reply, a status block:
 
 ```
 ---
-Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
@@ -385,8 +385,8 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `tools/glob.py` and `tools/grep.py`.
 
 **Layer 5 — plan/build.** Done. `docs/06-plan-build.md` implemented in
-`agent.py` and `__main__.py`. Plan drops `write`/`edit` from `tools=`
-and denies them at dispatch.
+`agent.py` and `__main__.py`. Startup default is `plan`. Plan drops
+`write`/`edit` from `tools=` and denies them at dispatch.
 
 **Layer 6 — shell.** Done. `docs/07-shell.md` implemented in
 `tools/shell.py` and `agent.py`. Plan denies `bash` and `powershell`.

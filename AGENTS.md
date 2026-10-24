@@ -123,9 +123,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   returns workspace-relative paths; a root outside returns absolute
   forward-slash paths. Never `relative_to(SANDBOX)` an outside hit — that
   raised, and the turn learned nothing.
-- Plan and build are one session. `mode = {"name": "build"}` lives in
-  `agent.py`. `/plan` and `/build` are handled in `__main__.py` before any
-  model call. Plan drops `write` and `edit` from `tools=`
+- Plan and build are one session. `mode = {"name": "plan"}` lives in
+  `agent.py`; a new session starts in plan. `/plan` and `/build` are
+  handled in `__main__.py` before any model call. Plan drops `write` and
+  `edit` from `tools=`
   (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
   `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
   `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.

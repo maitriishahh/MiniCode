@@ -1,8 +1,9 @@
 # STATUS.md — MiniCode
 
-Current code: layers 0–7 are in. Plan drops `write` / `edit` only.
-`bash` / `powershell` stay in the list and ask. Status line is
-`In | Out | Session | Elapsed: {_elapsed}`. Next is the streaming guide.
+Current code: layers 0–7 are in. Startup default is `plan`. Plan drops
+`write` / `edit` only. `bash` / `powershell` stay in the list and ask.
+Status line is `In | Out | Session | Elapsed: {_elapsed}`. Next is the
+streaming guide.
 
 ## Done
 
@@ -49,9 +50,9 @@ Current code: layers 0–7 are in. Plan drops `write` / `edit` only.
   wired. `SYSTEM` has the locate sentence as its own sentence. Shell is
   layer 6.
 - [x] Layer 5 (`docs/06-plan-build.md`): `/plan` and `/build` on one
-  session. Plan drops `write`/`edit` from `tools=` and denies them at
-  dispatch. `TOOLS` stays full. History is not rewritten. `MAX_STEPS` is
-  `16`. Shell is layer 6.
+  session. Startup default is `plan`. Plan drops `write`/`edit` from
+  `tools=` and denies them at dispatch. `TOOLS` stays full. History is
+  not rewritten. `MAX_STEPS` is `16`. Shell is layer 6.
 - [x] Layer 6 (`docs/07-shell.md`): `shell` in `tools/shell.py`. Windows:
   Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
   `bash` or `powershell`. This layer denied both in plan. Layer 7 puts
@@ -75,6 +76,8 @@ Current code: layers 0–7 are in. Plan drops `write` / `edit` only.
 - [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one
   decimal. Then two largest of `s m h d w y`. Week is 7 days. Year is 365
   days. No months.
+- [x] `README.md` — user install, configure, run, commands, tools,
+  permissions, status line, troubleshooting, and limitations.
 
 ## Next
 
@@ -85,7 +88,7 @@ Current code: layers 0–7 are in. Plan drops `write` / `edit` only.
 
 streaming/abort, sessions, cache
 control, cost, diff viewer, `AGENTS.md` injection, compaction (context gap
-on a real codebase; do not start it), tests (with `tool_from_fn`), README,
+on a real codebase; do not start it), tests (with `tool_from_fn`),
 models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;

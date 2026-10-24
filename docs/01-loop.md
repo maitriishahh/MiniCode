@@ -341,7 +341,7 @@ it inside the sandbox.
 File: `src/minicode/__main__.py`.
 
 ```python
-MODE = "build"
+MODE = "plan"
 
 def main() -> None:
     print(f"Sandbox: {SANDBOX}")
@@ -383,7 +383,7 @@ The live line also has `Session`. Do not restore `{elapsed:.1f}s`.
 
 ```
 ---
-Model: gemini-3.5-flash-lite | Mode: build | Tools Loaded: read
+Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read
 Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
