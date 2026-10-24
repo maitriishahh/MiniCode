@@ -105,7 +105,7 @@ sent to the model.
 ## Example session
 
 ```text
-Sandbox: C:\Users\you\Desktop\PyCharm Projects\MiniCode
+Sandbox: C:\path\to\project
 
 Mode: plan | Tools Loaded: read, glob, grep, bash
 
@@ -119,7 +119,7 @@ minicode >> The project depends on openai, pydantic, and python-dotenv.
 
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\Users\you\Desktop\PyCharm Projects\MiniCode
+Sandbox: C:\path\to\project
 1,204 In | 48 Out | 48 Session | Elapsed: 2.1s
 ---
 
@@ -193,7 +193,7 @@ After each turn:
 ```text
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\Users\you\Desktop\PyCharm Projects\MiniCode
+Sandbox: C:\path\to\project
 1,204 In | 48 Out | 96 Session | Elapsed: 2.1s
 ---
 ```
