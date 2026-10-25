@@ -65,10 +65,11 @@ mode = {"name":"plan"}
 PLAN_DENIED = ("write", "edit")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
-    "Do not create or modify files. Propose steps and wait for approval. "
-    "Do not create or delete files with the shell. Tell the user to run /build. "
+    "Do not create or modify files. Do not paste file contents. "
+    "Do not create or delete files with the shell. "
     "Never name internal tools. Speak in user actions: 'I will edit...', 'I checked...', not 'Use edit/glob/grep'. "
-    "Propose file + change + reason. To build, the user runs /build. "
+    "Propose the file, the change, and the reason. "
+    "If the user asks you to create or change a file, end by telling them to run /build. "
     "After `glob` returns, read every matching file in that same response. Do not read one file per turn. "
     "If the user named a file, read that path; do not glob first."
 )
@@ -154,6 +155,10 @@ for _fn in (read, write, edit, glob, grep, shell):
 last_usage = {"prompt_tokens": 0, "completion_tokens": 0}
 session_usage = {"completion_tokens": 0}
 
+def _tool_note(content: str) -> None:
+    print(f"\n{content}\n")
+
+
 def agent(messages:list) -> str:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
@@ -195,6 +200,7 @@ def agent(messages:list) -> str:
             args = call["function"]["arguments"]
             if mode["name"] == "plan" and name in PLAN_DENIED:
                 content = f"Plan mode: `{name}` is disabled. Propose the change and ask to run /build."
+                _tool_note(content)
             else:
                 run = TOOLS.get(name)
                 if run:
@@ -202,6 +208,7 @@ def agent(messages:list) -> str:
                     try:
                         if denied is not None:
                             content = denied
+                            _tool_note(content)
                         else:
                             content = run(args)
                             print(f"\n|Tools Used: `{name}` ({args})|\n")
@@ -209,6 +216,7 @@ def agent(messages:list) -> str:
                         clear_approved()
                 else:
                     content = f"Unknown tool: {name}"
+                    _tool_note(content)
             messages.append(
                 {
                     "role":"tool",

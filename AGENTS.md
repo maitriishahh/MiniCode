@@ -99,7 +99,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   of the full file. Partial changes (add/append/insert, replace X with Y)
   are `read` then `edit` — never `write` with partial content. A new file
   is `write`, not the shell. `PLAN_SYSTEM` says not to create or delete
-  files with the shell, and to tell the user to run `/build`. The routing
+  files with the shell, not to paste file contents, and, if the user asked
+  for a file, to end by telling them to run `/build`. The routing
   rule lives in `SYSTEM`, not in per-tool docstrings.
 - `edit` prints a one-shot stdlib `difflib.unified_diff` to stdout with
   `fromfile=f"a/{path} (before)"`, `tofile=f"b/{path} (after)"`,
@@ -131,7 +132,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `edit` from `tools=`
   (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
   `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
-  `SYSTEM + PLAN_SYSTEM`). History is not rewritten. `MAX_STEPS` is `16`.
+  `SYSTEM + PLAN_SYSTEM`). A new session starts in plan, so `messages[0]`
+  is `SYSTEM + " " + PLAN_SYSTEM` at startup, not only after `/plan`.
+  `/plan` and `/build` always assign that pair, even when the mode is
+  already the one requested. History is not rewritten. `MAX_STEPS` is `16`.
   Plan mode may tell the model to read every `glob` match in one response,
   and it says a user-named file is read directly without a `glob` first.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
@@ -167,14 +171,16 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   permissions file is deferred, after streaming, not next. `agent.py` holds
   `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
   `Permission denied: {key} {value}` as `role: "tool"`, with no
-  `|Tools Used|` line.
+  `|Tools Used|` line. A plan denial, a permission denial, and an unknown
+  tool print that tool string. Still no `|Tools Used|` line.
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the
   loaded shell. It says a new file is `write`, not the shell.
   `PLAN_SYSTEM` appends: if the user named a file, read that path; do not
   glob first. It also says not to create or delete files with the shell,
-  and to tell the user to run `/build`.
+  not to paste file contents, and, if the user asked for a file, to end by
+  telling them to run `/build`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths may be absolute or workspace-relative. On Windows, `classify`
   rewrites a Git Bash drive path `/d/Pycharm_Projects/...` to
@@ -220,7 +226,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
   After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
-  including in plan. Unknown tools stay silent on stdout. Status block
+  including in plan. A plan denial, a permission denial, and an unknown
+  tool print that tool string, not `|Tools Used|`. Status block
   after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.

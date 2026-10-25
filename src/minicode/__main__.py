@@ -48,7 +48,7 @@ def main() -> None:
     messages = [
         {
             "role":"system",
-            "content": SYSTEM
+            "content": SYSTEM + " " + PLAN_SYSTEM if mode["name"] == "plan" else SYSTEM
         }
     ]
     while True:
@@ -65,12 +65,11 @@ def main() -> None:
         stripped = text.strip()
         if stripped == "/plan" or stripped == "/build":
             want = stripped[1:]
-            if mode["name"] != want:
-                mode["name"] = want
-                if want == "plan":
-                    messages[0]["content"] = SYSTEM + " " + PLAN_SYSTEM
-                else:
-                    messages[0]["content"] = SYSTEM
+            mode["name"] = want
+            if want == "plan":
+                messages[0]["content"] = SYSTEM + " " + PLAN_SYSTEM
+            else:
+                messages[0]["content"] = SYSTEM
             print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
             continue
         if stripped == "/model" or stripped.startswith("/model "):

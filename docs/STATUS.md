@@ -88,6 +88,11 @@ streaming guide. Cost display waits until more models are added.
   skips their contents.
 - [x] `README.md` — user install, configure, run, commands, tools,
   permissions, status line, troubleshooting, and limitations.
+- [x] Plan prompt is loaded at startup, not only on a `/plan` transition.
+  `/plan` and `/build` always assign `messages[0]`. `PLAN_SYSTEM` forbids
+  pasting file contents and ends a create-or-change request with `/build`.
+  A plan denial, a permission denial, and an unknown tool print that tool
+  string. Still no `|Tools Used|` line for those.
 
 ## Open gaps
 
