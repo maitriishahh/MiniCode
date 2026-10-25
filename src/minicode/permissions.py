@@ -3,12 +3,21 @@ import sys
 
 RULES = (
     ("read", "*", "allow"),
+    ("read", "*.env", "ask"),
+    ("read", "*.env.*", "ask"),
+    ("read", "*.env.example", "allow"),
     ("glob", "*", "allow"),
     ("grep", "*", "allow"),
     ("edit", "*", "allow"),
-    ("shell", "*", "ask"),
+    ("shell", "*", "allow"),
+    ("shell", "*.env*", "ask"),
     ("external_directory", "*", "ask"),
 )
+
+_PLAN_VERBS = {
+    "rm", "rmdir", "del", "erase", "touch", "mkdir", "mv", "cp", "ln",
+    "cat", "head", "tail", "less", "more",
+}
 
 ALWAYS: set[tuple[str, str]] = set()
 ask = {"fn": None}
@@ -46,6 +55,36 @@ def check(key: str, value: str) -> str:
 
 def remember(key: str, value: str) -> None:
     ALWAYS.add((key, norm(value)))
+
+
+def plan_touches(command: str) -> bool:
+    if ">" in command:
+        return True
+    for part in re.split(r"&&|;|\|", command):
+        words = part.strip().split()
+        if not words:
+            continue
+        token = words[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if token in _PLAN_VERBS:
+            return True
+    return False
+
+
+def force_ask(key: str, value: str) -> str:
+    if check(key, value) == "deny":
+        return "deny"
+    if (key, norm(value)) in ALWAYS:
+        return "allow"
+    fn = ask["fn"]
+    if fn is None:
+        return "deny"
+    choice = fn(key, value)
+    if choice == "always":
+        remember(key, value)
+        return "allow"
+    if choice == "once":
+        return "allow"
+    return "deny"
 
 
 def decide(key: str, value: str) -> str:

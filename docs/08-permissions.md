@@ -31,7 +31,7 @@ forward slashes.
 | `edit` | the `path` argument; covers `write` and `edit` | `allow` |
 | `glob` | the glob pattern, not the search root | `allow` |
 | `grep` | the regex, not the search root | `allow` |
-| `shell` | the raw command; covers `bash` and `powershell` | `ask` |
+| `shell` | the raw command; covers `bash` and `powershell` | `allow`, except `.env` text |
 | `external_directory` | one resolved path outside the sandbox | `ask` |
 
 Rules are that table, in code. No `.minicode/permissions`. No prefix allows.
@@ -78,9 +78,11 @@ The existing message stays:
 `Plan mode: \`write\` is disabled. Propose the change and ask to run /build.`
 Same sentence for `edit`. Do not prompt. Do not print `|Tools Used|`.
 
-`bash` and `powershell` stay in the schema in plan. Plan uses the same
-`shell` ask as build. A rule denial is `Permission denied: …`, not
-"disabled." Do not force-deny shell because the mode is plan.
+`bash` and `powershell` stay in the schema in plan. Plan asks when a piece's
+first word is a content-read, create, or delete, or the text contains `>`.
+`ls`, `pwd`, `git`, `python`, `echo`, and `find` do not ask. A rule denial
+is `Permission denied: …`, not "disabled." Do not force-deny shell because
+the mode is plan.
 
 ## Post-pass — absolute paths and outside hits
 
@@ -427,21 +429,20 @@ This machine registers `bash`. The same checks apply if the winner is
 `powershell`. Do not soak with `&&`.
 
 1. In-sandbox `write` runs with no prompt, then prints `|Tools Used|`.
-2. `run git status` prints `Permission: shell` and the command. `deny`
-   returns `Permission denied: shell git status` as `role: "tool"`, does
-   not print a `Shell (` block, and does not print `|Tools Used|`.
-   `always` skips the prompt only for that exact command. `git status
-   --short` asks again.
+2. `run git status` does not prompt. `touch notes.txt` in plan does.
+   `deny` returns `Permission denied: shell …`, does not print a `Shell (`
+   block, and does not print `|Tools Used|`. `always` skips the prompt only
+   for that exact command.
 3. A path outside the sandbox, such as `C:/Windows/win.ini` on this
    machine, prints `Permission: external_directory` and the resolved
    forward-slash path. `deny` does not call the tool. `once` reads that
    one path. A second outside path asks again.
-4. `.env` inside the sandbox, and a `.env` outside it, return
-   `Refusing to access .env files`. No prompt. No `|Tools Used|`.
+4. `.env` inside or outside prompts on `read`. Deny does not read it.
+   `.env.example` does not prompt.
 5. `/plan` still hides `write` and `edit`. Tools Loaded does not include
    them. A guessed `write` is still `Plan mode: \`write\` is disabled`.
-   A shell call in plan prompts. It is not "disabled." `/build` puts
-   `write` and `edit` back. Shell still asks.
+   `ls` in plan does not prompt. `rm` in plan does. `/build` puts `write`
+   and `edit` back. Ordinary shell does not ask.
 
 The fence is still for file tools:
 
@@ -463,8 +464,10 @@ still `cd` out after the user allows that exact command. Do not parse it.
 ## Don't add yet
 
 Later, in order, not in the implement pass: streaming and a Ctrl+C that
-leaves a coherent turn, sessions. A permissions file and a durable
-`always` wait with sessions. Do not write one now. Background bash stays
+leaves a coherent turn, sessions. An OpenCode-shaped JSON permissions file
+is deferred after streaming, not next. `always` stays in memory until
+sessions. A configured `deny` beats `always`. Do not write the file now.
+Background bash stays
 deferred. `/connect` stays with the catalog. Do not add the transport tag
 here.
 
@@ -476,17 +479,17 @@ symlink policy, `doom_loop`, v2's default-allow outside the sandbox.
 ## Checkpoint
 
 1. Which key gates `write`? Which key gates `powershell`?
-2. Why is an in-sandbox `edit` silent, while `shell` asks?
+2. Why is an in-sandbox `edit` silent, while `touch` in plan asks?
 3. What does `always` store, and what does it not store?
 4. What happens if `__main__.py` forgets to set `ask["fn"]`?
 5. Why is the approved set a set of `Path`s, not a boolean?
 6. In plan, is `bash` in the schema? What does a denied shell call say?
-7. What string comes back for `.env` outside the sandbox? Is there a prompt?
+7. What happens for `.env`? Is there a prompt?
 
 Answers: (1) `edit`, and `shell`; (2) the sandbox already bounds the path,
-and there is no command scanner, so the ask is the shell gate; (3) the
+and ordinary shell is allow; plan asks only for content-read, create, and delete; (3) the
 exact normalized value, in memory, until exit — not a widened glob, not a
 file, and not a `deny`; (4) `decide` returns `deny`; (5) a boolean would
 let `glob` or `grep` escape past the one path the user allowed; (6) yes,
 and `Permission denied: shell …`, not `Plan mode: \`bash\` is disabled`;
-(7) `Refusing to access .env files`, and no.
+(7) `Permission: read` for the resolved path; deny does not open it.

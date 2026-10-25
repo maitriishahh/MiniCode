@@ -141,8 +141,6 @@ def _show(text: str) -> str:
 def shell(command: str) -> str:
     if not command.strip():
         raise ValueError("Empty command")
-    if ".env" in command.lower():
-        raise ValueError("Refusing to access .env file")
     if _RESOLVED is None:
         raise ValueError("No shell found. Searched: " +"; ".join(_SEARCHED))
     argv, _dialect, _name = _RESOLVED

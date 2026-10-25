@@ -144,19 +144,25 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   not name `&&` or a semicolon. `cwd` is `SANDBOX`. Timeout is
   120s, not a parameter. Output is capped at 8000 characters, tail kept. A
   non-zero exit returns `exit {code}` plus output, and that string is
-  printed once. `.env` in the command text is a tool error. No `workdir`,
+  printed once. A shell command whose text contains `.env` asks. `$VAR`
+  and `$env:VAR` do not. No `workdir`,
   no background process, no persistent session. Do not point `cwd` at the
   repo root to bypass `--sandbox`.
 - Permissions are implemented in `docs/08-permissions.md`,
   `permissions.py`, the dispatch gate in `agent.py`, and the prompt in
   `__main__.py`. No config file, no shell scanner, no env scrubbing, no
   transport tag. Defaults: `read` / `glob` / `grep` / `edit` allow (`edit`
-  gates `write` and `edit`); `shell` ask (gates `bash` and `powershell`);
-  `external_directory` ask. Last matching rule wins. `*` matches any
-  character, including `/`. `always` is in-memory and exact. A missing
-  prompt denies. `.env` stays a hard refuse. Plan keeps `write` / `edit` out
-  of the schema. Shell stays in the schema and asks. Do not parse the
-  command. Do not force-deny shell in plan. `agent.py` holds
+  gates `write` and `edit`); `shell` allow, except a command whose text
+  contains `.env`, which asks; `read` of `*.env` and `*.env.*` asks,
+  `*.env.example` allows; `external_directory` asks. Last matching rule
+  wins. `*` matches any character, including `/`. `always` is in-memory
+  and exact. A missing prompt denies. Plan keeps `write` / `edit` out of
+  the schema. Shell stays in the schema. In plan, a command asks when a
+  piece's first word is a content-read, create, or delete (`rm`, `touch`,
+  `cat`, and the rest of that list) or the text contains `>`. `ls`, `pwd`,
+  `git`, `python`, `echo`, and `find` do not. Do not parse past that. Do
+  not force-deny shell in plan. `python -c` can still write. A JSON
+  permissions file is deferred, after streaming, not next. `agent.py` holds
   `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
   `Permission denied: {key} {value}` as `role: "tool"`, with no
   `|Tools Used|` line.
@@ -171,8 +177,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `D:/Pycharm_Projects/...` before the sandbox check. `/tmp` and `/home`
   do not match. No rewrite on Unix. A path outside the workspace
   triggers `external_directory`: allow runs, ask prompts, deny returns
-  `Permission denied: external_directory {path}`. `.env` files stay a hard
-  tool error, inside or outside.
+  `Permission denied: external_directory {path}`. `.env` and `.env.*` ask
+  on `read`. `.env.example` does not. A denial is `Permission denied: read
+  {path}`.
   Workspace is the launch cwd (`_sandbox_root()`: `Path.cwd().resolve()`,
   `--sandbox path` overrides it, auto-created at startup). The old default
   was the root-level `sandbox/` dir — that was the dev fence so tool tests

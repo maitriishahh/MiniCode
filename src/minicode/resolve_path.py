@@ -28,7 +28,7 @@ def _from_bash(path: str) -> str:
 def classify(path: str) -> tuple[str, Path]:
     path = _from_bash(path)
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
-    if p.name == ".env" or p.name.startswith(".env."):
+    if p.name != ".env.example" and (p.name == ".env" or p.name.startswith(".env.")):
         return "dotenv", p
     if p != SANDBOX and SANDBOX not in p.parents:
         return "external", p
@@ -45,7 +45,7 @@ def clear_approved() -> None:
 
 def _resolve(path: str) -> Path:
     kind, p = classify(path)
-    if kind == "dotenv":
+    if kind == "dotenv" and p not in _approved:
         raise ValueError("Refusing to access .env files")
     if kind == "external" and p not in _approved:
         raise ValueError(f"Outside sandbox: {path}")

@@ -225,11 +225,12 @@ Product workspace is the launch directory, like Pi and OpenCode: cwd, or
 `--sandbox path`. `read` / `write` / `edit` / `glob` / `grep` accept an
 absolute path or a workspace-relative one. An absolute path outside the
 workspace is not silently rejected: it triggers `external_directory`.
-`.env` files stay denied even inside the workspace.
+`.env` and `.env.*` ask on read. `.env.example` does not.
 
 Permissions are implemented (Layer 7, `docs/08-permissions.md`): `allow` /
 `ask` / `deny`, last matching rule wins, `*` crosses `/`. Defaults are
-`read` / `glob` / `grep` / `edit` allow, `shell` ask, `external_directory`
+`read` / `glob` / `grep` / `edit` allow, `shell` allow except `.env` text,
+`external_directory`
 ask. `ask` is a REPL prompt (`once` / `always` / `deny`); `always` is
 in-memory and exact. No config file, no command scanner, no env scrubbing.
 `always` does not outlive the process; that waits with sessions. `glob` and
@@ -251,9 +252,10 @@ first.
 The permissions guide is `docs/08-permissions.md`, implemented in
 `permissions.py`, `agent.py`, and `__main__.py`. OpenCode's actions are
 `allow` / `ask` / `deny`, last matching rule wins. Inside the sandbox, reads
-and edits allow. `shell` asks, because this project does not parse the
-command. `external_directory` asks, so a path outside the sandbox is a
-prompt instead of a hard error. `.env` stays denied. `always` is exact and
+and edits allow. `shell` allows ordinary commands. It asks when the text
+contains `.env`, and in plan when a piece reads file contents, creates, or
+deletes. `external_directory` asks, so a path outside the sandbox is a
+prompt instead of a hard error. `.env` reads ask. `always` is exact and
 dies with the process. No config file. No scanner. Containerization stays
 the real boundary for untrusted work.
 
@@ -268,7 +270,7 @@ with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
 adds `bash` and `powershell` to that deny set. That pass is done.
 `docs/08-permissions.md` puts both names back in the tool list. The same
-`shell` ask used in build restricts them. It does not force-deny them, and
+plan verb check restricts content-read, create, and delete. It does not force-deny them, and
 it is not a stricter prompt. `write` / `edit` stay dropped from the schema.
 `/plan` and `/build` switch, and the status line shows which is active.
 

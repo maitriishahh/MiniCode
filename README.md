@@ -85,7 +85,8 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 
 1. Ask for something in plain English.
 2. MiniCode may read, search, or run a permitted command.
-3. Shell commands and paths outside the workspace ask for permission.
+3. Paths outside the workspace ask for permission. Shell asks for `.env`,
+   and in plan mode for commands that read, create, or delete files.
 4. Type `/build` before asking for file changes.
 5. Leave with `exit`, `quit`, `bye`, or Ctrl+C at the prompt.
 
@@ -141,17 +142,19 @@ fallback.
 | `grep` | Searches file contents with a regex. | Capped at 50 matches. `include` filters file names. |
 | `bash` / `powershell` | Runs a shell command. | 120-second timeout. Output capped at 8,000 characters. |
 
-`glob` and `grep` skip dot-directories, `__pycache__`, `.venv`, and `.env`
-files. Both tell the model to refine broad searches.
+`glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
+also skips `.env` contents. `glob` may list the name. Both tell the model
+to refine broad searches.
 
 ## Plan and build
 
 **Plan** is for reading, searching, and proposing changes. `write` and `edit`
 are not offered to the model, and a guessed call is refused. Shell commands are
-still available but ask for permission.
+still available. In plan, a command asks when it reads file contents, creates,
+or deletes. `ls` and `git` do not.
 
 **Build** offers every tool. `write` and `edit` run without a prompt inside the
-workspace. Shell commands still ask.
+workspace. Ordinary shell commands do not ask.
 
 Plan mode is not a hard sandbox: an approved shell command can still change
 files. Use build mode deliberately.
@@ -164,7 +167,7 @@ files. Use build mode deliberately.
 | `edit` | `write`, `edit` | allow |
 | `glob` | `glob` | allow |
 | `grep` | `grep` | allow |
-| `shell` | `bash`, `powershell` | ask |
+| `shell` | `bash`, `powershell` | allow, except `.env` text and plan verbs |
 | `external_directory` | paths outside the workspace | ask |
 
 When prompted:
@@ -173,8 +176,8 @@ When prompted:
 - `a` or `always` allows that exact value until MiniCode exits.
 - `d`, an empty answer, or Ctrl+C denies the call.
 
-`.env` files are always refused. A denial is returned to the model as
-`Permission denied: <key> <value>`.
+`.env` and `.env.*` ask on read. `.env.example` does not. A denial is
+returned to the model as `Permission denied: <key> <value>`.
 
 ## Workspace and safety
 

@@ -13,7 +13,7 @@ from minicode.tools.edit import edit
 from minicode.tools.glob import glob
 from minicode.tools.grep import grep
 from minicode.tools.shell import shell
-from minicode.permissions import decide
+from minicode.permissions import decide, force_ask, plan_touches
 from minicode.resolve_path import SANDBOX, classify, approve, clear_approved
 
 MAX_STEPS = 16
@@ -104,7 +104,11 @@ def _permit(name: str, raw: str) -> str | None:
     if isinstance(path, str) and name in ("read", "write", "edit", "glob", "grep"):
         kind, resolved = classify(path)
         if kind == "dotenv":
-            return "Refusing to access .env files"
+            shown = resolved.as_posix()
+            if decide("read", shown) == "deny":
+                return f"Permission denied: read {shown}"
+            approve(resolved)
+            return None
         if kind == "external":
             shown = resolved.as_posix()
             if decide("external_directory", shown) == "deny":
@@ -116,7 +120,11 @@ def _permit(name: str, raw: str) -> str | None:
     value = _value(key, parsed)
     if value is None:
         return None
-    if decide(key, value) == "deny":
+    if key == "shell" and mode["name"] == "plan" and plan_touches(value):
+        action = force_ask(key, value)
+    else:
+        action = decide(key, value)
+    if action == "deny":
         return f"Permission denied: {key} {value}"
     return None
 

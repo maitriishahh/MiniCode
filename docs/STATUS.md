@@ -1,7 +1,8 @@
 # STATUS.md — MiniCode
 
 Current code: layers 0–7 are in. Startup default is `plan`. Plan drops
-`write` / `edit` only. `bash` / `powershell` stay in the list and ask.
+`write` / `edit` only. `bash` / `powershell` stay in the list. Shell asks
+for `.env` text, and in plan for content-read, create, and delete verbs.
 Status line is `In | Out | Session | Elapsed: {_elapsed}`. Next is the
 streaming guide. Cost display waits until more models are added.
 
@@ -59,7 +60,8 @@ streaming guide. Cost display waits until more models are added.
   them back and adds permissions. `cwd` is `SANDBOX`.
 - [x] Layer 7 (`docs/08-permissions.md`): `permissions.py`, dispatch gate,
   and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
-  gates `write` and `edit`); `shell` asks; `external_directory` asks.
+  gates `write` and `edit`); `shell` allows except `.env` text and plan
+  verbs; `external_directory` asks.
   `always` is in-memory and exact. Plan keeps `write` / `edit` out of the
   schema; `bash` / `powershell` stay in and ask.
 - [x] Absolute-path fix: `read` / `write` / `edit` / `glob` / `grep` path
@@ -78,6 +80,10 @@ streaming guide. Cost display waits until more models are added.
   days. No months.
 - [x] On Windows, `classify` rewrites Git Bash `/d/...` to `D:/...` before
   the sandbox check. `/tmp` and `/home` stay as written. No rewrite on Unix.
+- [x] Shell defaults to allow. Ask for `.env` reads, `.env` in a command,
+  `external_directory`, and plan-mode content-read / create / delete verbs.
+  `.env.example` stays allow. `glob` may list `.env` names. `grep` still
+  skips their contents.
 - [x] `README.md` — user install, configure, run, commands, tools,
   permissions, status line, troubleshooting, and limitations.
 
@@ -92,7 +98,8 @@ Known and accepted. These are not the next layer.
 - Cache tokens in `usage` are not displayed.
 - Sandbox is a path boundary, not a container; shell can `cd` out and
   inherits the process environment.
-- Plan hides `write` / `edit` only; shell stays in the tool list and asks.
+- Plan hides `write` / `edit` only. Shell stays in the list. Plan asks for
+  content-read, create, and delete verbs, not for `ls` or `git`.
 - `always` approvals are in-memory only.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
@@ -105,7 +112,9 @@ Known and accepted. These are not the next layer.
 
 ## Deferred (do not start)
 
-streaming/abort, sessions, cache
+streaming/abort, sessions, a JSON permissions file (OpenCode-shaped
+rules, loaded at startup; `always` stays in memory until sessions; a
+configured `deny` beats `always`), cache
 control, diff viewer, `AGENTS.md` injection, compaction (context gap
 on a real codebase; do not start it), cost (until more models are added;
 then pricing on the Model record), tests (still not written),

@@ -22,9 +22,10 @@ def glob(pattern:str, path:str=".", limit:int=50) -> str:
             if not name.startswith(".") and name not in ("__pycache__", ".venv")
         ]
         for name in filenames:
-            if name == ".env" or name.startswith(".env."):
-                continue
-            if not Path(name).match(pattern):
+            dotenv = name == ".env" or name.startswith(".env.")
+            if dotenv and pattern in ("*", ".*", ".env*"):
+                pass
+            elif not Path(name).match(pattern):
                 continue
             file = Path(dirpath) / name
             shown = file.relative_to(SANDBOX).as_posix() if inside else file.as_posix()
