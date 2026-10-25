@@ -97,7 +97,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `old_text`=anchor, `new_text`=anchor+insertion). A new file is `write`
   with no read. An existing file replaced wholesale is `read` then `write`
   of the full file. Partial changes (add/append/insert, replace X with Y)
-  are `read` then `edit` — never `write` with partial content. The routing
+  are `read` then `edit` — never `write` with partial content. A new file
+  is `write`, not the shell. `PLAN_SYSTEM` says not to create or delete
+  files with the shell, and to tell the user to run `/build`. The routing
   rule lives in `SYSTEM`, not in per-tool docstrings.
 - `edit` prints a one-shot stdlib `difflib.unified_diff` to stdout with
   `fromfile=f"a/{path} (before)"`, `tofile=f"b/{path} (after)"`,
@@ -169,8 +171,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the
-  loaded shell. `PLAN_SYSTEM` appends: if the user named a file, read that
-  path; do not glob first.
+  loaded shell. It says a new file is `write`, not the shell.
+  `PLAN_SYSTEM` appends: if the user named a file, read that path; do not
+  glob first. It also says not to create or delete files with the shell,
+  and to tell the user to run `/build`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
 - Paths may be absolute or workspace-relative. On Windows, `classify`
   rewrites a Git Bash drive path `/d/Pycharm_Projects/...` to

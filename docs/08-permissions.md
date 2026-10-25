@@ -91,8 +91,10 @@ Implemented after the first permissions pass. File-tool docstrings now say
 `read` / `glob` / `grep` no longer say "in/under the sandbox". `SYSTEM`
 states the workspace root, allows absolute paths, says a user-named file is
 read with `read`, gives `glob` → `grep` → `read`, and names only the loaded
-shell. `PLAN_SYSTEM` adds: if the user named a file, read that path; do not
-glob first.
+shell. It says a new file is `write`, not the shell. `PLAN_SYSTEM` adds:
+if the user named a file, read that path; do not glob first. It also says
+not to create or delete files with the shell, and to tell the user to run
+`/build`.
 
 `glob` and `grep` also changed. After an outside root is approved, they no
 longer call `file.relative_to(SANDBOX)` — that raised for a Desktop hit and

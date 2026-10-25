@@ -71,8 +71,10 @@ streaming guide. Cost display waits until more models are added.
   `relative_to(SANDBOX)` crash on an outside hit.
 - [x] `SYSTEM` names the workspace, allows absolute paths, says a
   user-named file is read with `read`, gives the locate order, and names
-  only the loaded shell. `PLAN_SYSTEM` adds: if the user named a file, read
-  that path; do not glob first.
+  only the loaded shell. A new file is `write`, not the shell.
+  `PLAN_SYSTEM` adds: if the user named a file, read that path; do not glob
+  first. It also says not to create or delete files with the shell, and to
+  tell the user to run `/build`.
 - [x] Status line adds `Session`: process sum of `completion_tokens`.
   `In` and `Out` are unchanged. Prompt tokens are not added.
 - [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one

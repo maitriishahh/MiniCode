@@ -53,6 +53,7 @@ SYSTEM = (
     "`edit` changes one exact unique span. For add/append/insert or replace X with Y, `read` then `edit`; "
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
+    "A new file is `write`, not the shell. "
     f"Workspace is {SANDBOX}. A path may be absolute. Outside it asks permission. "
     "A path the user already named is read with `read`, not `glob` and not the shell. "
     "Locate an unknown file with `glob`, then `grep`, then `read`. "
@@ -65,6 +66,7 @@ PLAN_DENIED = ("write", "edit")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
     "Do not create or modify files. Propose steps and wait for approval. "
+    "Do not create or delete files with the shell. Tell the user to run /build. "
     "Never name internal tools. Speak in user actions: 'I will edit...', 'I checked...', not 'Use edit/glob/grep'. "
     "Propose file + change + reason. To build, the user runs /build. "
     "After `glob` returns, read every matching file in that same response. Do not read one file per turn. "
