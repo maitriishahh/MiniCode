@@ -166,7 +166,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   loaded shell. `PLAN_SYSTEM` appends: if the user named a file, read that
   path; do not glob first.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
-- Paths may be absolute or workspace-relative. A path outside the workspace
+- Paths may be absolute or workspace-relative. On Windows, `classify`
+  rewrites a Git Bash drive path `/d/Pycharm_Projects/...` to
+  `D:/Pycharm_Projects/...` before the sandbox check. `/tmp` and `/home`
+  do not match. No rewrite on Unix. A path outside the workspace
   triggers `external_directory`: allow runs, ask prompts, deny returns
   `Permission denied: external_directory {path}`. `.env` files stay a hard
   tool error, inside or outside.

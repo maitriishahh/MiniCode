@@ -207,11 +207,28 @@ Replace `_resolve`. `.env` is classified before the sandbox check, so an
 outside `.env` is the refuse string, not `Outside sandbox`, and it never
 asks.
 
+On Windows, `_from_bash` rewrites a Git Bash drive path before the join.
+`/d/Pycharm_Projects/MiniCode/sandbox/calc.py` becomes
+`D:/Pycharm_Projects/MiniCode/sandbox/calc.py`, which is inside the
+sandbox and does not ask. `/tmp` and `/home` do not match. No rewrite
+on Unix.
+
 ```python
 _approved: set[Path] = set()
+_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
+
+
+def _from_bash(path: str) -> str:
+    if sys.platform != "win32":
+        return path
+    match = _BASH_DRIVE.match(path.replace("\\", "/"))
+    if not match:
+        return path
+    return f"{match.group(1)}:/{match.group(2)}"
 
 
 def classify(path: str) -> tuple[str, Path]:
+    path = _from_bash(path)
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
     if p.name == ".env" or p.name.startswith(".env."):
         return "dotenv", p

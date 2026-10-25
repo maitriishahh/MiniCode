@@ -76,6 +76,8 @@ streaming guide. Cost display waits until more models are added.
 - [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one
   decimal. Then two largest of `s m h d w y`. Week is 7 days. Year is 365
   days. No months.
+- [x] On Windows, `classify` rewrites Git Bash `/d/...` to `D:/...` before
+  the sandbox check. `/tmp` and `/home` stay as written. No rewrite on Unix.
 - [x] `README.md` — user install, configure, run, commands, tools,
   permissions, status line, troubleshooting, and limitations.
 
