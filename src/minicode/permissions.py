@@ -39,7 +39,7 @@ def _match(pattern: str, value: str) -> bool:
             parts.append(".")
         else:
             parts.append(re.escape(ch))
-    return re.fullmatch("".join(parts), value) is not None
+    return re.fullmatch("".join(parts), value, flags=re.DOTALL) is not None
 
 
 def check(key: str, value: str) -> str:

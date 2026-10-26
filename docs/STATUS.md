@@ -96,6 +96,8 @@ streaming guide. Cost display waits until more models are added.
 - [x] A denied plan-mode shell ask returns a short `/build` sentence. The
   command stays in the prompt and is not copied into the tool string.
   The ask remains. Shell is not force-denied.
+- [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
+  heredoc still asks. A denied ask still returns the short `/build` sentence.
 
 ## Open gaps
 

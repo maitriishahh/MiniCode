@@ -161,7 +161,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   gates `write` and `edit`); `shell` allow, except a command whose text
   contains `.env`, which asks; `read` of `*.env` and `*.env.*` asks,
   `*.env.example` allows; `external_directory` asks. Last matching rule
-  wins. `*` matches any character, including `/`. `always` is in-memory
+  wins. `*` matches any character, including `/` and a newline. `always` is in-memory
   and exact. A missing prompt denies. Plan keeps `write` / `edit` out of
   the schema. Shell stays in the schema. In plan, a command asks when a
   piece's first word is a content-read, create, or delete (`rm`, `touch`,
