@@ -171,8 +171,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   permissions file is deferred, after streaming, not next. `agent.py` holds
   `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
   `Permission denied: {key} {value}` as `role: "tool"`, with no
-  `|Tools Used|` line. A plan denial, a permission denial, and an unknown
-  tool print that tool string. Still no `|Tools Used|` line.
+  `|Tools Used|` line. A plan-mode shell ask that the user denies returns
+  `Plan mode: that command was denied. Do not try another shell command to create or change a file. Tell the user to run /build.`
+  The prompt still shows the command. The tool string does not. A plan
+  denial, a permission denial, and an unknown tool print that tool string.
+  Still no `|Tools Used|` line.
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the

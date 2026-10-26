@@ -124,9 +124,14 @@ def _permit(name: str, raw: str) -> str | None:
     if value is None:
         return None
     if key == "shell" and mode["name"] == "plan" and plan_touches(value):
-        action = force_ask(key, value)
-    else:
-        action = decide(key, value)
+        if force_ask(key, value) == "deny":
+            return (
+                "Plan mode: that command was denied. "
+                "Do not try another shell command to create or change a file. "
+                "Tell the user to run /build."
+            )
+        return None
+    action = decide(key, value)
     if action == "deny":
         return f"Permission denied: {key} {value}"
     return None

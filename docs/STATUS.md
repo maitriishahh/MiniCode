@@ -93,6 +93,9 @@ streaming guide. Cost display waits until more models are added.
   pasting file contents and ends a create-or-change request with `/build`.
   A plan denial, a permission denial, and an unknown tool print that tool
   string. Still no `|Tools Used|` line for those.
+- [x] A denied plan-mode shell ask returns a short `/build` sentence. The
+  command stays in the prompt and is not copied into the tool string.
+  The ask remains. Shell is not force-denied.
 
 ## Open gaps
 
