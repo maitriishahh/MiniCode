@@ -6,6 +6,66 @@ One Python loop over an OpenAI-compatible chat API.
 
 **MiniCode starts in plan mode. Type `/build` to enable file writes.**
 
+## Architecture
+
+Solid arrows are runtime calls. `permissions.py` calls the prompt callback that
+`__main__.py` registers. `schema_generator.py` wraps each tool at import; its
+box carries the `import-time factory` label.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                    __main__.py (CLI)                                    |
+|  REPL loop · /plan /build /model · status · permission prompt adapter                   |
+|  shared messages · registers permissions.ask["fn"] · reads SANDBOX                      |
++-----------------------------------------------------------------------------------------+
+                                             | agent(messages)
+                                             v
++-----------------------------------------------------------------------------------------+
+|                                      agent.py (Core)                                    |
+|  .env + OpenAI client · MODELS/active · mode · MAX_STEPS loop                           |
+|  history · active_schemas() · TOOLS/SCHEMAS · tool dispatch                             |
+|  sole model-call site                                                                   |
++-----------------------------------------------------------------------------------------+
+              /                              |                              \
+              v                              v                              v
++---------------------------+  +---------------------------+  +---------------------------+
+|      permissions.py       |  |      resolve_path.py      |  |    schema_generator.py    |
+|     rules · ask hook      |  |    SANDBOX · classify     |  |      tool_from_fn()       |
+|    decide · force_ask     |  |    approve · _resolve     |  |    docstring -> schema    |
+|      plan_touches         |  |    path gate for tools    |  |    pydantic validation    |
+|      policy only          |  |      approval set         |  |    import-time factory    |
++---------------------------+  +-------------+-------------+  +-------------+-------------+
+                                             ^                              |
+                                             |                              |
+                                             |                              v
++-----------------------------------------------------------------------------------------+
+|                                       tools/                                            |
+|  - read.py  (line-numbered text)           - glob.py   (pattern matching)               |
+|  - write.py (overwrite file)               - grep.py   (content searching)              |
+|  - edit.py  (exact span replacement)       - shell.py  (subprocess execution)           |
++-----------------------------------------------------------------------------------------+
+```
+
+`agent.py` is the only module that calls the model. `permissions.py` does not
+run tools: `agent.py` checks the decision and then dispatches
+`TOOLS[name](args)`. `schema_generator.py` built those wrappers at import.
+`tools/read`, `write`, `edit`, `glob`, and `grep` call `resolve_path._resolve`;
+`shell` uses `SANDBOX`. `agent.py`, `tools/edit.py`, and `tools/shell.py` also
+write to stdout; the CLI is not the only printer.
+
+| Caller | Callee | What crosses |
+|---|---|---|
+| `__main__` | `agent` | `agent(messages)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage |
+| `__main__` | `permissions` | registers `ask["fn"]` at import |
+| `__main__` | `resolve_path` | reads `SANDBOX` at import |
+| `agent` | OpenAI API | one `chat.completions.create` site |
+| `agent` | `permissions` | `decide` / `force_ask` / `plan_touches` |
+| `permissions` | `__main__` | calls the registered prompt (callback) |
+| `agent` | `resolve_path` | `classify` / `approve` / `clear_approved` |
+| `agent` | `schema_generator` + `tools` | builds `TOOLS`/`SCHEMAS` at import; dispatches `TOOLS[name]` |
+| `schema_generator` | `tools` | wraps each function at import into a validating `run` |
+| `tools` | `resolve_path` | `_resolve` / `SANDBOX` |
+
 ## Features
 
 - Plan and build modes in one session
@@ -13,7 +73,8 @@ One Python loop over an OpenAI-compatible chat API.
 - Exact-match edits with a terminal diff
 - Model switching with `/model`
 - Workspace-bounded file access with `.env` protection
-- Permission prompts for shell commands and paths outside the workspace
+- Permission prompts for `.env` access, plan-mode file-changing shell commands,
+  and paths outside the workspace
 - Per-turn token and elapsed-time status
 
 ## Requirements
@@ -176,8 +237,9 @@ When prompted:
 - `a` or `always` allows that exact value until MiniCode exits.
 - `d`, an empty answer, or Ctrl+C denies the call.
 
-`.env` and `.env.*` ask on read. `.env.example` does not. A denial is
-returned to the model as `Permission denied: <key> <value>`.
+`.env` and `.env.*` ask on read. `.env.example` does not. Permission denials
+return `Permission denied: <key> <value>`. A denied plan-mode shell ask returns
+the short `/build` sentence instead.
 
 ## Workspace and safety
 

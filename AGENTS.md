@@ -76,6 +76,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 
 ## Conventions (do not break)
 
+- User-facing behavior changes update `README.md` in the same pass. An
+  architecture edge names an import or call site; label runtime, import-time,
+  and callback edges. A policy gate is not a parent of the tools it governs.
 - Growing file: each guide says keep / add / replace. The loop shape in
   `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
