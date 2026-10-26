@@ -3,8 +3,9 @@
 Current code: layers 0–7 are in. Startup default is `plan`. Plan drops
 `write` / `edit` only. `bash` / `powershell` stay in the list. Shell asks
 for `.env` text, and in plan for content-read, create, and delete verbs.
-Status line is `In | Out | Session | Elapsed: {_elapsed}`. Next is the
-streaming guide. Cost display waits until more models are added.
+Status line is `In | Out | Session | Elapsed: {_elapsed}`. The streaming
+guide is written and not implemented. Cost display waits until more models
+are added.
 
 ## Done
 
@@ -98,6 +99,8 @@ streaming guide. Cost display waits until more models are added.
   The ask remains. Shell is not force-denied.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
+- [x] `docs/09-streaming.md` — streaming and Ctrl+C abort. Specified, not
+  implemented. Implement that file next. Not sessions.
 
 ## Open gaps
 
@@ -105,7 +108,6 @@ Known and accepted. These are not the next layer.
 
 - No tests for `tool_from_fn` or the tools.
 - History is unbounded; compaction is deferred until the context gap hurts.
-- No streaming/abort. Ctrl+C during a model or shell call ends the REPL.
 - `context_window` is `None`, so context `%` is off.
 - Cache tokens in `usage` are not displayed.
 - Sandbox is a path boundary, not a container; shell can `cd` out and
@@ -119,12 +121,11 @@ Known and accepted. These are not the next layer.
 
 ## Next
 
-1. Write the streaming/abort guide. Do not implement it in that pass.
-   Not sessions.
+1. Implement `docs/09-streaming.md`. Do not start sessions in that pass.
 
 ## Deferred (do not start)
 
-streaming/abort, sessions, a JSON permissions file (OpenCode-shaped
+sessions, a JSON permissions file (OpenCode-shaped
 rules, loaded at startup; `always` stays in memory until sessions; a
 configured `deny` beats `always`), cache
 control, diff viewer, `AGENTS.md` injection, compaction (context gap

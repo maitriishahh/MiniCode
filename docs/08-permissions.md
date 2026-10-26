@@ -382,7 +382,8 @@ returns `Tool error:`. A gate denial does not print it. An unknown name
 does not print it. A plan denial does not print it.
 
 Do not catch `KeyboardInterrupt` around `run()`. Ctrl+C during a shell
-wait still kills the REPL. That is the streaming layer.
+wait still kills the REPL. That is `docs/09-streaming.md`. The guide is
+written. It is not implemented.
 
 ## Segment 4 — the prompt
 
@@ -466,7 +467,7 @@ still `cd` out after the user allows that exact command. Do not parse it.
 ## Don't add yet
 
 Later, in order, not in the implement pass: streaming and a Ctrl+C that
-leaves a coherent turn, sessions. An OpenCode-shaped JSON permissions file
+leaves a coherent turn (`docs/09-streaming.md`, written, not implemented), sessions. An OpenCode-shaped JSON permissions file
 is deferred after streaming, not next. `always` stays in memory until
 sessions. A configured `deny` beats `always`. Do not write the file now.
 Background bash stays
