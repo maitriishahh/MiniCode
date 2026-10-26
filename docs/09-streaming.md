@@ -117,131 +117,277 @@ Cost display stays deferred until more models are added.
 
 ## Segment 1 — stream and usage
 
-File: `src/minicode/agent.py`.
+File: `src/minicode/agent.py`. Add `import uuid` with the other imports.
+Paste these helpers above `agent`. A chunk with no choices is usage only.
+Do not index `choices[0]` on it. Ignore empty content for display. A
+signature may ride on that empty part. Keep `extra_content`. Do not parse
+it. If the step produced no text and no tool calls, `_assistant` stores
+`[empty response]` and `agent` emits it through `on_text` once. If the
+stream raised or was aborted before a usage chunk, add nothing for that
+step.
 
 ```python
-stream = client.chat.completions.create(
-    model=record["id"],
-    messages=messages,
-    tools=active_schemas(),
-    stream=True,
-    stream_options={"include_usage": True},
-)
+def _apply_usage(usage: dict | None) -> None:
+    if not usage:
+        return
+    last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
+    step_out = usage.get("completion_tokens") or 0
+    last_usage["completion_tokens"] += step_out
+    session_usage["completion_tokens"] += step_out
+
+
+def _consume(stream, on_text) -> tuple[str, list, object, dict | None]:
+    text = ""
+    calls: list = []
+    by_index: dict = {}
+    by_id: dict = {}
+    extra = None
+    usage = None
+    for chunk in stream:
+        data = chunk.to_dict()
+        if data.get("usage"):
+            usage = data["usage"]
+        choices = data.get("choices") or []
+        if not choices:
+            continue
+        delta = choices[0].get("delta") or {}
+        if delta.get("extra_content") is not None:
+            extra = delta["extra_content"]
+        piece = delta.get("content")
+        if isinstance(piece, str) and piece:
+            text += piece
+            if on_text:
+                on_text(piece)
+        for item in delta.get("tool_calls") or []:
+            _merge_call(calls, by_index, by_id, item)
+    return text, calls, extra, usage
 ```
-
-Iterate `stream`. Call `chunk.to_dict()`. A chunk with no choices is usage
-only. Remember that usage object. Do not index `choices[0]` on it.
-
-For a content string that is non-empty, append it and call `on_text` with
-that piece. Ignore empty content. A signature may ride on that empty part.
-Keep the chunk's `extra_content` if present. Do not display it.
-
-After the stream ends, if this step produced no text and no tool calls,
-the content is `[empty response]`. Emit that string through `on_text` once.
-
-Apply the remembered usage the way the loop already does: overwrite
-`prompt_tokens`, add `completion_tokens` once to the turn and to the
-session. If the stream raised or was aborted before a usage chunk, add
-nothing for that step.
 
 ## Segment 2 — tool-call merge
 
-Same file. One assistant dict per model step, not one per chunk.
+Same file. One assistant dict per model step, not one per chunk. Merge by
+`index` when it is present, otherwise by `id`, otherwise append. Concatenate
+name and argument fragments. The latest `extra_content` on that call wins.
+Drop `index`. Default `type` to `"function"` and `arguments` to `"{}"`.
+Synthesize an id with `uuid.uuid4()` only when the provider omitted it.
+Never use a fixed `call_0`.
 
-- Merge a tool-call delta by `index` when the index is present.
-- Otherwise merge by `id` when the id was already seen.
-- Otherwise append. A new `id` or a new `function.name` with no open call
-  starts a call.
-- Append `function.name` fragments and `function.arguments` fragments.
-  Do not replace an arguments string with a later fragment. Concatenate.
-- Copy `extra_content` from the tool-call delta onto that call when present.
-  Do not merge two signatures. The latest one on that call wins. Do not
-  parse it.
-- Drop `index` from the stored call. Default `type` to `"function"`.
-  Default `arguments` to `"{}"`. If the provider omitted `id`, synthesize
-  one with `uuid.uuid4()`. Never use a fixed `call_0`.
-- Final `content` is the accumulated string, or `None` when there was no
-  text. Store a plain dict: `role`, `content`, `tool_calls` if any,
-  `extra_content` if any. Nothing else.
+```python
+def _merge_call(calls: list, by_index: dict, by_id: dict, delta: dict) -> None:
+    fn = delta.get("function") or {}
+    index = delta.get("index")
+    call_id = delta.get("id")
+    name = fn.get("name") or ""
+    arguments = fn.get("arguments") or ""
+    target = None
+    if index is not None and index in by_index:
+        target = by_index[index]
+    elif isinstance(call_id, str) and call_id in by_id:
+        target = by_id[call_id]
+    elif calls and not call_id and not name:
+        target = calls[-1]
+    if target is None:
+        fresh = call_id if isinstance(call_id, str) and call_id else str(uuid.uuid4())
+        target = {
+            "id": fresh,
+            "type": delta.get("type") or "function",
+            "function": {"name": "", "arguments": ""},
+        }
+        calls.append(target)
+        by_id[fresh] = target
+    if index is not None:
+        by_index[index] = target
+    if isinstance(call_id, str) and call_id:
+        by_id[call_id] = target
+        target["id"] = call_id
+    if name:
+        target["function"]["name"] += name
+    if arguments:
+        target["function"]["arguments"] += arguments
+    if delta.get("extra_content") is not None:
+        target["extra_content"] = delta["extra_content"]
 
-Append that dict once, when the stream finishes cleanly and the step has
-text or tool calls. Set a flag so a Ctrl+C after that append does not add
-a second marker.
+
+def _assistant(text: str, calls: list, extra) -> dict:
+    msg: dict = {"role": "assistant", "content": text or None}
+    if calls:
+        stored = []
+        for call in calls:
+            item = {
+                "id": call["id"],
+                "type": call.get("type") or "function",
+                "function": {
+                    "name": call["function"]["name"],
+                    "arguments": call["function"]["arguments"] or "{}",
+                },
+            }
+            if "extra_content" in call:
+                item["extra_content"] = call["extra_content"]
+            stored.append(item)
+        msg["tool_calls"] = stored
+    if extra is not None:
+        msg["extra_content"] = extra
+    if not text and not calls:
+        msg["content"] = "[empty response]"
+    return msg
+
+
+def _marked(text: str, marker: str) -> str:
+    body = text.rstrip()
+    return f"{body}\n\n{marker}" if body else marker
+```
 
 ## Segment 3 — abort
 
-Same file. Wrap the stream. Wrap the tool loop.
+Same file. Replace `agent`. Keep `_permit`, the plan denial string, the
+short shell denial, and `_tool_note`. Append the tool result before either
+print. Remove `~~Thinking...`. `appended` is set after the assistant dict
+is in history. A Ctrl+C in the tool loop still returns `None` and fills
+missing ids. If a later edit needs "interrupt after the final append,
+return `""`", that flag is the check. Do not delete it.
 
-Ctrl+C mid-stream, before the assistant dict is appended: if the buffer has
-non-whitespace, append `text.rstrip() + "\n\n[interrupted by user]"`.
-Otherwise append the marker alone. Keep message-level `extra_content` if one
-arrived. Drop incomplete tool calls. They are not in history. Return `None`.
+```python
+def agent(messages: list, on_text=None) -> str | None:
+    last_usage["prompt_tokens"] = 0
+    last_usage["completion_tokens"] = 0
+    record = MODELS[active["id"]]
+    api_key = os.getenv(record["api_key"])
+    base = record["api_base"]
+    if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
+        api_key = "ollama"
+    try:
+        client = OpenAI(api_key=api_key, base_url=base)
+    except Exception as exc:
+        return f"Model Error: {exc}"
+    for step in range(MAX_STEPS):
+        text = ""
+        calls: list = []
+        extra = None
+        appended = False
+        try:
+            stream = client.chat.completions.create(
+                model=record["id"],
+                messages=messages,
+                tools=active_schemas(),
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            text, calls, extra, usage = _consume(stream, on_text)
+            _apply_usage(usage)
+        except KeyboardInterrupt:
+            messages.append({
+                "role": "assistant",
+                "content": _marked(text, "[interrupted by user]"),
+                **({"extra_content": extra} if extra is not None else {}),
+            })
+            return None
+        except Exception as exc:
+            messages.append({
+                "role": "assistant",
+                "content": _marked(text, "[model error]"),
+                **({"extra_content": extra} if extra is not None else {}),
+            })
+            return f"Model Error: {exc}"
+        msg = _assistant(text, calls, extra)
+        if msg["content"] == "[empty response]" and on_text:
+            on_text("[empty response]")
+        messages.append(msg)
+        appended = True
+        if not calls:
+            return ""
+        done: set[str] = set()
+        try:
+            for call in msg["tool_calls"]:
+                name = call["function"]["name"]
+                args = call["function"]["arguments"]
+                if mode["name"] == "plan" and name in PLAN_DENIED:
+                    content = f"Plan mode: `{name}` is disabled. Propose the change and ask to run /build."
+                    note = True
+                    ran = False
+                else:
+                    run = TOOLS.get(name)
+                    if run:
+                        denied = _permit(name, args)
+                        try:
+                            if denied is not None:
+                                content = denied
+                                note = True
+                                ran = False
+                            else:
+                                content = run(args)
+                                note = False
+                                ran = True
+                        finally:
+                            clear_approved()
+                    else:
+                        content = f"Unknown tool: {name}"
+                        note = True
+                        ran = False
+                messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+                done.add(call["id"])
+                if note:
+                    _tool_note(content)
+                elif ran:
+                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+        except KeyboardInterrupt:
+            for call in msg["tool_calls"]:
+                if call["id"] not in done:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call["id"],
+                        "content": "Interrupted by user.",
+                    })
+            return None
+        _ = appended
+    return f"Max limit reached: {MAX_STEPS}. Try smaller request."
+```
 
-Ctrl+C during tools: the assistant dict is already appended. Keep every
-tool result already appended. For each `tool_call_id` that has no result,
-append `Interrupted by user.` in call order. Do not append another assistant
-message. Return `None`.
-
-Append a finished tool result before `_tool_note` and before
-`|Tools Used: \`name\` ({args})|`. A `write` of a long file prints the whole
-argument. Ctrl+C during that print must not drop a result that already
-succeeded. The plan denial, the permission denial, and the unknown-tool
-string still print, and they still do not print `|Tools Used|`. The print
-moves to after the append. The strings do not change.
-
-API or model error before a final assistant append: if the buffer has
-non-whitespace, append it plus `\n\n[model error]`. Otherwise append
-`[model error]`. Return `Model Error: {exc}`. Do not leave the history
-ending on the user message. Gemini can reject the next turn when two user
-messages are adjacent.
-
-`max_steps` still returns `Max limit reached: {MAX_STEPS}. Try smaller request.`
-It does not raise.
-
-Ctrl+C at `user >>` still exits. That handler is already in `__main__.py`.
-Do not change it. Ctrl+C on the permission prompt still denies that call
-and the loop continues. Do not change `_permission`.
-
-`shell.py` stays. `subprocess.run` kills the direct child on timeout. On
-Ctrl+C it raises `KeyboardInterrupt`, which `run()` does not catch. `agent`
-catches that, fills missing ids, and returns `None`. The child that was the
-direct process is dead. Grandchildren can survive. That remains a gap. Do
-not kill a process tree in this layer.
-
-A `python calculator.py` that opens a window still blocks until the window
-closes, the 120-second timeout, or Ctrl+C. Do not add a background flag
-because a GUI does not exit. The escape is Ctrl+C, and it must return to
-`user >>`.
+`max_steps` still returns that notice. It does not raise. Ctrl+C at
+`user >>` still exits. Do not change that handler. Ctrl+C on the permission
+prompt still denies that call. Do not change `_permission`. `shell.py`
+stays. `subprocess.run` kills the direct child on timeout. On Ctrl+C it
+raises `KeyboardInterrupt`, which `run()` does not catch. `agent` catches
+that, fills missing ids, and returns `None`. Grandchildren can survive. Do
+not kill a process tree in this layer. A `python calculator.py` that opens
+a window still blocks until the window closes, the 120-second timeout, or
+Ctrl+C. Do not add a background flag. The escape is Ctrl+C, and it must
+return to `user >>`.
 
 ## Segment 4 — REPL
 
-File: `src/minicode/__main__.py`.
+File: `src/minicode/__main__.py`. Replace the `agent(messages)` call and
+delete `print(f"\nminicode >> {answer}\n")`. The status block stays. `""`
+prints nothing more. The answer already streamed, including
+`[empty response]` when that was the whole reply.
 
 ```python
+started = False
+
 def on_text(piece: str) -> None:
-    ...
+    nonlocal started
+    if not piece:
+        return
+    if not started:
+        print(f"\nminicode >> {piece}", end="")
+        started = True
+    else:
+        print(piece, end="")
+
 answer = agent(messages, on_text)
+if started:
+    print()
+if answer is None and not started:
+    print("\n[interrupted by user]\n")
+elif answer:
+    if started:
+        print(answer)
+    else:
+        print(f"\nminicode >> {answer}\n")
 ```
 
-On the first non-empty piece, print a newline, `minicode >> `, and the
-piece, with no extra newline. Later pieces print as they are. After the
-call returns, finish the streamed line with one newline if any piece was
-printed.
-
-- `None`: if the marker was not already streamed, print `[interrupted by user]`.
-- A non-empty return: print it. That is `Model Error: ...` or the max-step
-  notice. Do not prefix it with a second `minicode >>` if `on_text` already
-  started the line. Finish the line, then print the notice.
-- `""`: print nothing more. The answer already streamed, including
-  `[empty response]` when that was the whole reply.
-
-Remove `print(f"\nminicode >> {answer}\n")`. The status block still prints
-after a normal completion, an abort, an error, and an empty completion.
 `In`, `Out`, `Session`, and `_elapsed` do not change. No Tok/s. No context
-`%` unless `context_window` is set.
-
-`/plan`, `/build`, `/model`, and `exit` stay before any create. They are
-not sent to the model.
+`%` unless `context_window` is set. `/plan`, `/build`, `/model`, and `exit`
+stay before any create. They are not sent to the model.
 
 ## Soak
 

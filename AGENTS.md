@@ -62,7 +62,10 @@ docs/                    # STATUS + setup + one build guide per layer
 Do not invent empty package dirs (`llm/`, `core/`, `session/`, `ui/` …).
 Imports are `minicode.*`. Do not split further without a reason.
 
-A guide names the file. It does not say "grow `__main__.py`". REPL, slash
+A guide names the file and pastes the functions that belong there. "Not
+implemented" means those functions are not in `src/` yet. Do not say "grow
+`__main__.py`" instead of pasting the REPL functions. The loop stays in
+`agent.py`. A segment that only describes a function is not done. REPL, slash
 commands, and the status print live in `__main__.py`. The loop, `SYSTEM`,
 the registry, and the one `chat.completions.create` site live in `agent.py`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
