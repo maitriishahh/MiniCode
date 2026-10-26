@@ -75,8 +75,9 @@ root to "fix" that. The product soak launches in the repo, with no
 4. Do not edit `PLAN_SYSTEM`. Do not special-case the plan-denied message.
    The existing backstop already says `Plan mode: \`bash\` is disabled`.
 5. Do not catch `KeyboardInterrupt`. `tool_from_fn` catches `Exception`
-   only. Ctrl+C during the wait still kills the REPL. That is
-   `docs/09-streaming.md`. The guide is written. It is not implemented.
+   only. Ctrl+C during the wait returns to `user >>`; that is
+   `docs/09-streaming.md` and is implemented in the working tree, including
+   the conditional reasoning labels and final-answer-only prefix.
 6. Do not raise at import if nothing is found. The call returns a tool
    error that lists what was searched.
 
@@ -328,7 +329,8 @@ else:
   `.venv`. `uv` needs it.
 - Print the same string the model gets, once, when the process returns.
   The header is `Shell (bash):`, `Shell (sh):`, or `Shell (powershell):`.
-  Streaming is later. The separator matches `edit`: the closing `---` lands
+  Streaming is `docs/09-streaming.md` and is in the working tree. The
+  separator matches `edit`: the closing `---` lands
   on its own line. Unlike the diff, this text is sent to the model. The
   loop still prints `|Tools Used: \`bash\` ({args})|` or
   `|Tools Used: \`powershell\` ({args})|` after `run()` returns. Do not
@@ -436,8 +438,9 @@ proved from this Windows machine. Do not add a CI job for it.
 
 ## Open gaps at this layer
 
-- No streaming/abort. Ctrl+C during the wait ends the REPL.
-  Specified in `docs/09-streaming.md`. Not implemented.
+- Streaming/abort are in the working tree. Ctrl+C during the wait returns to
+  `user >>`. Conditional reasoning labels and the final-answer-only prefix
+  are implemented per `docs/09-streaming.md`.
 - The child process inherits the environment.
 - A permitted command can `cd` out of the workspace.
 
@@ -445,7 +448,7 @@ proved from this Windows machine. Do not add a CI job for it.
 
 Later, in order, not in the implement pass: permissions
 (`docs/08-permissions.md`), streaming and a Ctrl+C that leaves a coherent
-turn (`docs/09-streaming.md`, written, not implemented), sessions. Background bash is deferred until it hurts. It is not in that
+turn (`docs/09-streaming.md`, implemented), sessions. Background bash is deferred until it hurts. It is not in that
 chain. `/connect` stays with the catalog.
 
 Not scheduled. Do not add them as a follow-up: a shell-path env, `cmd.exe`,

@@ -1,7 +1,8 @@
 # 09 — Streaming and abort
 
-Do first: `docs/08-permissions.md`. Layer 7 is done. This guide is not
-implemented. Implement this file next. Do not start sessions in that pass.
+Do first: `docs/08-permissions.md`. Layer 7 is done. Streaming, abort, the
+conditional reasoning labels, and the final-answer-only `minicode >>` prefix
+are implemented in the working tree. Sessions are next, not this layer.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site stay in
 `agent.py`. The REPL, the status block, and the permission prompt stay in
@@ -9,36 +10,50 @@ Registry, loop, `SYSTEM`, and the one `chat.completions.create` site stay in
 in `resolve_path.py`. Shell stays in `tools/shell.py`. Do not add a module.
 Do not grow `__main__.py` with the loop.
 
-Today the create site is `client.with_raw_response.chat.completions.create`.
-The assistant message appended is `choices[0].message` from that JSON. A
-Gemini thought signature rides in that dict. Do not parse it. Streaming has
-no raw message, so the implement pass rebuilds that dict from chunks. That
-is the only change to the raw-append rule.
+The create site is `chat.completions.create(..., stream=True, ...)` in the
+working tree. The assistant message is rebuilt from `chunk.to_dict()`, not
+from a raw response body. A Gemini thought signature rides in that dict. Do
+not parse it. Preserve `extra_content`.
 
 ## What it is
 
-Text arrives as it is generated. Ctrl+C during a model call or a tool call
-returns to `user >>` with a history the next request can send. Today that
-Ctrl+C ends the REPL.
+Reasoning arrives as it is generated. Content is buffered for the whole
+model step, because the REPL cannot know whether a step will end with a tool
+call until the stream finishes. A no-tool step is the final answer and prints
+once after `minicode >>`; a tool-call step prints its text once without the
+prefix. Reasoning still streams live. Ctrl+C during a model call or a tool
+call returns to `user >>` with a history the next request can send.
 
-`agent(messages, on_text=None) -> str | None`.
+`agent(messages, on_event=None) -> str | None`.
+
+`agent` does not emit a wait line before the create. `_consume` emits
+`thinking` on the first non-empty `reasoning_content` or `reasoning` delta,
+then `reasoning` for each delta, then `reasoning_end` when the block closes.
+Content is accumulated, not emitted. After the step, `agent` emits
+`text(final=True)` for the no-tool answer (or `[empty response]`) and
+`text(final=False)` for a tool preamble or abort/error partial text. The REPL
+prints `Thinking:`, the reasoning, and `Thought:` only when reasoning exists.
+It prints `minicode >>` only when `final=True`. Reasoning is display-only: it
+never enters history and never fills `content`.
 
 | Event | History | Screen | Returns |
 |---|---|---|---|
 | Ctrl+C at `user >>` | none | exit | n/a |
 | Ctrl+C at the permission prompt | denial tool result | no exit | continues |
-| Ctrl+C mid-stream | partial text plus `[interrupted by user]`; incomplete tool calls dropped | `[interrupted by user]` | `None` |
+| Ctrl+C mid-stream | partial text plus `[interrupted by user]`; incomplete tool calls and reasoning dropped | partial text without prefix, then `[interrupted by user]` | `None` |
 | Ctrl+C during a tool | assistant calls kept; completed results kept; missing ids get `Interrupted by user.` | `[interrupted by user]` | `None` |
-| API or model error | partial text plus `[model error]` if no final answer was appended | `Model Error: ...` | the notice |
-| Empty completion | `[empty response]` | that marker, once | `""` |
-| Normal answer | assistant message | already streamed | `""` |
+| API or model error | partial text plus `[model error]` if no final answer was appended; reasoning not stored | partial text without prefix, then `Model Error: ...` | the notice |
+| Empty completion | `[empty response]` | `minicode >> [empty response]`, once | `""` |
+| Reasoning only, content null | `[empty response]`; reasoning not stored | reasoning block, `Thought:`, `minicode >> [empty response]` | `""` |
+| Normal answer | assistant message | printed once after the step with `minicode >>` | `""` |
 
 If Ctrl+C lands after the final assistant entry was appended, return `""`
 and print no marker.
 
 Partial text is `text.rstrip() + "\n\n[interrupted by user]"` when it has
 non-whitespace. Otherwise the marker alone. Keep `extra_content` if a chunk
-already carried it. Do not invent a signature.
+already carried it. Do not invent a signature. The partial text is displayed
+without the `minicode >>` prefix because it is not a final answer.
 
 Invariants: no empty assistant message, no partial tool call in history, no
 assistant `tool_calls` without one result per id, no consecutive user
@@ -65,6 +80,21 @@ chunk. Read to the end. Ignore empty content for display. Keep the last
 usage object in a step. Add `completion_tokens` once. Do not sum chunk
 usage. A usage chunk has `choices=[]`. Read usage before indexing choices.
 
+Reasoning is optional. A delta may carry `reasoning_content` (Qwen/DeepSeek
+shape) or `reasoning`. Display either. Do not read `extra_content` as
+reasoning; it carries the thought signature. Do not add `reasoning_effort` or
+`thinking_config` to the create. If the provider sends no reasoning, neither
+`Thinking:` nor `Thought:` appears; the buffered answer prints normally with
+its prefix.
+
+The final-only prefix is the reason content is buffered. A first content
+delta cannot be labelled final while a later delta may still carry a tool
+call. Do not write a provisional prefix and erase it, do not move the cursor
+back, and do not add a second create just to learn that the step is final.
+Reasoning has no such problem: it is display-only and streams live. The cost
+is that the final answer appears when the step ends, not token by token.
+Tool-step preambles have the same cost and print once without a prefix.
+
 Ollama's OpenAI-compatible endpoint accepts
 `stream_options={"include_usage": True}`. Same create site. No second
 client.
@@ -74,16 +104,17 @@ OpenCode's empty aborted assistant and an assistant `tool_calls` with no
 matching tool result 400 the next request. That is why the marker exists
 and why every id gets a result.
 
-`~~Thinking...` is a wait line printed before the create returns. It is not
-model reasoning. A blocked `python calculator.py` looks like the model is
-thinking. Remove it. The first text delta is the progress. A tool's own
-print is the progress during a tool. Do not put a wait line back.
+`Thinking:` is the header for a reasoning block. It is emitted lazily on the
+first reasoning delta, not before the create. Close the block with `Thought:`
+when content starts, when a tool call starts, at the end of the stream, or on
+abort/error. Do not emit either label when there is no reasoning content. A
+tool's own print is still the progress during a tool.
 
 A Qwen thinking model can finish with `content` null after the tools
-already ran. The REPL then prints `minicode >>` and nothing else. That is
-an empty completion, not a dropped reply. Emit `[empty response]` once. Do
-not read `reasoning`, `reasoning_content`, or a thought signature to fill
-it.
+already ran. The REPL then prints `minicode >> [empty response]`. That is
+an empty completion, not a dropped reply. Emit `[empty response]` once.
+Reasoning may be displayed, but do not copy `reasoning`, `reasoning_content`,
+or a thought signature into `content` or history.
 
 `In` still overwrites with the last call's `prompt_tokens`. `Out` and
 `Session` still add only `completion_tokens`. An aborted or failed stream
@@ -99,17 +130,27 @@ Cost display stays deferred until more models are added.
    the status block, `In | Out | Session | Elapsed`. No Tok/s. Plan still
    drops `write` / `edit` and still returns the short `/build` sentence on
    a denied shell ask. `*` still matches a newline. Do not rewrite those.
-2. Replace: the `with_raw_response` create becomes
+2. Replace: the unconditional wait-line header. Emit `thinking` lazily on the
+   first non-empty reasoning delta inside `_consume`, then `reasoning` for
+   each delta and `reasoning_end` when the block closes. Do not emit
+   `thinking` before
    `chat.completions.create(..., stream=True, stream_options={"include_usage": True})`.
-   One site. Remove `print("~~Thinking...")`.
+   One site. The REPL renders the header in the event handler; do not print
+   it from `agent`.
 3. Add: merge helpers in `agent.py`. Build a plain dict. Preserve
-   `extra_content`. Drop `index`.
-4. Add: `on_text` in the REPL. Print `minicode >>` once, on the first
-   non-empty delta. Do not print the answer again at the end.
+   `extra_content`. Drop `index`. Read `reasoning_content` or `reasoning`
+   for display only; never append it to history.
+4. Add: `on_event` in the REPL. It renders `thinking`, `reasoning`,
+   `reasoning_end`, and `text(final=...)`. `agent` buffers content for the
+   step: a no-tool `text(final=True)` is the only text that gets
+   `minicode >>`; a tool preamble and abort/error partial text use
+   `text(final=False)`. Print the final answer once, at step end. Do not
+   print it again from the returned value.
 5. Add: abort handling in `agent`. `KeyboardInterrupt` is control flow, not
    a tool error. `tool_from_fn` catches `Exception` only, so Ctrl+C still
    leaves `run()`. Catch it in `agent`, not in `shell.py` and not in
-   `tool_from_fn`.
+   `tool_from_fn`. Keep partial text in mutable step state so the abort/error
+   path can append it and display it without a prefix.
 6. Do not change `shell.py`. Timeout stays 120 seconds. No background
    process. No process tree. A GUI that does not exit still blocks until
    the timeout or until Ctrl+C. After this layer, that Ctrl+C aborts the
@@ -121,10 +162,16 @@ File: `src/minicode/agent.py`. Add `import uuid` with the other imports.
 Paste these helpers above `agent`. A chunk with no choices is usage only.
 Do not index `choices[0]` on it. Ignore empty content for display. A
 signature may ride on that empty part. Keep `extra_content`. Do not parse
-it. If the step produced no text and no tool calls, `_assistant` stores
-`[empty response]` and `agent` emits it through `on_text` once. If the
-stream raised or was aborted before a usage chunk, add nothing for that
-step.
+it. Read `reasoning_content` or `reasoning` only before the first content
+or tool call; later reasoning is ignored. Emit `thinking` only when the
+first reasoning delta arrives. If the step produced no text and no tool
+calls, `_assistant` stores `[empty response]` and `agent` emits it as a
+final text event once. If the stream raised or was aborted before a usage
+chunk, add nothing for that step.
+
+The step state is mutable on purpose. When the stream raises, `_consume`
+does not return, so a local `text`, `calls`, or `extra` would be lost before
+`agent` can append the partial marker or close the reasoning block.
 
 ```python
 def _apply_usage(usage: dict | None) -> None:
@@ -136,31 +183,53 @@ def _apply_usage(usage: dict | None) -> None:
     session_usage["completion_tokens"] += step_out
 
 
-def _consume(stream, on_text) -> tuple[str, list, object, dict | None]:
-    text = ""
-    calls: list = []
+def _consume(stream, on_event, state: dict) -> None:
+    state["text"] = ""
+    state["calls"] = []
+    state["extra"] = None
+    state["usage"] = None
     by_index: dict = {}
     by_id: dict = {}
-    extra = None
-    usage = None
+    reasoning = False
+    closed = False
+
+    def emit(kind: str, piece: str = "") -> None:
+        if on_event:
+            on_event(kind, piece)
+
+    def close_reasoning() -> None:
+        nonlocal closed
+        if reasoning and not closed:
+            emit("reasoning_end")
+            closed = True
+
     for chunk in stream:
         data = chunk.to_dict()
         if data.get("usage"):
-            usage = data["usage"]
+            state["usage"] = data["usage"]
         choices = data.get("choices") or []
         if not choices:
             continue
         delta = choices[0].get("delta") or {}
         if delta.get("extra_content") is not None:
-            extra = delta["extra_content"]
+            state["extra"] = delta["extra_content"]
+        if not state["text"] and not state["calls"]:
+            think = delta.get("reasoning_content") or delta.get("reasoning")
+            if isinstance(think, str) and think:
+                if not reasoning:
+                    emit("thinking")
+                    reasoning = True
+                emit("reasoning", think)
         piece = delta.get("content")
         if isinstance(piece, str) and piece:
-            text += piece
-            if on_text:
-                on_text(piece)
-        for item in delta.get("tool_calls") or []:
-            _merge_call(calls, by_index, by_id, item)
-    return text, calls, extra, usage
+            close_reasoning()
+            state["text"] += piece
+        items = delta.get("tool_calls") or []
+        if items:
+            close_reasoning()
+            for item in items:
+                _merge_call(state["calls"], by_index, by_id, item)
+    close_reasoning()
 ```
 
 ## Segment 2 — tool-call merge
@@ -241,13 +310,23 @@ def _marked(text: str, marker: str) -> str:
 
 Same file. Replace `agent`. Keep `_permit`, the plan denial string, the
 short shell denial, and `_tool_note`. Append the tool result before either
-print. Remove `~~Thinking...`. `appended` is set after the assistant dict
-is in history. A Ctrl+C in the tool loop still returns `None` and fills
-missing ids. If a later edit needs "interrupt after the final append,
-return `""`", that flag is the check. Do not delete it.
+print. Do not emit `thinking` before the create; `_consume` owns that event
+now. Emit `reasoning_end` on abort and model error so an open block closes.
+Partial text lives in step state so the abort/error path can append it and
+display it without a prefix.
+
+After a step, append the assistant dict before printing model text. A step
+with no calls is final: emit `text(final=True)` with `msg["content"]` and
+return `""`. A step with calls emits its text as `text(final=False)` before
+the tool lines. Put that preamble print inside the tool try. A Ctrl+C while
+it prints must still fill every tool id with `Interrupted by user.`
+`appended` is set after the assistant dict is in history. A Ctrl+C in the
+tool loop still returns `None` and fills missing ids. If a later edit needs
+"interrupt after the final append, return `""`", that flag is the check.
+Do not delete it.
 
 ```python
-def agent(messages: list, on_text=None) -> str | None:
+def agent(messages: list, on_event=None) -> str | None:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
     record = MODELS[active["id"]]
@@ -260,9 +339,7 @@ def agent(messages: list, on_text=None) -> str | None:
     except Exception as exc:
         return f"Model Error: {exc}"
     for step in range(MAX_STEPS):
-        text = ""
-        calls: list = []
-        extra = None
+        state = {"text": "", "calls": [], "extra": None, "usage": None}
         appended = False
         try:
             stream = client.chat.completions.create(
@@ -272,31 +349,41 @@ def agent(messages: list, on_text=None) -> str | None:
                 stream=True,
                 stream_options={"include_usage": True},
             )
-            text, calls, extra, usage = _consume(stream, on_text)
-            _apply_usage(usage)
+            _consume(stream, on_event, state)
+            _apply_usage(state["usage"])
         except KeyboardInterrupt:
+            if on_event:
+                on_event("reasoning_end")
             messages.append({
                 "role": "assistant",
-                "content": _marked(text, "[interrupted by user]"),
-                **({"extra_content": extra} if extra is not None else {}),
+                "content": _marked(state["text"], "[interrupted by user]"),
+                **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
             })
+            if state["text"] and on_event:
+                on_event("text", state["text"])
             return None
         except Exception as exc:
+            if on_event:
+                on_event("reasoning_end")
             messages.append({
                 "role": "assistant",
-                "content": _marked(text, "[model error]"),
-                **({"extra_content": extra} if extra is not None else {}),
+                "content": _marked(state["text"], "[model error]"),
+                **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
             })
+            if state["text"] and on_event:
+                on_event("text", state["text"])
             return f"Model Error: {exc}"
-        msg = _assistant(text, calls, extra)
-        if msg["content"] == "[empty response]" and on_text:
-            on_text("[empty response]")
+        msg = _assistant(state["text"], state["calls"], state["extra"])
         messages.append(msg)
         appended = True
-        if not calls:
+        if not state["calls"]:
+            if on_event:
+                on_event("text", msg["content"], final=True)
             return ""
         done: set[str] = set()
         try:
+            if state["text"] and on_event:
+                on_event("text", state["text"])
             for call in msg["tool_calls"]:
                 name = call["function"]["name"]
                 args = call["function"]["arguments"]
@@ -355,34 +442,46 @@ return to `user >>`.
 
 ## Segment 4 — REPL
 
-File: `src/minicode/__main__.py`. Replace the `agent(messages)` call and
-delete `print(f"\nminicode >> {answer}\n")`. The status block stays. `""`
-prints nothing more. The answer already streamed, including
-`[empty response]` when that was the whole reply.
+File: `src/minicode/__main__.py`. Replace the `agent(messages)` call. The
+status block stays. `""` prints nothing more. `agent` already printed the
+final text with `minicode >>`, including `[empty response]` when that was
+the whole reply. Print the interrupt marker when `answer is None`, even
+after partial text. A non-empty `answer` is a `Model Error:` or max-limit
+notice, not a final answer: print it without the prefix. Do not fall back to
+`minicode >> {answer}`.
 
 ```python
-started = False
+reasoning = False
+wrote = False
 
-def on_text(piece: str) -> None:
-    nonlocal started
-    if not piece:
-        return
-    if not started:
-        print(f"\nminicode >> {piece}", end="")
-        started = True
-    else:
-        print(piece, end="")
+def on_event(kind: str, piece: str = "", final: bool = False) -> None:
+    nonlocal reasoning, wrote
+    if kind == "thinking":
+        print("\nThinking:", flush=True)
+        reasoning = True
+        wrote = True
+    elif kind == "reasoning":
+        print(piece, end="", flush=True)
+        reasoning = True
+        wrote = True
+    elif kind == "reasoning_end":
+        if reasoning:
+            print("\nThought:", flush=True)
+            reasoning = False
+    elif kind == "text":
+        if final:
+            print(f"\nminicode >> {piece}", flush=True)
+        else:
+            print(piece, end="", flush=True)
+        wrote = True
 
-answer = agent(messages, on_text)
-if started:
+answer = agent(messages, on_event)
+if wrote:
     print()
-if answer is None and not started:
+if answer is None:
     print("\n[interrupted by user]\n")
 elif answer:
-    if started:
-        print(answer)
-    else:
-        print(f"\nminicode >> {answer}\n")
+    print(f"\n{answer}\n")
 ```
 
 `In`, `Out`, `Session`, and `_elapsed` do not change. No Tok/s. No context
@@ -397,26 +496,43 @@ From the launch dir, with the dev fence:
 uv run python -m minicode --sandbox sandbox
 ```
 
-- A text reply streams after `minicode >>`. The status block follows. The
-  answer is not printed twice. No `~~Thinking...`.
-- A tool turn prints the tool line after the result is in history. Plan
+- A no-reasoning text reply shows neither `Thinking:` nor `Thought:`. The
+  final answer prints once after `minicode >>` when the step ends, then the
+  status block. The answer is not printed twice.
+- A reasoning reply shows `Thinking:` on the first reasoning delta, streams
+  the reasoning, prints `Thought:` when it closes, then prints the final
+  answer after `minicode >>`. The answer itself is buffered, not streamed.
+- A reasoning reply with a tool call closes the block before the tool
+  preamble or `|Tools Used|`; the next model step starts a new block.
+- A reasoning-only reply with null content closes the block with `Thought:`,
+  prints `minicode >> [empty response]`, and keeps reasoning out of history.
+- A tool turn prints its preamble without a prefix, then the tool line after
+  the result is in history; the later final answer gets the prefix. Plan
   still denies `write` / `edit` with the existing sentence and no
   `|Tools Used|` line.
-- A multi-step turn streams each text piece and does not reprint the final
-  answer.
+- A multi-step turn prints each tool preamble without a prefix and gives
+  `minicode >>` only to the final no-tool answer. The final answer is not
+  reprinted.
 - A Gemini tool turn, then a second turn, does not 400 on
   `thought_signature`. If it does, the merge dropped `extra_content`. Do
   not parse the signature and do not invent one.
-- Ctrl+C mid-stream prints `[interrupted by user]`, prints the status
-  block, and returns to `user >>`. The next message is accepted.
+- Ctrl+C mid-stream prints any partial text without a prefix, then
+  `[interrupted by user]`, the status block, and returns to `user >>`. The
+  next message is accepted.
+- Ctrl+C during reasoning closes the block with `Thought:`, prints
+  `[interrupted by user]`, prints the status block, and returns to
+  `user >>`.
+- Ctrl+C while a tool preamble prints still fills every tool id with
+  `Interrupted by user.` and returns to `user >>`.
 - Ctrl+C during `python -c "import time; time.sleep(30)"` does the same.
   The sleep does not have to finish.
 - Ctrl+C on the permission prompt denies that call and does not exit.
 - Ctrl+C at `user >>` exits.
 - `/plan` still proposes and says `/build`. `/build` still writes. A
   denied plan-mode shell ask still returns the short `/build` sentence.
-- An empty completion prints `[empty response]` once, then the status
-  block.
+- An empty completion prints `minicode >> [empty response]` once, then the
+  status block.
+- A `Model Error:` or max-limit notice prints without `minicode >>`.
 - `python calculator.py` may open a window and block. Ctrl+C returns to
   `user >>`. Do not add a background shell to make the window survive.
 
@@ -433,6 +549,14 @@ for it.
 - No atomic write. A `write` that is interrupted inside the tool is the
   tool's problem. This layer only keeps the history coherent.
 - No retry. A model error is a notice and a marker, not another create.
+- Content is buffered per model step so the REPL can reserve `minicode >>`
+  for the final answer. The final answer is not token-streamed; only
+  reasoning is. A tool preamble is also printed at step end.
+- A provider that sends no reasoning shows no `Thinking:`/`Thought:` and no
+  wait line. The first visible output is the buffered final answer at step
+  end.
+- Reasoning display is provider-dependent. No forced thinking flag in this
+  layer.
 - No tests.
 
 ## Don't add yet
@@ -442,9 +566,12 @@ diff viewer, `AGENTS.md` injection. Cost display waits until more models
 are added. Compaction waits until the context gap hurts.
 
 Not this layer: async, a background shell, a process tree, a persistent
-shell, Rich, a test suite, reading `reasoning_content`, a Tok/s line,
-summing `prompt_tokens` into `Session`, a second create site, an SSE
-parser, `client.chat.completions.stream()`.
+shell, Rich, a test suite, using `reasoning_content` as assistant content
+or history, a provider thinking flag (`reasoning_effort`, `thinking_config`),
+a Tok/s line, summing `prompt_tokens` into `Session`, a second create site,
+an SSE parser, `client.chat.completions.stream()`, an ANSI cursor rewrite to
+put a prefix on already-streamed text, a second create just to learn that a
+step is final.
 
 ## Checkpoint
 
@@ -456,8 +583,9 @@ parser, `client.chat.completions.stream()`.
 4. Ctrl+C mid-stream: what is appended, and what is dropped?
 5. Ctrl+C during the second of three tool calls: which results are kept,
    and what fills the gap?
-6. Why does `[empty response]` exist, and why is a reasoning field not
-   copied into `content`?
-7. What does `agent` return for a normal streamed answer, and why does the
-   REPL not print `minicode >> {answer}`?
-8. Why does a Tk window still block, and what is the escape?
+6. Why does `[empty response]` exist, and why is a reasoning field never
+   copied into `content` or history even when it is displayed?
+7. Why is content buffered per step, and why does only `text(final=True)`
+   get `minicode >>`?
+8. Why does a `Model Error:` notice not get the prefix?
+9. Why does a Tk window still block, and what is the escape?

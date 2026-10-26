@@ -214,7 +214,7 @@ into `__main__.py`.
 ## Don't add yet
 
 shell, plan/build swap (`/plan` dropping `write`/`edit`), permissions UI,
-Rich, streaming, sessions, compaction, cost display, diff **viewer**.
+Rich, sessions, compaction, cost display, diff **viewer**.
 `/model` is Layer 2 and is done.
 Plan mode without a restricted tool list is still later — but now there is
 something to restrict, which is why this layer comes first.

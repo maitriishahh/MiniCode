@@ -240,8 +240,8 @@ these back into `__main__.py`.
 
 ## Don't add yet
 
-Shell, plan/build swap (`/plan` dropping `write`/`edit`), Rich, streaming,
-sessions, compaction, cost display, diff **viewer**, recursive `exclude` rules,
+Shell, plan/build swap (`/plan` dropping `write`/`edit`), Rich, sessions,
+compaction, cost display, diff **viewer**, recursive `exclude` rules,
 case-insensitive flags, context lines (`-C`). Permissions and the
 outside-root output rule arrived later (`docs/08-permissions.md`). If the
 agent can name a file, find text, narrow with `include`, fail cleanly on

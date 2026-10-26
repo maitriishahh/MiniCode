@@ -11,10 +11,10 @@ One Python loop over an OpenAI-compatible chat API.
 `-->` is a runtime call. `-.->` is import-time or a callback.
 
 ```text
-__main__.py -- agent(messages) --> agent.py
+__main__.py -- agent(messages, on_event) --> agent.py
 __main__.py -- registers ask["fn"] -.-> permissions.py
 __main__.py -- reads SANDBOX -.-> resolve_path.py
-agent.py -- chat.completions.create --> model API
+agent.py -- chat.completions.create(stream=True) --> model API
 agent.py -- decide / force_ask / plan_touches --> permissions.py
 permissions.py -- prompt callback -.-> __main__.py
 agent.py -- classify / approve / clear_approved --> resolve_path.py
@@ -36,12 +36,12 @@ user >> input
     ↓
     append the user message
     ↓
-    agent(messages)
+    agent(messages, on_event)
     ↓
-    chat.completions.create → model API
+    chat.completions.create(stream=True) → model API
     ↓
     append the assistant message
-    ├── no tool call → return the answer
+    ├── no tool call → buffer final answer → text(final=True)
     └── each tool call
         ├── plan denies write/edit, or unknown name → tool result
         ├── deny → tool result
@@ -50,12 +50,12 @@ user >> input
     ↓
     repeat until the model stops, or MAX_STEPS
     ↓
-    print minicode >> and the status block → next prompt
+    print the final answer and status block → next prompt
 ```
 
 | Caller | Callee | What crosses |
 |---|---|---|
-| `__main__` | `agent` | `agent(messages)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage |
+| `__main__` | `agent` | `agent(messages, on_event)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage |
 | `__main__` | `permissions` | registers `ask["fn"]` at import |
 | `__main__` | `resolve_path` | reads `SANDBOX` at import |
 | `agent` | OpenAI API | one `chat.completions.create` site |
@@ -72,6 +72,8 @@ user >> input
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
 - Exact-match edits with a terminal diff
+- Live model reasoning under `Thinking:` / `Thought:` when the provider sends it
+- Final answers printed once with `minicode >>`; tool preambles print without it
 - Model switching with `/model`
 - Workspace-bounded file access with `.env` protection
 - Permission prompts for `.env` access, plan-mode file-changing shell commands,
@@ -174,8 +176,6 @@ Mode: plan | Tools Loaded: read, glob, grep, bash
 
 user >> read pyproject.toml and summarize the dependencies
 
-~~Thinking...
-
 |Tools Used: `read` ({"path": "pyproject.toml"})|
 
 minicode >> The project depends on openai, pydantic, and python-dotenv.
@@ -189,6 +189,13 @@ Sandbox: C:\path\to\project
 user >> /build
 Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
+
+If the model streams reasoning, it appears under `Thinking:` and ends with
+`Thought:` before the answer or first tool line. Not every model sends
+reasoning; when it does not, neither label appears. Only the final answer
+gets `minicode >>`; tool preambles and error notices do not. Content is
+buffered per model step so the harness can tell a final answer from a tool
+preamble; the final answer is not streamed token by token.
 
 If your shell tool is named `powershell` instead of `bash`, that is the Windows
 fallback.
@@ -282,9 +289,9 @@ Sandbox: C:\path\to\project
 
 ## Not included yet
 
-Streaming and abort handling, sessions and resume, cache control, cost display,
-compaction, a diff viewer, `AGENTS.md` injection, MCP, subagents, and a
-graphical interface. Context percentage stays off until a verified
-`context_window` is set. Cost display waits until more models are added.
-Ctrl+C during a running shell command ends MiniCode rather than cancelling
-only that command.
+Sessions and resume, cache control, cost display, compaction, a diff viewer,
+`AGENTS.md` injection, MCP, subagents, and a graphical interface. Context
+percentage stays off until a verified `context_window` is set. Cost display
+waits until more models are added. Ctrl+C during a model call or a tool call
+aborts that step and returns to `user >>`. A grandchild shell process can
+survive.

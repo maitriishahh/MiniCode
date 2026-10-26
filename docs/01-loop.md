@@ -402,14 +402,17 @@ until more models are added; it then needs pricing on the record.
 
 - No tests for `tool_from_fn` or `read`.
 - History is unbounded; compaction waits until the context gap hurts.
-- No streaming/abort. Ctrl+C during a model call ends the REPL.
-  Specified in `docs/09-streaming.md`. Not implemented.
+- Streaming/abort are in the working tree. Conditional reasoning labels
+  (`Thinking:` / `Thought:` only when reasoning exists) and the
+  final-answer-only `minicode >>` prefix are implemented per
+  `docs/09-streaming.md`. Ctrl+C during a model call or a tool call returns
+  to `user >>`.
 - Cost display is deferred until more models are added.
 
 ## Don't add yet
 
 `write`/`edit` (next guide), shell, plan/build swap, permissions UI, Rich,
-streaming, sessions, compaction, cost display, diff viewer. If the REPL reads
+sessions, compaction, cost display, diff viewer. If the REPL reads
 files, prints the tool line, survives bad args and escapes, shows the status
 block, and exits cleanly — stop.
 

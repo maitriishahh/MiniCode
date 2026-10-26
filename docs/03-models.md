@@ -235,8 +235,8 @@ thought-signature parser.
 
 ## Don't add yet
 
-models.dev import, `/connect`, variants, streaming, fallbacks,
-thinking-trace conversion, a signature parser, shell, grep, plan/build,
+models.dev import, `/connect`, variants, fallbacks, thinking-trace
+conversion, a signature parser, shell, grep, plan/build,
 flipping the sandbox default to cwd, a third server, passing `max_tokens`,
 a cost line (wait for more models), Tok/s, LiteLLM, one SDK per provider,
 a hardcoded model id, putting the catalog in `.env`.

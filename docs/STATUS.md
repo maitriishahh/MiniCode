@@ -1,11 +1,12 @@
 # STATUS.md — MiniCode
 
-Current code: layers 0–7 are in. Startup default is `plan`. Plan drops
-`write` / `edit` only. `bash` / `powershell` stay in the list. Shell asks
-for `.env` text, and in plan for content-read, create, and delete verbs.
-Status line is `In | Out | Session | Elapsed: {_elapsed}`. The streaming
-guide is written and not implemented. Cost display waits until more models
-are added.
+Current code: layers 0–7 are committed. Layer 8 streaming, abort, the
+conditional reasoning labels, and the final-answer-only `minicode >>` prefix
+are in the working tree. Startup default is `plan`. Plan drops `write` /
+`edit` only. `bash` / `powershell` stay in the list. Shell asks for `.env`
+text, and in plan for content-read, create, and delete verbs. Status line is
+`In | Out | Session | Elapsed: {_elapsed}`. Cost display waits until more
+models are added.
 
 ## Done
 
@@ -99,8 +100,11 @@ are added.
   The ask remains. Shell is not force-denied.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
-- [x] `docs/09-streaming.md` — streaming and Ctrl+C abort. Specified, not
-  implemented. Implement that file next. Not sessions.
+- [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort in the
+  working tree. Conditional reasoning labels (`Thinking:` / `Thought:` only
+  when reasoning exists) and the final-answer-only `minicode >>` prefix with
+  buffered content are implemented. Content buffers per model step, so the
+  final answer is not token-streamed; reasoning still streams live.
 
 ## Open gaps
 
@@ -118,10 +122,13 @@ Known and accepted. These are not the next layer.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
+- Content buffers per model step, so the final answer is not token-streamed;
+  reasoning still streams live. Reasoning availability is provider-dependent;
+  no forced `reasoning_effort` or `thinking_config`.
 
 ## Next
 
-1. Implement `docs/09-streaming.md`. Do not start sessions in that pass.
+1. Sessions/resume.
 
 ## Deferred (do not start)
 
@@ -134,4 +141,5 @@ then pricing on the Model record), tests (still not written),
 models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;
-fetched with the catalog, not a create flag).
+fetched with the catalog, not a create flag), provider thinking flags
+(`reasoning_effort`, `thinking_config`).

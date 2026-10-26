@@ -114,8 +114,8 @@ no search, no permissions change.
 ## Don't add yet
 
 Search tool (next guide, capped `grep` or `find` — not a shell), shell,
-plan/build swap, allow/ask/deny, `external_directory` gate, streaming,
-sessions, compaction, cost display, diff viewer. If the flip works and the
+plan/build swap, allow/ask/deny, `external_directory` gate, sessions,
+compaction, cost display, diff viewer. If the flip works and the
 fence is still one flag away — stop.
 
 ## Checkpoint

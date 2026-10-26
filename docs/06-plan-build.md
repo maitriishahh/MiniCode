@@ -301,8 +301,8 @@ Live plan keeps `bash` / `powershell` and asks. No
 
 ## Don't add yet
 
-Shell, allow/ask/deny, `external_directory` gate, streaming, sessions,
-compaction, cost display, diff viewer, `PLAN.md` file lifecycle, models.dev
+Shell, allow/ask/deny, `external_directory` gate, sessions, compaction, cost
+display, diff viewer, `PLAN.md` file lifecycle, models.dev
 import, `/connect`, variants, passing `max_tokens`, Tok/s. If plan proposes
 without writing, build writes, the switch needs no restart, and the status
 tells which is active — stop.

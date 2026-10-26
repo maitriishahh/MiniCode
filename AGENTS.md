@@ -8,14 +8,15 @@ A small Python coding harness. Docs first, then the `.py` from the doc.
 2. `docs/STATUS.md` — what is done, what to write next
 3. `HARNESS_RESEARCH_AND_PLAN.md` — decisions (loop, providers, sandbox,
    plan/build, observability)
-4. The next build guide listed in STATUS
+4. The next build guide or amendment listed in STATUS
 
 When a session locks a new convention, write it into `AGENTS.md` in the same
 pass. A new session must not need prior chat history.
 
 The next guide is the file named in `docs/STATUS.md`. Write that guide
-before any code. Do not implement the next layer in the same pass as
-writing it unless the user says implement.
+before any code unless STATUS names an amendment to an existing guide. Do
+not implement the next layer in the same pass as writing it unless the user
+says implement.
 
 ## When the user questions a shipped choice
 
@@ -86,13 +87,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
   History stores plain dicts only. The assistant message appended is the raw
-  JSON object from the response body (`choices[0].message`), not an SDK
-  object and not a rebuilt `tool_calls` list. A Gemini thought signature
-  rides in that dict. Do not parse it. A 400 that names `thought_signature`
-  is the only reason to touch that append. `docs/09-streaming.md` replaces
-  that append with a `chunk.to_dict()` merge when it is implemented. Until
-  then the raw append stays. Do not implement streaming in a pass that is
-  only writing the guide.
+  JSON object from the response body (`choices[0].message`) or the plain dict
+  rebuilt from `chunk.to_dict()` in the streaming loop, not an SDK object and
+  not a rebuilt `tool_calls` list. Preserve `extra_content`. A Gemini thought
+  signature rides in that dict. Do not parse it. A 400 that names
+  `thought_signature` is the only reason to touch that append. The streaming
+  rebuild lives in `docs/09-streaming.md`. Do not implement streaming in a
+  pass that is only writing the guide.
 - Tool functions use Google-style docstrings. Only the first line becomes the
   model-visible description and `Args:` entries become parameter docs;
   extra scope sentences in the docstring body are invisible to the model.
@@ -177,7 +178,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `cat`, and the rest of that list) or the text contains `>`. `ls`, `pwd`,
   `git`, `python`, `echo`, and `find` do not. Do not parse past that. Do
   not force-deny shell in plan. `python -c` can still write. A JSON
-  permissions file is deferred, after streaming, not next. `agent.py` holds
+  permissions file is deferred, not next. `agent.py` holds
   `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
   `Permission denied: {key} {value}` as `role: "tool"`, with no
   `|Tools Used|` line. A plan-mode shell ask that the user denies returns
@@ -236,10 +237,18 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   secret into the record. Do not replace `os.getenv`. A key-only command is
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
-- REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
-  `docs/09-streaming.md` replaces that final print with a one-time prefix
-  on the first streamed delta. Until that guide is implemented, the final
-  print stays. After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
+- REPL prompt is `user >> `. Reasoning streams live under `Thinking:` and
+  closes with `Thought:` only when the provider sends `reasoning_content` or
+  `reasoning`. With no reasoning, neither label appears and there is no wait
+  line. Content is buffered per model step: the no-tool final answer prints
+  once after `minicode >>`; a tool preamble and abort/error partial text print
+  without the prefix. Do not print `minicode >>` on reasoning, tool
+  preambles, `Model Error:`, max-limit notices, or `[interrupted by user]`.
+  The final answer is not token-streamed; that is the cost of reserving the
+  prefix for the final step. `docs/09-streaming.md` specifies the event
+  contract. Reasoning is display-only: never
+  append it to history, never use it as `content`, and do not add a provider
+  thinking flag. After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
   including in plan. A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tools Used|`. Status block
   after the answer, wrapped in `---`:
@@ -263,11 +272,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `prompt_tokens` into `Session`.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
-- Streaming and abort are specified in `docs/09-streaming.md` and not
-  implemented. `KeyboardInterrupt` during a model call or a tool call is
-  control flow, not a tool error. `tool_from_fn` catches `Exception` only.
-  Do not catch it there. Do not read a reasoning field to fill an empty
-  `content`.
+- Streaming, abort, the conditional reasoning labels, and the
+  final-answer-only prefix are in the working tree. `KeyboardInterrupt` during
+  a model call or a tool call is control flow, not a tool error. `tool_from_fn`
+  catches `Exception` only. Do not catch it there. Never read a reasoning
+  field to fill an empty `content` or add it to history.
 - Do not commit secrets, session dumps, or transcripts.
 
 ## Do not

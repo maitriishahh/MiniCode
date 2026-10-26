@@ -2,8 +2,8 @@
 
 Do first: `docs/07-shell.md`. Layer 6 is done. This layer is implemented in
 `permissions.py`, the dispatch gate in `agent.py`, and the prompt in
-`__main__.py`. Do not start streaming in this pass. Do not add a config
-file, a shell scanner, or env scrubbing.
+`__main__.py`. Streaming lives in `docs/09-streaming.md`. Do not add a
+config file, a shell scanner, or env scrubbing.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
 `agent.py`. The ask prompt lives in `__main__.py`. `tool_from_fn` stays in
@@ -382,8 +382,9 @@ returns `Tool error:`. A gate denial does not print it. An unknown name
 does not print it. A plan denial does not print it.
 
 Do not catch `KeyboardInterrupt` around `run()`. Ctrl+C during a shell
-wait still kills the REPL. That is `docs/09-streaming.md`. The guide is
-written. It is not implemented.
+wait returns to `user >>`; that is `docs/09-streaming.md` and is implemented
+in the working tree, including the conditional reasoning labels and the
+final-answer-only prefix.
 
 ## Segment 4 — the prompt
 
@@ -467,8 +468,9 @@ still `cd` out after the user allows that exact command. Do not parse it.
 ## Don't add yet
 
 Later, in order, not in the implement pass: streaming and a Ctrl+C that
-leaves a coherent turn (`docs/09-streaming.md`, written, not implemented), sessions. An OpenCode-shaped JSON permissions file
-is deferred after streaming, not next. `always` stays in memory until
+leaves a coherent turn (`docs/09-streaming.md`, implemented), sessions.
+An OpenCode-shaped JSON permissions file is deferred, not next. `always`
+stays in memory until
 sessions. A configured `deny` beats `always`. Do not write the file now.
 Background bash stays
 deferred. `/connect` stays with the catalog. Do not add the transport tag

@@ -94,20 +94,50 @@ def main() -> None:
             }
         )
         start_time = time.perf_counter()
-        answer = agent(messages)
+
+        wrote = False
+        reasoning = False
+
+        def on_event(kind:str, piece:str = "", final: bool = False) -> None:
+            nonlocal wrote, reasoning
+            if kind == "thinking":
+                print("\nThinking:", flush=True)
+                reasoning = True
+                wrote = True
+            elif kind == "reasoning":
+                print(piece, end="", flush=True)
+                reasoning = True
+                wrote = True
+            elif kind == "reasoning_end":
+                if reasoning:
+                    print("\nThought:", flush=True)
+                    reasoning = False
+            elif kind == "text":
+                if final:
+                    print(f"\nminicode >> {piece}", flush=True)
+                else:
+                    print(piece, end="", flush=True)
+                wrote = True
+
+        answer = agent(messages, on_event)
         elapsed = time.perf_counter() - start_time
         prompt_tokens = last_usage["prompt_tokens"]
         out_tokens = last_usage["completion_tokens"]
         session_tokens = session_usage["completion_tokens"]
-
-        print(f"\nminicode >> {answer}\n")
         window = MODELS[active["id"]]["context_window"]
+        if wrote:
+            print()
+        if answer is None:
+            print("\n[interrupted by user]\n")
+        elif answer:
+            print(f"\n{answer}\n")
+
         ctx = f" | {prompt_tokens / window:.1%} context" if window else ""
         print(
             f"---"
             f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
             f"\nSandbox: {SANDBOX}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {_elapsed(elapsed)}{ctx}\n"
+            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session Usage | Elapsed: {_elapsed(elapsed)}{ctx}\n"
             f"---"
         )
 

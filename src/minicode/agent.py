@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -163,8 +164,127 @@ session_usage = {"completion_tokens": 0}
 def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
+def _apply_usage(usage: dict | None) -> None:
+    if not usage:
+        return
+    last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
+    step_out = usage.get("completion_tokens") or 0
+    last_usage["completion_tokens"] += step_out
+    session_usage["completion_tokens"] += step_out
 
-def agent(messages:list) -> str:
+
+def _consume(stream, on_event, state: dict) -> None:
+    state["text"] = ""
+    state["calls"] = []
+    state["extra"] = None
+    state["usage"] = None
+    by_index: dict = {}
+    by_id: dict = {}
+    reasoning = False
+    closed = False
+
+    def emit(kind: str, piece: str = "") -> None:
+        if on_event:
+            on_event(kind, piece)
+
+    def close_reasoning() -> None:
+        nonlocal closed
+        if reasoning and not closed:
+            emit("reasoning_end")
+            closed = True
+
+    for chunk in stream:
+        data = chunk.to_dict()
+        if data.get("usage"):
+            state["usage"] = data["usage"]
+        choices = data.get("choices") or []
+        if not choices:
+            continue
+        delta = choices[0].get("delta") or {}
+        if delta.get("extra_content") is not None:
+            state["extra"] = delta["extra_content"]
+        if not state["text"] and not state["calls"]:
+            think = delta.get("reasoning_content") or delta.get("reasoning")
+            if isinstance(think, str) and think:
+                if not reasoning:
+                    emit("thinking")
+                    reasoning = True
+                emit("reasoning", think)
+        piece = delta.get("content")
+        if isinstance(piece, str) and piece:
+            close_reasoning()
+            state["text"] += piece
+        items = delta.get("tool_calls") or []
+        if items:
+            close_reasoning()
+            for item in items:
+                _merge_call(state["calls"], by_index, by_id, item)
+    close_reasoning()
+
+def _merge_call(calls: list, by_index: dict, by_id: dict, delta: dict) -> None:
+    fn = delta.get("function") or {}
+    index = delta.get("index")
+    call_id = delta.get("id")
+    name = fn.get("name") or ""
+    arguments = fn.get("arguments") or ""
+    target = None
+    if index is not None and index in by_index:
+        target = by_index[index]
+    elif isinstance(call_id, str) and call_id in by_id:
+        target = by_id[call_id]
+    elif calls and not call_id and not name:
+        target = calls[-1]
+    if target is None:
+        fresh = call_id if isinstance(call_id, str) and call_id else str(uuid.uuid4())
+        target = {
+            "id": fresh,
+            "type": delta.get("type") or "function",
+            "function": {"name": "", "arguments": ""},
+        }
+        calls.append(target)
+        by_id[fresh] = target
+    if index is not None:
+        by_index[index] = target
+    if isinstance(call_id, str) and call_id:
+        by_id[call_id] = target
+        target["id"] = call_id
+    if name:
+        target["function"]["name"] += name
+    if arguments:
+        target["function"]["arguments"] += arguments
+    if delta.get("extra_content") is not None:
+        target["extra_content"] = delta["extra_content"]
+
+
+def _assistant(text: str, calls: list, extra) -> dict:
+    msg: dict = {"role": "assistant", "content": text or None}
+    if calls:
+        stored = []
+        for call in calls:
+            item = {
+                "id": call["id"],
+                "type": call.get("type") or "function",
+                "function": {
+                    "name": call["function"]["name"],
+                    "arguments": call["function"]["arguments"] or "{}",
+                },
+            }
+            if "extra_content" in call:
+                item["extra_content"] = call["extra_content"]
+            stored.append(item)
+        msg["tool_calls"] = stored
+    if extra is not None:
+        msg["extra_content"] = extra
+    if not text and not calls:
+        msg["content"] = "[empty response]"
+    return msg
+
+
+def _marked(text: str, marker: str) -> str:
+    body = text.rstrip()
+    return f"{body}\n\n{marker}" if body else marker
+
+def agent(messages: list, on_event=None) -> str | None:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
     record = MODELS[active["id"]]
@@ -172,61 +292,96 @@ def agent(messages:list) -> str:
     base = record["api_base"]
     if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
         api_key = "ollama"
-
     try:
         client = OpenAI(api_key=api_key, base_url=base)
     except Exception as exc:
         return f"Model Error: {exc}"
-
     for step in range(MAX_STEPS):
+        state = {"text": "", "calls": [], "extra": None, "usage": None}
+        appended = False
         try:
-            print(f"\n~~Thinking...\n")
-            resp = client.with_raw_response.chat.completions.create(
+            stream = client.chat.completions.create(
                 model=record["id"],
                 messages=messages,
-                tools=active_schemas()
+                tools=active_schemas(),
+                stream=True,
+                stream_options={"include_usage": True},
             )
-            body = json.loads(resp.text)
+            _consume(stream, on_event, state)
+            _apply_usage(state["usage"])
+        except KeyboardInterrupt:
+            if on_event:
+                on_event("reasoning_end")
+            messages.append({
+                "role": "assistant",
+                "content": _marked(state["text"], "[interrupted by user]"),
+                **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
+            })
+            if state["text"] and on_event:
+                on_event("text", state["text"])
+            return None
         except Exception as exc:
+            if on_event:
+                on_event("reasoning_end")
+            messages.append({
+                "role": "assistant",
+                "content": _marked(state["text"], "[model error]"),
+                **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
+            })
+            if state["text"] and on_event:
+                on_event("text", state["text"])
             return f"Model Error: {exc}"
-
-        usage = body.get("usage") or {}
-        last_usage["prompt_tokens"] = usage.get("prompt_tokens") or 0
-        step_out = usage.get("completion_tokens") or 0
-        last_usage["completion_tokens"] += step_out
-        session_usage["completion_tokens"] += step_out
-        msg = body["choices"][0]["message"]
+        msg = _assistant(state["text"], state["calls"], state["extra"])
         messages.append(msg)
-        calls = msg.get("tool_calls") or []
-        if not calls:
-            return msg.get("content") or ""
-        for call in calls:
-            name = call["function"]["name"]
-            args = call["function"]["arguments"]
-            if mode["name"] == "plan" and name in PLAN_DENIED:
-                content = f"Plan mode: `{name}` is disabled. Propose the change and ask to run /build."
-                _tool_note(content)
-            else:
-                run = TOOLS.get(name)
-                if run:
-                    denied = _permit(name, args)
-                    try:
-                        if denied is not None:
-                            content = denied
-                            _tool_note(content)
-                        else:
-                            content = run(args)
-                            print(f"\n|Tools Used: `{name}` ({args})|\n")
-                    finally:
-                        clear_approved()
+        appended = True
+        if not state["calls"]:
+            if on_event:
+                on_event("text", msg["content"], final=True)
+            return ""
+        done: set[str] = set()
+        try:
+            if state["text"] and on_event:
+                on_event("text", state["text"])
+            for call in msg["tool_calls"]:
+                name = call["function"]["name"]
+                args = call["function"]["arguments"]
+                if mode["name"] == "plan" and name in PLAN_DENIED:
+                    content = f"Plan mode: `{name}` is disabled. Propose the change and ask to run /build."
+                    note = True
+                    ran = False
                 else:
-                    content = f"Unknown tool: {name}"
+                    run = TOOLS.get(name)
+                    if run:
+                        denied = _permit(name, args)
+                        try:
+                            if denied is not None:
+                                content = denied
+                                note = True
+                                ran = False
+                            else:
+                                content = run(args)
+                                note = False
+                                ran = True
+                        finally:
+                            clear_approved()
+                    else:
+                        content = f"Unknown tool: {name}"
+                        note = True
+                        ran = False
+                messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+                done.add(call["id"])
+                if note:
                     _tool_note(content)
-            messages.append(
-                {
-                    "role":"tool",
-                    "tool_call_id":call["id"],
-                    "content":content,
-                }
-            )
+                elif ran:
+                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+        except KeyboardInterrupt:
+            for call in msg["tool_calls"]:
+                if call["id"] not in done:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call["id"],
+                        "content": "Interrupted by user.",
+                    })
+            return None
+        _ = appended
     return f"Max limit reached: {MAX_STEPS}. Try smaller request."

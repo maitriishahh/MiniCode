@@ -71,7 +71,7 @@ cannot be added through it.
 | Permissions | Implemented: `allow` / `ask` / `deny`, last matching rule wins (§5) |
 | UI | `input()` REPL + tool line + status block per turn (§7) |
 | Layout | `src/minicode/`, growing from one module (§8) |
-| Sync vs async | Sync. Streaming is specified in `docs/09-streaming.md` and not implemented. The implement pass stays sync |
+| Sync vs async | Sync. Streaming, abort, conditional reasoning labels, and the final-answer-only prefix are implemented (`docs/09-streaming.md`). Stay sync |
 | Tests | Not written. Planned after `tool_from_fn`; still open |
 | Cost | Deferred until more models are added; then needs pricing on the Model record |
 
@@ -103,10 +103,10 @@ OpenCode's shape, adapted, without the catalog:
   id is still one tuple if asked. It is not the free backup.
 - Switching models mid-session changes the next create's `model` and
   `base_url`. History stays Chat Completions dicts: the raw assistant
-  message from the response JSON, so extra fields round-trip. A Gemini
-  thought signature rides in that dict. Do not parse it. `docs/09-streaming.md`
-  rebuilds that dict from `chunk.to_dict()` when it is implemented. Until
-  then the raw append stays. Do not invent a signature.
+  message from the response JSON, or the plain dict rebuilt from
+  `chunk.to_dict()` in the streaming loop, so extra fields round-trip. A
+  Gemini thought signature rides in that dict. Do not parse it. Preserve
+  `extra_content`. Do not invent a signature.
 
 The `openai` package is the transport, not a provider catalog. What it does
 not give you is the product layer: a typed catalogue, context windows,
@@ -316,10 +316,12 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 ---
 ```
 
-`docs/09-streaming.md` specifies streaming the answer and removing
-`~~Thinking...`. It is not implemented. Until then the answer prints once
-at the end of the turn. An aborted stream adds no usage. Do not put
-`prompt_tokens` into `Session`.
+Streaming, abort, conditional reasoning labels (`Thinking:` / `Thought:`
+only when reasoning exists), and the final-answer-only `minicode >>` prefix
+with buffered content are implemented per `docs/09-streaming.md`. Reasoning
+streams live; content buffers per model step, so the final answer prints
+once with the prefix and tool preambles print without it. An aborted stream
+adds no usage. Do not put `prompt_tokens` into `Session`.
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
 `completion_tokens` for the turn. `Session` is summed `completion_tokens`
@@ -413,10 +415,13 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `__main__.py`. Plan keeps `bash` / `powershell` in the tool list; rules
 restrict them, not a stricter prompt.
 
-**Layer 8 — streaming and abort.** Guide written: `docs/09-streaming.md`.
-Not implemented. One streamed create, a `chunk.to_dict()` merge that keeps
-`extra_content`, and a Ctrl+C that returns to `user >>` with a coherent
-history. No background shell. `Session` still excludes prompt tokens.
+**Layer 8 — streaming and abort.** Code in the working tree;
+`docs/09-streaming.md` is the guide. Conditional reasoning labels
+(`Thinking:` / `Thought:` only when reasoning exists) and the
+final-answer-only `minicode >>` prefix with buffered content are implemented.
+One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
+and a Ctrl+C that returns to `user >>` with a coherent history. No background
+shell. `Session` still excludes prompt tokens.
 
 **Known gaps by phase.** These are open, not new layers.
 
@@ -430,12 +435,12 @@ history. No background shell. `Session` still excludes prompt tokens.
 | Layer 5 | Plan hides `write`/`edit` only; shell stays and asks | Tool-list restriction, not a shell deny |
 | Layer 7 | `always` approvals die with the process | Sessions/resume |
 | Layer 7 | No env scrubbing; shell inherits the process environment | Not planned |
+| Layer 8 | Content buffers per step; the final answer is not token-streamed | Sessions/resume next |
 | After Layer 8 | Sessions/resume, cache control, diff viewer, `AGENTS.md` injection | In that order |
 | — | Cost display | Deferred until more models are added |
 
-**Next:** implement `docs/09-streaming.md`. Do not start sessions in that
-pass. After that: sessions/resume → cache control
-→ diff viewer → `AGENTS.md` injection into the system prompt.
+**Next:** sessions/resume → cache control → diff viewer → `AGENTS.md`
+injection into the system prompt.
 Cost is not in this chain. It is deferred until more models are added;
 when it lands it needs pricing on the Model record.
 A shell command can still `cd` out. Permissions asks before the command
