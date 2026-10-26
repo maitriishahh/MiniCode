@@ -403,6 +403,7 @@ until more models are added; it then needs pricing on the record.
 - No tests for `tool_from_fn` or `read`.
 - History is unbounded; compaction waits until the context gap hurts.
 - No streaming/abort. Ctrl+C during a model call ends the REPL.
+  Specified in `docs/09-streaming.md`. Not implemented.
 - Cost display is deferred until more models are added.
 
 ## Don't add yet

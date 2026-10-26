@@ -75,8 +75,8 @@ root to "fix" that. The product soak launches in the repo, with no
 4. Do not edit `PLAN_SYSTEM`. Do not special-case the plan-denied message.
    The existing backstop already says `Plan mode: \`bash\` is disabled`.
 5. Do not catch `KeyboardInterrupt`. `tool_from_fn` catches `Exception`
-   only. Ctrl+C during the wait still kills the REPL. That is the
-   streaming/abort layer.
+   only. Ctrl+C during the wait still kills the REPL. That is
+   `docs/09-streaming.md`. The guide is written. It is not implemented.
 6. Do not raise at import if nothing is found. The call returns a tool
    error that lists what was searched.
 
@@ -437,6 +437,7 @@ proved from this Windows machine. Do not add a CI job for it.
 ## Open gaps at this layer
 
 - No streaming/abort. Ctrl+C during the wait ends the REPL.
+  Specified in `docs/09-streaming.md`. Not implemented.
 - The child process inherits the environment.
 - A permitted command can `cd` out of the workspace.
 
@@ -444,7 +445,7 @@ proved from this Windows machine. Do not add a CI job for it.
 
 Later, in order, not in the implement pass: permissions
 (`docs/08-permissions.md`), streaming and a Ctrl+C that leaves a coherent
-turn, sessions. Background bash is deferred until it hurts. It is not in that
+turn (`docs/09-streaming.md`, written, not implemented), sessions. Background bash is deferred until it hurts. It is not in that
 chain. `/connect` stays with the catalog.
 
 Not scheduled. Do not add them as a follow-up: a shell-path env, `cmd.exe`,

@@ -83,7 +83,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   JSON object from the response body (`choices[0].message`), not an SDK
   object and not a rebuilt `tool_calls` list. A Gemini thought signature
   rides in that dict. Do not parse it. A 400 that names `thought_signature`
-  is the only reason to touch that append.
+  is the only reason to touch that append. `docs/09-streaming.md` replaces
+  that append with a `chunk.to_dict()` merge when it is implemented. Until
+  then the raw append stays. Do not implement streaming in a pass that is
+  only writing the guide.
 - Tool functions use Google-style docstrings. Only the first line becomes the
   model-visible description and `Args:` entries become parameter docs;
   extra scope sentences in the docstring body are invisible to the model.
@@ -228,7 +231,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. The answer prints as `minicode >> {answer}`.
-  After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
+  `docs/09-streaming.md` replaces that final print with a one-time prefix
+  on the first streamed delta. Until that guide is implemented, the final
+  print stays. After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
   including in plan. A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tools Used|`. Status block
   after the answer, wrapped in `---`:
@@ -247,9 +252,16 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `prompt_tokens` into it. A resent prompt is not new work. Cost display is
   deferred until more models are added; when it lands, pricing makes input
   part of a total. No Tok/s. A wall-clock rate is network wait, not model
-  speed, and summed `total_tokens` counts the prompt once per step.
+  speed, and summed `total_tokens` counts the prompt once per step. An
+  aborted stream adds nothing. `docs/09-streaming.md` does not put
+  `prompt_tokens` into `Session`.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
+- Streaming and abort are specified in `docs/09-streaming.md` and not
+  implemented. `KeyboardInterrupt` during a model call or a tool call is
+  control flow, not a tool error. `tool_from_fn` catches `Exception` only.
+  Do not catch it there. Do not read a reasoning field to fill an empty
+  `content`.
 - Do not commit secrets, session dumps, or transcripts.
 
 ## Do not
