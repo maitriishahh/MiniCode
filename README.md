@@ -8,50 +8,50 @@ One Python loop over an OpenAI-compatible chat API.
 
 ## Architecture
 
-Solid arrows are runtime calls. `permissions.py` calls the prompt callback that
-`__main__.py` registers. `schema_generator.py` wraps each tool at import; its
-box carries the `import-time factory` label.
+`-->` is a runtime call. `-.->` is import-time or a callback.
 
-```
-+-----------------------------------------------------------------------------------------+
-|                                    __main__.py (CLI)                                    |
-|  REPL loop · /plan /build /model · status · permission prompt adapter                   |
-|  shared messages · registers permissions.ask["fn"] · reads SANDBOX                      |
-+-----------------------------------------------------------------------------------------+
-                                             | agent(messages)
-                                             v
-+-----------------------------------------------------------------------------------------+
-|                                      agent.py (Core)                                    |
-|  .env + OpenAI client · MODELS/active · mode · MAX_STEPS loop                           |
-|  history · active_schemas() · TOOLS/SCHEMAS · tool dispatch                             |
-|  sole model-call site                                                                   |
-+-----------------------------------------------------------------------------------------+
-              /                              |                              \
-              v                              v                              v
-+---------------------------+  +---------------------------+  +---------------------------+
-|      permissions.py       |  |      resolve_path.py      |  |    schema_generator.py    |
-|     rules · ask hook      |  |    SANDBOX · classify     |  |      tool_from_fn()       |
-|    decide · force_ask     |  |    approve · _resolve     |  |    docstring -> schema    |
-|      plan_touches         |  |    path gate for tools    |  |    pydantic validation    |
-|      policy only          |  |      approval set         |  |    import-time factory    |
-+---------------------------+  +-------------+-------------+  +-------------+-------------+
-                                             ^                              |
-                                             |                              |
-                                             |                              v
-+-----------------------------------------------------------------------------------------+
-|                                       tools/                                            |
-|  - read.py  (line-numbered text)           - glob.py   (pattern matching)               |
-|  - write.py (overwrite file)               - grep.py   (content searching)              |
-|  - edit.py  (exact span replacement)       - shell.py  (subprocess execution)           |
-+-----------------------------------------------------------------------------------------+
+```text
+__main__.py -- agent(messages) --> agent.py
+__main__.py -- registers ask["fn"] -.-> permissions.py
+__main__.py -- reads SANDBOX -.-> resolve_path.py
+agent.py -- chat.completions.create --> model API
+agent.py -- decide / force_ask / plan_touches --> permissions.py
+permissions.py -- prompt callback -.-> __main__.py
+agent.py -- classify / approve / clear_approved --> resolve_path.py
+agent.py -- dispatch TOOLS[name] --> tools/
+agent.py -- tool_from_fn -.-> schema_generator.py
+schema_generator.py -- wraps each tool -.-> tools/
+tools/ -- _resolve / SANDBOX --> resolve_path.py
 ```
 
-`agent.py` is the only module that calls the model. `permissions.py` does not
-run tools: `agent.py` checks the decision and then dispatches
-`TOOLS[name](args)`. `schema_generator.py` built those wrappers at import.
-`tools/read`, `write`, `edit`, `glob`, and `grep` call `resolve_path._resolve`;
-`shell` uses `SANDBOX`. `agent.py`, `tools/edit.py`, and `tools/shell.py` also
-write to stdout; the CLI is not the only printer.
+`agent.py` is the only model-call site. `permissions.py` only decides. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import.
+
+```text
+user >> input
+├── empty → next prompt
+├── exit / quit / bye → stop
+├── /plan or /build → swap messages[0] → next prompt
+├── /model → list or set the id → next prompt
+└── otherwise
+    ↓
+    append the user message
+    ↓
+    agent(messages)
+    ↓
+    chat.completions.create → model API
+    ↓
+    append the assistant message
+    ├── no tool call → return the answer
+    └── each tool call
+        ├── plan denies write/edit, or unknown name → tool result
+        ├── deny → tool result
+        ├── ask → prompt callback → __main__.py
+        └── allow → TOOLS[name] → tools/ → resolve_path.py
+    ↓
+    repeat until the model stops, or MAX_STEPS
+    ↓
+    print minicode >> and the status block → next prompt
+```
 
 | Caller | Callee | What crosses |
 |---|---|---|
@@ -62,7 +62,8 @@ write to stdout; the CLI is not the only printer.
 | `agent` | `permissions` | `decide` / `force_ask` / `plan_touches` |
 | `permissions` | `__main__` | calls the registered prompt (callback) |
 | `agent` | `resolve_path` | `classify` / `approve` / `clear_approved` |
-| `agent` | `schema_generator` + `tools` | builds `TOOLS`/`SCHEMAS` at import; dispatches `TOOLS[name]` |
+| `agent` | `schema_generator` | `tool_from_fn` at import |
+| `agent` | `tools` | imports the functions; dispatches `TOOLS[name]` |
 | `schema_generator` | `tools` | wraps each function at import into a validating `run` |
 | `tools` | `resolve_path` | `_resolve` / `SANDBOX` |
 
