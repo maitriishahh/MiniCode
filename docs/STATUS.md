@@ -101,8 +101,8 @@ models are added.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
 - [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort in the
-  working tree. Conditional reasoning labels (`Thinking:` / `Thought:` only
-  when reasoning exists) and the final-answer-only `minicode >>` prefix with
+  working tree. Conditional reasoning (`Thinking:` only when reasoning
+  exists; no `Thought:` closer) and the final-answer-only `minicode >>` prefix with
   buffered content are implemented. Content buffers per model step, so the
   final answer is not token-streamed; reasoning still streams live. Gemini
   asks for thought summaries with `include_thoughts` only. No

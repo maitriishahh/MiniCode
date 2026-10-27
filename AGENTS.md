@@ -217,8 +217,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   lines. Do not hardcode an id. Do not put the catalog in `.env`. The
   record field is `api_key`, and its value is the env name, not the secret.
   Lookup is `os.getenv(record["api_key"])`. `default_id` is
-  `os.getenv("GEMINI_MODEL")` once. That is the startup choice. `/model <id>`
-  changes `active["id"]` for the session only. Restart restores
+  `os.getenv("GEMINI_MODEL")` once. That is the startup choice. `/model`
+  lists `N id` with a blank line above and below. `/model N` or
+  `/model <id>` changes `active["id"]` for the session only. A bare integer
+  is a number, not an id. Restart restores
   `default_id`. An unset id env skips that server. An empty key on
   `127.0.0.1` or `localhost` becomes `"ollama"`. A missing Gemini key still
   fails. A raised call returns `Model Error:`. No `gemini/` or
@@ -237,10 +239,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   secret into the record. Do not replace `os.getenv`. A key-only command is
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
-- REPL prompt is `user >> `. Reasoning streams live under `Thinking:` and
-  closes with `Thought:` when a delta carries `reasoning_content` or
-  `reasoning`. After the step, one split pulls `<thought>` or `<think>` out
-  of the buffered content and shows that the same way. No tag is kept in
+- REPL prompt is `user >> `. Reasoning streams live under `Thinking:` when
+  a delta carries `reasoning_content` or `reasoning`. No `Thought:` closer.
+  After the step, one split pulls `<thought>` or `<think>` out of the
+  buffered content and shows that the same way. No tag is kept in
   history. The Gemini create passes `include_thoughts: true` only. No
   `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
   With no summary, neither label appears and there is no wait line. Content

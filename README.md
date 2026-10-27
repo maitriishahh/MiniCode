@@ -83,7 +83,7 @@ One Python loop over an OpenAI-compatible chat API.
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
 - Exact-match edits with a terminal diff
-- Live model reasoning under `Thinking:` / `Thought:` when the provider sends it. Gemini is asked for a thought summary; that summary is not part of the answer
+- Live model reasoning under `Thinking:` when the provider sends it. Gemini is asked for a thought summary; that summary is not part of the answer
 - Final answers printed once with `minicode >>`; tool preambles print without it
 - Model switching with `/model`
 - Workspace-bounded file access with `.env` protection
@@ -171,8 +171,9 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 |---|---|
 | `/plan` | Switch to plan mode. `write` and `edit` are disabled. |
 | `/build` | Switch to build mode. All tools are available. |
-| `/model` | List the models loaded from `.env`. |
-| `/model <id>` | Switch to another loaded model for this session. |
+| `/model` | List the loaded models as `N id`, with a blank line above and below. |
+| `/model N` | Switch to model number `N` from that list. |
+| `/model <id>` | Switch to another loaded model by id for this session. |
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. Neither command is
@@ -201,10 +202,11 @@ user >> /build
 Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
-If the model streams reasoning, it appears under `Thinking:` and ends with
-`Thought:` before the answer or first tool line. Gemini is asked for that
-summary; it is shown under those labels and is not part of the answer. Not
-every model sends reasoning; when it does not, neither label appears. Only
+If the model streams reasoning, it appears under `Thinking:` and then the
+answer or first tool line. There is no `Thought:` closer. Gemini is asked
+for that summary; it is shown under `Thinking:` and is not part of the
+answer. Not every model sends reasoning; when it does not, the label does
+not appear. Only
 the final answer gets `minicode >>`; tool preambles and error notices do not.
 Content is buffered per model step so the harness can tell a final answer
 from a tool preamble; the final answer is not streamed token by token.

@@ -403,7 +403,7 @@ until more models are added; it then needs pricing on the record.
 - No tests for `tool_from_fn` or `read`.
 - History is unbounded; compaction waits until the context gap hurts.
 - Streaming/abort are in the working tree. Conditional reasoning labels
-  (`Thinking:` / `Thought:` only when reasoning exists) and the
+  (`Thinking:` only when reasoning exists; no `Thought:` closer) and the
   final-answer-only `minicode >>` prefix are implemented per
   `docs/09-streaming.md`. Gemini asks for thought summaries. Ctrl+C during a
   model call or a tool call returns to `user >>`.

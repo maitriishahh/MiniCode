@@ -34,8 +34,8 @@ same way.
 Content is accumulated, not emitted. Those tags are stripped before the
 buffer. After the step, `agent` emits `text(final=True)` for the no-tool
 answer (or `[empty response]`) and `text(final=False)` for a tool preamble or
-abort/error partial text. The REPL prints `Thinking:`, the reasoning, and
-`Thought:` only when reasoning exists. It prints `minicode >>` only when
+abort/error partial text. The REPL prints `Thinking:` and the reasoning only
+when reasoning exists. No `Thought:` closer. It prints `minicode >>` only when
 `final=True`. Reasoning is display-only: it never enters history and never
 fills `content`.
 
@@ -47,7 +47,7 @@ fills `content`.
 | Ctrl+C during a tool | assistant calls kept; completed results kept; missing ids get `Interrupted by user.` | `[interrupted by user]` | `None` |
 | API or model error | partial text plus `[model error]` if no final answer was appended; reasoning not stored | partial text without prefix, then `Model Error: ...` | the notice |
 | Empty completion | `[empty response]` | `minicode >> [empty response]`, once | `""` |
-| Reasoning only, content null | `[empty response]`; reasoning not stored | reasoning block, `Thought:`, `minicode >> [empty response]` | `""` |
+| Reasoning only, content null | `[empty response]`; reasoning not stored | reasoning block, then `minicode >> [empty response]` | `""` |
 | Normal answer | assistant message | printed once after the step with `minicode >>` | `""` |
 
 If Ctrl+C lands after the final assistant entry was appended, return `""`
@@ -90,11 +90,10 @@ inside `content` when the create asks for it. The Gemini base passes
 `extra_body={"extra_body": {"google": {"thinking_config": {"include_thoughts": True}}}}`.
 No `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
 After the step, split `<thought>` or `<think>` out of the buffered content
-once. Show the inside under `Thinking:` / `Thought:`. Keep the rest as the
+once. Show the inside under `Thinking:`. No `Thought:` closer. Keep the rest as the
 answer. Do not read `extra_content` as reasoning; it carries the thought
-signature. Do not parse it. If the provider sends no reasoning, neither
-`Thinking:` nor `Thought:` appears; the buffered answer prints normally with
-its prefix.
+signature. Do not parse it. If the provider sends no reasoning, `Thinking:`
+does not appear; the buffered answer prints normally with its prefix.
 
 The final-only prefix is the reason content is buffered. A first content
 delta cannot be labelled final while a later delta may still carry a tool
@@ -115,8 +114,8 @@ and why every id gets a result.
 
 `Thinking:` is the header for a reasoning block. It is emitted lazily on the
 first reasoning delta, or after the step when a `<thought>` / `<think>` span
-was in the buffered content. Not before the create. Close the block with
-`Thought:` when that text ends. Do not emit either label when there is no
+was in the buffered content. Not before the create. Do not print a
+`Thought:` closer. Do not emit `Thinking:` when there is no
 reasoning content. A tool's own print is still the progress during a tool.
 
 A Qwen thinking model can finish with `content` null after the tools
@@ -501,9 +500,7 @@ def on_event(kind: str, piece: str = "", final: bool = False) -> None:
         reasoning = True
         wrote = True
     elif kind == "reasoning_end":
-        if reasoning:
-            print("\nThought:", flush=True)
-            reasoning = False
+        reasoning = False
     elif kind == "text":
         if final:
             print(f"\nminicode >> {piece}", flush=True)
@@ -532,16 +529,16 @@ From the launch dir, with the dev fence:
 uv run python -m minicode --sandbox sandbox
 ```
 
-- A no-reasoning text reply shows neither `Thinking:` nor `Thought:`. The
-  final answer prints once after `minicode >>` when the step ends, then the
-  status block. The answer is not printed twice.
+- A no-reasoning text reply shows no `Thinking:`. The final answer prints
+  once after `minicode >>` when the step ends, then the status block. The
+  answer is not printed twice.
 - A reasoning reply shows `Thinking:` on the first reasoning delta, streams
-  the reasoning, prints `Thought:` when it closes, then prints the final
-  answer after `minicode >>`. The answer itself is buffered, not streamed.
+  the reasoning, then prints the final answer after `minicode >>`. No
+  `Thought:` closer. The answer itself is buffered, not streamed.
 - A reasoning reply with a tool call closes the block before the tool
   preamble or `|Tools Used|`; the next model step starts a new block.
-- A reasoning-only reply with null content closes the block with `Thought:`,
-  prints `minicode >> [empty response]`, and keeps reasoning out of history.
+- A reasoning-only reply with null content prints the reasoning, then
+  `minicode >> [empty response]`, and keeps reasoning out of history.
 - A tool turn prints its preamble without a prefix, then the tool line after
   the result is in history; the later final answer gets the prefix. Plan
   still denies `write` / `edit` with the existing sentence and no
@@ -555,7 +552,7 @@ uv run python -m minicode --sandbox sandbox
 - Ctrl+C mid-stream prints any partial text without a prefix, then
   `[interrupted by user]`, the status block, and returns to `user >>`. The
   next message is accepted.
-- Ctrl+C during reasoning closes the block with `Thought:`, prints
+- Ctrl+C during reasoning stops the block, prints
   `[interrupted by user]`, prints the status block, and returns to
   `user >>`.
 - Ctrl+C while a tool preamble prints still fills every tool id with
@@ -588,7 +585,7 @@ for it.
 - Content is buffered per model step so the REPL can reserve `minicode >>`
   for the final answer. The final answer is not token-streamed; only
   reasoning is. A tool preamble is also printed at step end.
-- A provider that sends no reasoning shows no `Thinking:`/`Thought:` and no
+- A provider that sends no reasoning shows no `Thinking:` and no
   wait line. The first visible output is the buffered final answer at step
   end.
 - Gemini asks for summaries with `include_thoughts` only. No

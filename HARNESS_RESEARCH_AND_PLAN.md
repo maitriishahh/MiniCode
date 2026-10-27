@@ -316,8 +316,8 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 ---
 ```
 
-Streaming, abort, conditional reasoning labels (`Thinking:` / `Thought:`
-only when reasoning exists), and the final-answer-only `minicode >>` prefix
+Streaming, abort, conditional reasoning (`Thinking:` only when reasoning
+exists; no `Thought:` closer), and the final-answer-only `minicode >>` prefix
 with buffered content are implemented per `docs/09-streaming.md`. Reasoning
 streams live; content buffers per model step, so the final answer prints
 once with the prefix and tool preambles print without it. Gemini asks for
@@ -418,7 +418,7 @@ restrict them, not a stricter prompt.
 
 **Layer 8 — streaming and abort.** Code in the working tree;
 `docs/09-streaming.md` is the guide. Conditional reasoning labels
-(`Thinking:` / `Thought:` only when reasoning exists) and the
+(`Thinking:` only when reasoning exists; no `Thought:` closer) and the
 final-answer-only `minicode >>` prefix with buffered content are implemented.
 Gemini asks for thought summaries; the tags are stripped before history.
 One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,

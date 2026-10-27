@@ -177,26 +177,38 @@ locally, never sent to the model. The space after `/model` is required.
 `/models` is not this command.
 
 ```python
-stripped = text.strip()
+ids = list(MODELS)
 if stripped == "/model" or stripped.startswith("/model "):
     parts = stripped.split(maxsplit=1)
     if len(parts) == 1:
-        for mid in MODELS:
+        print()
+        for n, mid in enumerate(ids, 1):
             mark = " (active)" if mid == active["id"] else ""
-            print(f"{mid}{mark}")
+            print(f"{n} {mid}{mark}")
+        print()
     else:
         chosen = parts[1].strip()
+        if chosen.isdigit():
+            n = int(chosen)
+            picked = ids[n - 1] if 1 <= n <= len(ids) else None
+            if picked is None:
+                print(f"\nUnknown Model: {chosen}\n")
+                continue
+            chosen = picked
         if chosen not in MODELS:
-            print(f"Unknown Model: {chosen}")
+            print(f"\nUnknown Model: {chosen}\n")
         else:
             active["id"] = chosen
-            print(f"Model: {active['id']}")
+            print(f"\nModel: {active['id']}\n")
     continue
 ```
 
-Unknown id prints an error and does not switch. `/model` with no argument
-lists every id loaded at startup and marks the active one. It does not add
-a model. It does not edit `.env`. Restart restores `default_id`.
+Unknown id or number prints an error and does not switch. `/model` with no
+argument lists every id loaded at startup, numbered from 1, and marks the
+active one. A blank line sits above and below that list, and above and below
+`Model:` / `Unknown Model:`. `/model N` and `/model <id>` both switch. A
+bare integer is a number, not an id. It does not add a model. It does not
+edit `.env`. Restart restores `default_id`.
 
 ## Segment 4 — Status line
 

@@ -73,18 +73,28 @@ def main() -> None:
             print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
             continue
         if stripped == "/model" or stripped.startswith("/model "):
+            ids = list(MODELS)
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:
-                for mid in MODELS:
+                print()
+                for n, mid in enumerate(ids, 1):
                     mark = " (active)" if mid == active["id"] else ""
-                    print(f"{mid}{mark}")
+                    print(f"{n} {mid}{mark}")
+                print()
             else:
                 chosen = parts[1].strip()
+                if chosen.isdigit():
+                    n = int(chosen)
+                    picked = ids[n - 1] if 1 <= n <= len(ids) else None
+                    if picked is None:
+                        print(f"\nUnknown Model: {chosen}\n")
+                        continue
+                    chosen = picked
                 if chosen not in MODELS:
-                    print(f"Unknown Model: {chosen}")
+                    print(f"\nUnknown Model: {chosen}\n")
                 else:
                     active["id"] = chosen
-                    print(f"Model: {active["id"]}")
+                    print(f"\nModel: {active['id']}\n")
             continue
 
         messages.append(
@@ -109,9 +119,7 @@ def main() -> None:
                 reasoning = True
                 wrote = True
             elif kind == "reasoning_end":
-                if reasoning:
-                    print("\nThought:", flush=True)
-                    reasoning = False
+                reasoning = False
             elif kind == "text":
                 if final:
                     print(f"\nminicode >> {piece}", flush=True)
