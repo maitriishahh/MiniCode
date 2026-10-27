@@ -8,50 +8,59 @@ One Python loop over an OpenAI-compatible chat API.
 
 ## Architecture
 
-`-->` is a runtime call. `-.->` is import-time or a callback.
+### Project Flow Diagram
 
 ```text
-__main__.py -- agent(messages, on_event) --> agent.py
-__main__.py -- registers ask["fn"] -.-> permissions.py
-__main__.py -- reads SANDBOX -.-> resolve_path.py
-agent.py -- chat.completions.create(stream=True) --> model API
-agent.py -- decide / force_ask / plan_touches --> permissions.py
-permissions.py -- prompt callback -.-> __main__.py
-agent.py -- classify / approve / clear_approved --> resolve_path.py
-agent.py -- dispatch TOOLS[name] --> tools/
-agent.py -- tool_from_fn -.-> schema_generator.py
-schema_generator.py -- wraps each tool -.-> tools/
-tools/ -- _resolve / SANDBOX --> resolve_path.py
+  [ User / Terminal ]
+         │
+         ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/model`)
+  [ __main__.py ] (REPL loop, session usage tracking, elapsed time measurement)
+         │
+         ├─► Command handled locally? (/plan, /build, /model, exit)
+         │
+         ▼  (otherwise appends user message to history, calls agent)
+  [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
+         │
+         ├─► client.chat.completions.create(stream=True)
+         │        │
+         │        ├─► Model API (Gemini / Ollama)
+         │        │        │
+         │        │        ▼ (Streaming response chunks)
+         │        ├─► _consume(stream, on_event, state)
+         │        │        ├─► Emits reasoning/thinking (if present)
+         │        │        ├─► Accumulates text content & tool calls (handles missing indices/Gemini extra_content)
+         │        │        └─► Captures token usage metadata
+         │        │
+         │        ├─► KeyboardInterrupt / Exception handling during stream
+         │        │        └─► Appends interrupted/error assistant message, returns None / error
+         │        │
+         │        ▼ (No tool calls)
+         ├─► Final Answer Buffer ──► on_event("text", piece, final=True) ──► Printed via `minicode >>`
+         │
+         └─► Tool Calls Present?
+                  │
+                  ▼
+         [ Permission & Boundary Check ] (`_permit` in agent.py → permissions.py & resolve_path.py)
+                  │
+                  ├─► Plan mode active & tool in PLAN_DENIED (write, edit) or shell mutating sandbox?
+                  │        └─► Denied / prompts user via terminal callback (`_permission` in `__main__.py`)
+                  ├─► Target path in `.env` or external directory?
+                  │        └─► Prompts user: `[o]nce / [a]lways / [d]eny`
+                  │
+                  ▼ (Allowed)
+         [ Tool Dispatch ] (`TOOLS[name]` in `tools/`)
+                  │
+                  ├─► read.py, write.py, edit.py, glob.py, grep.py, shell.py
+                  │        └─► Validated against SANDBOX boundary (`resolve_path.py`)
+                  │        └─► Executes operation (e.g. diff for edit, subprocess for shell)
+                  │
+                  ▼
+         [ Append Tool Result ] (`role: "tool"`, `tool_call_id`)
+                  │
+                  └─► Loop continues to next step in `agent()`
 ```
 
-`agent.py` is the only model-call site. `permissions.py` only decides. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import.
-
-```text
-user >> input
-├── empty → next prompt
-├── exit / quit / bye → stop
-├── /plan or /build → swap messages[0] → next prompt
-├── /model → list or set the id → next prompt
-└── otherwise
-    ↓
-    append the user message
-    ↓
-    agent(messages, on_event)
-    ↓
-    chat.completions.create(stream=True) → model API
-    ↓
-    append the assistant message
-    ├── no tool call → buffer final answer → text(final=True)
-    └── each tool call
-        ├── plan denies write/edit, or unknown name → tool result
-        ├── deny → tool result
-        ├── ask → prompt callback → __main__.py
-        └── allow → TOOLS[name] → tools/ → resolve_path.py
-    ↓
-    repeat until the model stops, or MAX_STEPS
-    ↓
-    print the final answer and status block → next prompt
-```
+### Component Interaction Table
 
 | Caller | Callee | What crosses |
 |---|---|---|
@@ -66,6 +75,8 @@ user >> input
 | `agent` | `tools` | imports the functions; dispatches `TOOLS[name]` |
 | `schema_generator` | `tools` | wraps each function at import into a validating `run` |
 | `tools` | `resolve_path` | `_resolve` / `SANDBOX` |
+
+`agent.py` is the only model-call site. `permissions.py` only decides. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import.
 
 ## Features
 
@@ -196,102 +207,3 @@ reasoning; when it does not, neither label appears. Only the final answer
 gets `minicode >>`; tool preambles and error notices do not. Content is
 buffered per model step so the harness can tell a final answer from a tool
 preamble; the final answer is not streamed token by token.
-
-If your shell tool is named `powershell` instead of `bash`, that is the Windows
-fallback.
-
-## Tools
-
-| Tool | What it does | Notes |
-|---|---|---|
-| `read` | Reads a file with line numbers. | Starts at line 1 and returns up to 2,000 lines by default. |
-| `write` | Creates a file or replaces a whole file. | `content` must be the full final file. Creates parent folders. |
-| `edit` | Replaces one exact unique span. | Fails on zero or multiple matches. Prints a diff to the terminal. |
-| `glob` | Finds files by name pattern. | Capped at 50 paths. |
-| `grep` | Searches file contents with a regex. | Capped at 50 matches. `include` filters file names. |
-| `bash` / `powershell` | Runs a shell command. | 120-second timeout. Output capped at 8,000 characters. |
-
-`glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
-also skips `.env` contents. `glob` may list the name. Both tell the model
-to refine broad searches.
-
-## Plan and build
-
-**Plan** is for reading, searching, and proposing changes. `write` and `edit`
-are not offered to the model, and a guessed call is refused. Shell commands are
-still available. In plan, a command asks when it reads file contents, creates,
-or deletes. `ls` and `git` do not.
-
-**Build** offers every tool. `write` and `edit` run without a prompt inside the
-workspace. Ordinary shell commands do not ask.
-
-Plan mode is not a hard sandbox: an approved shell command can still change
-files. Use build mode deliberately.
-
-## Permissions
-
-| Key | Covers | Default |
-|---|---|---|
-| `read` | `read` | allow |
-| `edit` | `write`, `edit` | allow |
-| `glob` | `glob` | allow |
-| `grep` | `grep` | allow |
-| `shell` | `bash`, `powershell` | allow, except `.env` text and plan verbs |
-| `external_directory` | paths outside the workspace | ask |
-
-When prompted:
-
-- `o` or `once` allows this call.
-- `a` or `always` allows that exact value until MiniCode exits.
-- `d`, an empty answer, or Ctrl+C denies the call.
-
-`.env` and `.env.*` ask on read. `.env.example` does not. Permission denials
-return `Permission denied: <key> <value>`. A denied plan-mode shell ask returns
-the short `/build` sentence instead.
-
-## Workspace and safety
-
-The workspace is the directory you launch from, or the path passed to
-`--sandbox`. File tools may use absolute or workspace-relative paths. A path
-outside the workspace triggers the `external_directory` prompt.
-
-The workspace is a path boundary, not a container. An approved shell command
-can leave it with `cd` or change files outside it. The shell also inherits your
-environment variables. Do not run MiniCode on a repository you do not trust.
-
-## Status line
-
-After each turn:
-
-```text
----
-Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project
-1,204 In | 48 Out | 96 Session | Elapsed: 2.1s
----
-```
-
-- `In` is the prompt size of the last model call.
-- `Out` is the output tokens for the turn.
-- `Session` is the total output tokens since startup.
-- `Elapsed` is wall-clock time for the turn.
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `401` or authentication error | Check `GEMINI_API_KEY` in `.env`. |
-| `404` model not found | Remove any `gemini/` prefix from `GEMINI_MODEL`. |
-| `No module named minicode` | Run `uv sync` from the MiniCode directory. |
-| `Model Error: ...` with Ollama | Start Ollama and check that `OLLAMA_MODEL` matches a pulled model. |
-| `No shell found` | Install Git Bash or PowerShell on Windows, or bash/sh on Unix. |
-| `Max limit reached: 16` | The turn hit the step limit. Ask for a smaller task. |
-
-## Not included yet
-
-Sessions and resume, cache control, cost display, compaction, a diff viewer,
-`AGENTS.md` injection, MCP, subagents, and a graphical interface. Context
-percentage stays off until a verified `context_window` is set. Cost display
-waits until more models are added. Ctrl+C during a model call or a tool call
-aborts that step and returns to `user >>`. A grandchild shell process can
-survive.
