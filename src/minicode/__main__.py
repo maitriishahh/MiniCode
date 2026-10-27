@@ -116,7 +116,7 @@ def main() -> None:
                 if final:
                     print(f"\nminicode >> {piece}", flush=True)
                 else:
-                    print(piece, end="", flush=True)
+                    print(f"\n{piece}", flush=True)
                 wrote = True
 
         answer = agent(messages, on_event)

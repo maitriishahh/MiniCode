@@ -104,7 +104,9 @@ models are added.
   working tree. Conditional reasoning labels (`Thinking:` / `Thought:` only
   when reasoning exists) and the final-answer-only `minicode >>` prefix with
   buffered content are implemented. Content buffers per model step, so the
-  final answer is not token-streamed; reasoning still streams live.
+  final answer is not token-streamed; reasoning still streams live. Gemini
+  asks for thought summaries (`include_thoughts`, `thinking_level: low`).
+  `<thought>` / `<think>` are display-only and are stripped before history.
 
 ## Open gaps
 
@@ -123,8 +125,9 @@ Known and accepted. These are not the next layer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
 - Content buffers per model step, so the final answer is not token-streamed;
-  reasoning still streams live. Reasoning availability is provider-dependent;
-  no forced `reasoning_effort` or `thinking_config`.
+  reasoning still streams live. Gemini asks for thought summaries
+  (`include_thoughts`, `thinking_level: low`). No `reasoning_effort`. A
+  provider that sends no summary still shows neither label.
 
 ## Next
 
@@ -141,5 +144,5 @@ then pricing on the Model record), tests (still not written),
 models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;
-fetched with the catalog, not a create flag), provider thinking flags
-(`reasoning_effort`, `thinking_config`).
+fetched with the catalog, not a create flag), `reasoning_effort` (Gemini
+summaries use `include_thoughts` plus `thinking_level: low`, not this flag).

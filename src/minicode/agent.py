@@ -164,6 +164,35 @@ session_usage = {"completion_tokens": 0}
 def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
+_OPEN_TAGS = ("<thought>", "<think>")
+_CLOSE_TAGS = {"<thought>": "</thought>", "<think>": "</think>"}
+
+def _gemini_extra(base: str) -> dict | None:
+    if "generativelanguage.googleapis.com" not in base:
+        return None
+    return {
+        "extra_body": {
+            "google": {
+                "thinking_config": {
+                    "include_thoughts": True,
+                    "thinking_level": "low",
+                }
+            }
+        }
+    }
+
+def _tag_suffix(text: str, tags: tuple[str, ...]) -> str:
+    best = ""
+    lowered = text.lower()
+    for tag in tags:
+        limit = min(len(text), len(tag) - 1)
+        for n in range(limit, 0, -1):
+            if lowered.endswith(tag[:n]):
+                if n > len(best):
+                    best = text[-n:]
+                break
+    return best
+
 def _apply_usage(usage: dict | None) -> None:
     if not usage:
         return
@@ -182,16 +211,83 @@ def _consume(stream, on_event, state: dict) -> None:
     by_id: dict = {}
     reasoning = False
     closed = False
+    in_thought = False
+    close_tag = ""
+    held = ""
 
     def emit(kind: str, piece: str = "") -> None:
         if on_event:
             on_event(kind, piece)
 
     def close_reasoning() -> None:
-        nonlocal closed
+        nonlocal reasoning, closed
         if reasoning and not closed:
             emit("reasoning_end")
-            closed = True
+        reasoning = False
+        closed = True
+
+    def emit_reasoning(text: str) -> None:
+        nonlocal reasoning, closed
+        if not text:
+            return
+        if not reasoning:
+            if not text.strip():
+                return
+            emit("thinking")
+            reasoning = True
+            closed = False
+        emit("reasoning", text)
+
+    def feed(piece: str) -> None:
+        nonlocal in_thought, close_tag, held
+        buf = held + piece
+        held = ""
+        while buf:
+            if not in_thought:
+                lower = buf.lower()
+                found_at = -1
+                found_tag = ""
+                for tag in _OPEN_TAGS:
+                    at = lower.find(tag)
+                    if at != -1 and (found_at == -1 or at < found_at):
+                        found_at = at
+                        found_tag = tag
+                if found_at == -1:
+                    suffix = _tag_suffix(buf, _OPEN_TAGS)
+                    if suffix:
+                        head = buf[:-len(suffix)]
+                        if head:
+                            close_reasoning()
+                            state["text"] += head
+                        held = suffix
+                        return
+                    close_reasoning()
+                    state["text"] += buf
+                    return
+                if found_at:
+                    close_reasoning()
+                    state["text"] += buf[:found_at]
+                in_thought = True
+                close_tag = _CLOSE_TAGS[found_tag]
+                buf = buf[found_at + len(found_tag):]
+                continue
+            lower = buf.lower()
+            at = lower.find(close_tag)
+            if at == -1:
+                suffix = _tag_suffix(buf, (close_tag,))
+                if suffix:
+                    emit_reasoning(buf[:-len(suffix)])
+                    held = suffix
+                    return
+                emit_reasoning(buf)
+                return
+            end = at + len(close_tag)
+            if at:
+                emit_reasoning(buf[:at])
+            close_reasoning()
+            in_thought = False
+            close_tag = ""
+            buf = buf[end:]
 
     for chunk in stream:
         data = chunk.to_dict()
@@ -203,22 +299,28 @@ def _consume(stream, on_event, state: dict) -> None:
         delta = choices[0].get("delta") or {}
         if delta.get("extra_content") is not None:
             state["extra"] = delta["extra_content"]
-        if not state["text"] and not state["calls"]:
+        if not in_thought and not state["text"] and not state["calls"]:
             think = delta.get("reasoning_content") or delta.get("reasoning")
             if isinstance(think, str) and think:
-                if not reasoning:
-                    emit("thinking")
-                    reasoning = True
-                emit("reasoning", think)
+                emit_reasoning(think)
         piece = delta.get("content")
         if isinstance(piece, str) and piece:
-            close_reasoning()
-            state["text"] += piece
+            feed(piece)
         items = delta.get("tool_calls") or []
         if items:
+            if in_thought and held:
+                emit_reasoning(held)
+            elif held:
+                state["text"] += held
+            held = ""
+            in_thought = False
             close_reasoning()
             for item in items:
                 _merge_call(state["calls"], by_index, by_id, item)
+    if in_thought and held:
+        emit_reasoning(held)
+    elif held:
+        state["text"] += held
     close_reasoning()
 
 def _merge_call(calls: list, by_index: dict, by_id: dict, delta: dict) -> None:
@@ -300,13 +402,17 @@ def agent(messages: list, on_event=None) -> str | None:
         state = {"text": "", "calls": [], "extra": None, "usage": None}
         appended = False
         try:
-            stream = client.chat.completions.create(
-                model=record["id"],
-                messages=messages,
-                tools=active_schemas(),
-                stream=True,
-                stream_options={"include_usage": True},
-            )
+            create = {
+                "model": record["id"],
+                "messages": messages,
+                "tools": active_schemas(),
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+            extra = _gemini_extra(base)
+            if extra:
+                create["extra_body"] = extra
+            stream = client.chat.completions.create(**create)
             _consume(stream, on_event, state)
             _apply_usage(state["usage"])
         except KeyboardInterrupt:

@@ -405,8 +405,8 @@ until more models are added; it then needs pricing on the record.
 - Streaming/abort are in the working tree. Conditional reasoning labels
   (`Thinking:` / `Thought:` only when reasoning exists) and the
   final-answer-only `minicode >>` prefix are implemented per
-  `docs/09-streaming.md`. Ctrl+C during a model call or a tool call returns
-  to `user >>`.
+  `docs/09-streaming.md`. Gemini asks for thought summaries. Ctrl+C during a
+  model call or a tool call returns to `user >>`.
 - Cost display is deferred until more models are added.
 
 ## Don't add yet

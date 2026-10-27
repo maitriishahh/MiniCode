@@ -238,8 +238,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. Reasoning streams live under `Thinking:` and
-  closes with `Thought:` only when the provider sends `reasoning_content` or
-  `reasoning`. With no reasoning, neither label appears and there is no wait
+  closes with `Thought:` when a delta carries `reasoning_content` or
+  `reasoning`, or when content inlines a summary as `<thought>...</thought>`
+  (Qwen may use `<think>`). The Gemini create passes
+  `extra_body.extra_body.google.thinking_config` with `include_thoughts`
+  true and `thinking_level` `low`, because this model's default `minimal`
+  thinks but returns no summary. No `reasoning_effort`. Ollama does not get
+  that body. With no summary, neither label appears and there is no wait
   line. Content is buffered per model step: the no-tool final answer prints
   once after `minicode >>`; a tool preamble and abort/error partial text print
   without the prefix. Do not print `minicode >>` on reasoning, tool
@@ -247,8 +252,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   The final answer is not token-streamed; that is the cost of reserving the
   prefix for the final step. `docs/09-streaming.md` specifies the event
   contract. Reasoning is display-only: never
-  append it to history, never use it as `content`, and do not add a provider
-  thinking flag. After a successful tool run, print `|Tools Used: `{name}` ({args})|`,
+  append it to history, never use it as `content`. Strip `<thought>` and
+  `<think>` before history. Do not read `extra_content` as reasoning; it
+  still carries the thought signature. Do not parse the signature. After a
+  successful tool run, print `|Tools Used: `{name}` ({args})|`,
   including in plan. A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tools Used|`. Status block
   after the answer, wrapped in `---`:

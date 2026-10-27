@@ -320,8 +320,9 @@ Streaming, abort, conditional reasoning labels (`Thinking:` / `Thought:`
 only when reasoning exists), and the final-answer-only `minicode >>` prefix
 with buffered content are implemented per `docs/09-streaming.md`. Reasoning
 streams live; content buffers per model step, so the final answer prints
-once with the prefix and tool preambles print without it. An aborted stream
-adds no usage. Do not put `prompt_tokens` into `Session`.
+once with the prefix and tool preambles print without it. Gemini asks for
+thought summaries; `<thought>` / `<think>` stay display-only. An aborted
+stream adds no usage. Do not put `prompt_tokens` into `Session`.
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
 `completion_tokens` for the turn. `Session` is summed `completion_tokens`
@@ -419,6 +420,7 @@ restrict them, not a stricter prompt.
 `docs/09-streaming.md` is the guide. Conditional reasoning labels
 (`Thinking:` / `Thought:` only when reasoning exists) and the
 final-answer-only `minicode >>` prefix with buffered content are implemented.
+Gemini asks for thought summaries; the tags are stripped before history.
 One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
 and a Ctrl+C that returns to `user >>` with a coherent history. No background
 shell. `Session` still excludes prompt tokens.

@@ -28,13 +28,15 @@ call returns to `user >>` with a history the next request can send.
 
 `agent` does not emit a wait line before the create. `_consume` emits
 `thinking` on the first non-empty `reasoning_content` or `reasoning` delta,
-then `reasoning` for each delta, then `reasoning_end` when the block closes.
-Content is accumulated, not emitted. After the step, `agent` emits
-`text(final=True)` for the no-tool answer (or `[empty response]`) and
-`text(final=False)` for a tool preamble or abort/error partial text. The REPL
-prints `Thinking:`, the reasoning, and `Thought:` only when reasoning exists.
-It prints `minicode >>` only when `final=True`. Reasoning is display-only: it
-never enters history and never fills `content`.
+or on the first real character inside a `<thought>` / `<think>` span, then
+`reasoning` for each piece, then `reasoning_end` when the block closes.
+Content is accumulated, not emitted. Those tags are stripped before the
+buffer. After the step, `agent` emits `text(final=True)` for the no-tool
+answer (or `[empty response]`) and `text(final=False)` for a tool preamble or
+abort/error partial text. The REPL prints `Thinking:`, the reasoning, and
+`Thought:` only when reasoning exists. It prints `minicode >>` only when
+`final=True`. Reasoning is display-only: it never enters history and never
+fills `content`.
 
 | Event | History | Screen | Returns |
 |---|---|---|---|
@@ -81,11 +83,17 @@ usage object in a step. Add `completion_tokens` once. Do not sum chunk
 usage. A usage chunk has `choices=[]`. Read usage before indexing choices.
 
 Reasoning is optional. A delta may carry `reasoning_content` (Qwen/DeepSeek
-shape) or `reasoning`. Display either. Do not read `extra_content` as
-reasoning; it carries the thought signature. Do not add `reasoning_effort` or
-`thinking_config` to the create. If the provider sends no reasoning, neither
-`Thinking:` nor `Thought:` appears; the buffered answer prints normally with
-its prefix.
+shape) or `reasoning`. Display either. Gemini's OpenAI layer does not. It
+inlines a summary as `<thought>...</thought>` inside `content` only when the
+create asks for it. The Gemini base passes
+`extra_body={"extra_body": {"google": {"thinking_config": {"include_thoughts": True, "thinking_level": "low"}}}}`.
+`thinking_level: low` is required: this model's default `minimal` thinks but
+returns no summary. No `reasoning_effort`. Ollama does not get that body.
+Split `<thought>` and `<think>` out of `content` before buffering. A closing
+tag and the answer may share one delta. Do not read `extra_content` as
+reasoning; it carries the thought signature. Do not parse it. If the provider
+sends no reasoning, neither `Thinking:` nor `Thought:` appears; the buffered
+answer prints normally with its prefix.
 
 The final-only prefix is the reason content is buffered. A first content
 delta cannot be labelled final while a later delta may still carry a tool
@@ -105,16 +113,18 @@ matching tool result 400 the next request. That is why the marker exists
 and why every id gets a result.
 
 `Thinking:` is the header for a reasoning block. It is emitted lazily on the
-first reasoning delta, not before the create. Close the block with `Thought:`
-when content starts, when a tool call starts, at the end of the stream, or on
-abort/error. Do not emit either label when there is no reasoning content. A
-tool's own print is still the progress during a tool.
+first reasoning delta or the first real character inside `<thought>` /
+`<think>`, not before the create. Close the block with `Thought:` when the
+answer starts, when the close tag arrives, when a tool call starts, at the
+end of the stream, or on abort/error. Do not emit either label when there is
+no reasoning content. A tool's own print is still the progress during a tool.
 
 A Qwen thinking model can finish with `content` null after the tools
 already ran. The REPL then prints `minicode >> [empty response]`. That is
 an empty completion, not a dropped reply. Emit `[empty response]` once.
 Reasoning may be displayed, but do not copy `reasoning`, `reasoning_content`,
-or a thought signature into `content` or history.
+a `<thought>` / `<think>` span, or a thought signature into `content` or
+history.
 
 `In` still overwrites with the last call's `prompt_tokens`. `Out` and
 `Session` still add only `completion_tokens`. An aborted or failed stream
@@ -139,7 +149,8 @@ Cost display stays deferred until more models are added.
    it from `agent`.
 3. Add: merge helpers in `agent.py`. Build a plain dict. Preserve
    `extra_content`. Drop `index`. Read `reasoning_content` or `reasoning`
-   for display only; never append it to history.
+   for display only. Split `<thought>` and `<think>` out of `content`. Never
+   append either to history.
 4. Add: `on_event` in the REPL. It renders `thinking`, `reasoning`,
    `reasoning_end`, and `text(final=...)`. `agent` buffers content for the
    step: a no-tool `text(final=True)` is the only text that gets
@@ -162,9 +173,11 @@ File: `src/minicode/agent.py`. Add `import uuid` with the other imports.
 Paste these helpers above `agent`. A chunk with no choices is usage only.
 Do not index `choices[0]` on it. Ignore empty content for display. A
 signature may ride on that empty part. Keep `extra_content`. Do not parse
-it. Read `reasoning_content` or `reasoning` only before the first content
-or tool call; later reasoning is ignored. Emit `thinking` only when the
-first reasoning delta arrives. If the step produced no text and no tool
+it. Read `reasoning_content` or `reasoning` only before the first answer
+text or tool call; later field reasoning is ignored. Also split
+`<thought>` and `<think>` out of `content`, including a close tag that
+shares a delta with the answer. Emit `thinking` only when the first real
+reasoning character arrives. If the step produced no text and no tool
 calls, `_assistant` stores `[empty response]` and `agent` emits it as a
 final text event once. If the stream raised or was aborted before a usage
 chunk, add nothing for that step.
@@ -174,6 +187,35 @@ does not return, so a local `text`, `calls`, or `extra` would be lost before
 `agent` can append the partial marker or close the reasoning block.
 
 ```python
+_OPEN_TAGS = ("<thought>", "<think>")
+_CLOSE_TAGS = {"<thought>": "</thought>", "<think>": "</think>"}
+
+def _gemini_extra(base: str) -> dict | None:
+    if "generativelanguage.googleapis.com" not in base:
+        return None
+    return {
+        "extra_body": {
+            "google": {
+                "thinking_config": {
+                    "include_thoughts": True,
+                    "thinking_level": "low",
+                }
+            }
+        }
+    }
+
+def _tag_suffix(text: str, tags: tuple[str, ...]) -> str:
+    best = ""
+    lowered = text.lower()
+    for tag in tags:
+        limit = min(len(text), len(tag) - 1)
+        for n in range(limit, 0, -1):
+            if lowered.endswith(tag[:n]):
+                if n > len(best):
+                    best = text[-n:]
+                break
+    return best
+
 def _apply_usage(usage: dict | None) -> None:
     if not usage:
         return
@@ -192,16 +234,83 @@ def _consume(stream, on_event, state: dict) -> None:
     by_id: dict = {}
     reasoning = False
     closed = False
+    in_thought = False
+    close_tag = ""
+    held = ""
 
     def emit(kind: str, piece: str = "") -> None:
         if on_event:
             on_event(kind, piece)
 
     def close_reasoning() -> None:
-        nonlocal closed
+        nonlocal reasoning, closed
         if reasoning and not closed:
             emit("reasoning_end")
-            closed = True
+        reasoning = False
+        closed = True
+
+    def emit_reasoning(text: str) -> None:
+        nonlocal reasoning, closed
+        if not text:
+            return
+        if not reasoning:
+            if not text.strip():
+                return
+            emit("thinking")
+            reasoning = True
+            closed = False
+        emit("reasoning", text)
+
+    def feed(piece: str) -> None:
+        nonlocal in_thought, close_tag, held
+        buf = held + piece
+        held = ""
+        while buf:
+            if not in_thought:
+                lower = buf.lower()
+                found_at = -1
+                found_tag = ""
+                for tag in _OPEN_TAGS:
+                    at = lower.find(tag)
+                    if at != -1 and (found_at == -1 or at < found_at):
+                        found_at = at
+                        found_tag = tag
+                if found_at == -1:
+                    suffix = _tag_suffix(buf, _OPEN_TAGS)
+                    if suffix:
+                        head = buf[:-len(suffix)]
+                        if head:
+                            close_reasoning()
+                            state["text"] += head
+                        held = suffix
+                        return
+                    close_reasoning()
+                    state["text"] += buf
+                    return
+                if found_at:
+                    close_reasoning()
+                    state["text"] += buf[:found_at]
+                in_thought = True
+                close_tag = _CLOSE_TAGS[found_tag]
+                buf = buf[found_at + len(found_tag):]
+                continue
+            lower = buf.lower()
+            at = lower.find(close_tag)
+            if at == -1:
+                suffix = _tag_suffix(buf, (close_tag,))
+                if suffix:
+                    emit_reasoning(buf[:-len(suffix)])
+                    held = suffix
+                    return
+                emit_reasoning(buf)
+                return
+            end = at + len(close_tag)
+            if at:
+                emit_reasoning(buf[:at])
+            close_reasoning()
+            in_thought = False
+            close_tag = ""
+            buf = buf[end:]
 
     for chunk in stream:
         data = chunk.to_dict()
@@ -213,22 +322,28 @@ def _consume(stream, on_event, state: dict) -> None:
         delta = choices[0].get("delta") or {}
         if delta.get("extra_content") is not None:
             state["extra"] = delta["extra_content"]
-        if not state["text"] and not state["calls"]:
+        if not in_thought and not state["text"] and not state["calls"]:
             think = delta.get("reasoning_content") or delta.get("reasoning")
             if isinstance(think, str) and think:
-                if not reasoning:
-                    emit("thinking")
-                    reasoning = True
-                emit("reasoning", think)
+                emit_reasoning(think)
         piece = delta.get("content")
         if isinstance(piece, str) and piece:
-            close_reasoning()
-            state["text"] += piece
+            feed(piece)
         items = delta.get("tool_calls") or []
         if items:
+            if in_thought and held:
+                emit_reasoning(held)
+            elif held:
+                state["text"] += held
+            held = ""
+            in_thought = False
             close_reasoning()
             for item in items:
                 _merge_call(state["calls"], by_index, by_id, item)
+    if in_thought and held:
+        emit_reasoning(held)
+    elif held:
+        state["text"] += held
     close_reasoning()
 ```
 
@@ -342,13 +457,17 @@ def agent(messages: list, on_event=None) -> str | None:
         state = {"text": "", "calls": [], "extra": None, "usage": None}
         appended = False
         try:
-            stream = client.chat.completions.create(
-                model=record["id"],
-                messages=messages,
-                tools=active_schemas(),
-                stream=True,
-                stream_options={"include_usage": True},
-            )
+            create = {
+                "model": record["id"],
+                "messages": messages,
+                "tools": active_schemas(),
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+            extra = _gemini_extra(base)
+            if extra:
+                create["extra_body"] = extra
+            stream = client.chat.completions.create(**create)
             _consume(stream, on_event, state)
             _apply_usage(state["usage"])
         except KeyboardInterrupt:
@@ -472,7 +591,7 @@ def on_event(kind: str, piece: str = "", final: bool = False) -> None:
         if final:
             print(f"\nminicode >> {piece}", flush=True)
         else:
-            print(piece, end="", flush=True)
+            print(f"\n{piece}", flush=True)
         wrote = True
 
 answer = agent(messages, on_event)
@@ -555,8 +674,8 @@ for it.
 - A provider that sends no reasoning shows no `Thinking:`/`Thought:` and no
   wait line. The first visible output is the buffered final answer at step
   end.
-- Reasoning display is provider-dependent. No forced thinking flag in this
-  layer.
+- Gemini asks for summaries (`include_thoughts`, `thinking_level: low`).
+  No `reasoning_effort`. Ollama does not get that body.
 - No tests.
 
 ## Don't add yet
@@ -566,8 +685,8 @@ diff viewer, `AGENTS.md` injection. Cost display waits until more models
 are added. Compaction waits until the context gap hurts.
 
 Not this layer: async, a background shell, a process tree, a persistent
-shell, Rich, a test suite, using `reasoning_content` as assistant content
-or history, a provider thinking flag (`reasoning_effort`, `thinking_config`),
+shell, Rich, a test suite, using `reasoning_content` or a `<thought>` /
+`<think>` span as assistant content or history, `reasoning_effort`,
 a Tok/s line, summing `prompt_tokens` into `Session`, a second create site,
 an SSE parser, `client.chat.completions.stream()`, an ANSI cursor rewrite to
 put a prefix on already-streamed text, a second create just to learn that a

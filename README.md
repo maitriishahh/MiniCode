@@ -83,7 +83,7 @@ One Python loop over an OpenAI-compatible chat API.
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
 - Exact-match edits with a terminal diff
-- Live model reasoning under `Thinking:` / `Thought:` when the provider sends it
+- Live model reasoning under `Thinking:` / `Thought:` when the provider sends it. Gemini is asked for a thought summary; that summary is not part of the answer
 - Final answers printed once with `minicode >>`; tool preambles print without it
 - Model switching with `/model`
 - Workspace-bounded file access with `.env` protection
@@ -202,8 +202,108 @@ Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
 If the model streams reasoning, it appears under `Thinking:` and ends with
-`Thought:` before the answer or first tool line. Not every model sends
-reasoning; when it does not, neither label appears. Only the final answer
-gets `minicode >>`; tool preambles and error notices do not. Content is
-buffered per model step so the harness can tell a final answer from a tool
-preamble; the final answer is not streamed token by token.
+`Thought:` before the answer or first tool line. Gemini is asked for that
+summary; it is shown under those labels and is not part of the answer. Not
+every model sends reasoning; when it does not, neither label appears. Only
+the final answer gets `minicode >>`; tool preambles and error notices do not.
+Content is buffered per model step so the harness can tell a final answer
+from a tool preamble; the final answer is not streamed token by token.
+
+If your shell tool is named `powershell` instead of `bash`, that is the Windows
+fallback.
+
+## Tools
+
+| Tool | What it does | Notes |
+|---|---|---|
+| `read` | Reads a file with line numbers. | Starts at line 1 and returns up to 2,000 lines by default. |
+| `write` | Creates a file or replaces a whole file. | `content` must be the full final file. Creates parent folders. |
+| `edit` | Replaces one exact unique span. | Fails on zero or multiple matches. Prints a diff to the terminal. |
+| `glob` | Finds files by name pattern. | Capped at 50 paths. |
+| `grep` | Searches file contents with a regex. | Capped at 50 matches. `include` filters file names. |
+| `bash` / `powershell` | Runs a shell command. | 120-second timeout. Output capped at 8,000 characters. |
+
+`glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
+also skips `.env` contents. `glob` may list the name. Both tell the model
+to refine broad searches.
+
+## Plan and build
+
+**Plan** is for reading, searching, and proposing changes. `write` and `edit`
+are not offered to the model, and a guessed call is refused. Shell commands are
+still available. In plan, a command asks when it reads file contents, creates,
+or deletes. `ls` and `git` do not.
+
+**Build** offers every tool. `write` and `edit` run without a prompt inside the
+workspace. Ordinary shell commands do not ask.
+
+Plan mode is not a hard sandbox: an approved shell command can still change
+files. Use build mode deliberately.
+
+## Permissions
+
+| Key | Covers | Default |
+|---|---|---|
+| `read` | `read` | allow |
+| `edit` | `write`, `edit` | allow |
+| `glob` | `glob` | allow |
+| `grep` | `grep` | allow |
+| `shell` | `bash`, `powershell` | allow, except `.env` text and plan verbs |
+| `external_directory` | paths outside the workspace | ask |
+
+When prompted:
+
+- `o` or `once` allows this call.
+- `a` or `always` allows that exact value until MiniCode exits.
+- `d`, an empty answer, or Ctrl+C denies the call.
+
+`.env` and `.env.*` ask on read. `.env.example` does not. Permission denials
+return `Permission denied: <key> <value>`. A denied plan-mode shell ask returns
+the short `/build` sentence instead.
+
+## Workspace and safety
+
+The workspace is the directory you launch from, or the path passed to
+`--sandbox`. File tools may use absolute or workspace-relative paths. A path
+outside the workspace triggers the `external_directory` prompt.
+
+The workspace is a path boundary, not a container. An approved shell command
+can leave it with `cd` or change files outside it. The shell also inherits your
+environment variables. Do not run MiniCode on a repository you do not trust.
+
+## Status line
+
+After each turn:
+
+```text
+---
+Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
+Sandbox: C:\path\to\project
+1,204 In | 48 Out | 96 Session | Elapsed: 2.1s
+---
+```
+
+- `In` is the prompt size of the last model call.
+- `Out` is the output tokens for the turn.
+- `Session` is the total output tokens since startup.
+- `Elapsed` is wall-clock time for the turn.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `401` or authentication error | Check `GEMINI_API_KEY` in `.env`. |
+| `404` model not found | Remove any `gemini/` prefix from `GEMINI_MODEL`. |
+| `No module named minicode` | Run `uv sync` from the MiniCode directory. |
+| `Model Error: ...` with Ollama | Start Ollama and check that `OLLAMA_MODEL` matches a pulled model. |
+| `No shell found` | Install Git Bash or PowerShell on Windows, or bash/sh on Unix. |
+| `Max limit reached: 16` | The turn hit the step limit. Ask for a smaller task. |
+
+## Not included yet
+
+Sessions and resume, cache control, cost display, compaction, a diff viewer,
+`AGENTS.md` injection, MCP, subagents, and a graphical interface. Context
+percentage stays off until a verified `context_window` is set. Cost display
+waits until more models are added. Ctrl+C during a model call or a tool call
+aborts that step and returns to `user >>`. A grandchild shell process can
+survive.
