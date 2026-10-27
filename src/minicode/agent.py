@@ -164,9 +164,6 @@ session_usage = {"completion_tokens": 0}
 def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
-_OPEN_TAGS = ("<thought>", "<think>")
-_CLOSE_TAGS = {"<thought>": "</thought>", "<think>": "</think>"}
-
 def _gemini_extra(base: str) -> dict | None:
     if "generativelanguage.googleapis.com" not in base:
         return None
@@ -175,23 +172,21 @@ def _gemini_extra(base: str) -> dict | None:
             "google": {
                 "thinking_config": {
                     "include_thoughts": True,
-                    "thinking_level": "low",
                 }
             }
         }
     }
 
-def _tag_suffix(text: str, tags: tuple[str, ...]) -> str:
-    best = ""
-    lowered = text.lower()
-    for tag in tags:
-        limit = min(len(text), len(tag) - 1)
-        for n in range(limit, 0, -1):
-            if lowered.endswith(tag[:n]):
-                if n > len(best):
-                    best = text[-n:]
-                break
-    return best
+def _split_thought(text: str) -> tuple[str, str]:
+    lower = text.lower()
+    for open_tag, close_tag in (("<thought>", "</thought>"), ("<think>", "</think>")):
+        start = lower.find(open_tag)
+        end = lower.find(close_tag)
+        if start != -1 and end > start:
+            inside = text[start + len(open_tag):end]
+            rest = text[:start] + text[end + len(close_tag):]
+            return inside, rest
+    return "", text
 
 def _apply_usage(usage: dict | None) -> None:
     if not usage:
@@ -210,84 +205,10 @@ def _consume(stream, on_event, state: dict) -> None:
     by_index: dict = {}
     by_id: dict = {}
     reasoning = False
-    closed = False
-    in_thought = False
-    close_tag = ""
-    held = ""
 
     def emit(kind: str, piece: str = "") -> None:
         if on_event:
             on_event(kind, piece)
-
-    def close_reasoning() -> None:
-        nonlocal reasoning, closed
-        if reasoning and not closed:
-            emit("reasoning_end")
-        reasoning = False
-        closed = True
-
-    def emit_reasoning(text: str) -> None:
-        nonlocal reasoning, closed
-        if not text:
-            return
-        if not reasoning:
-            if not text.strip():
-                return
-            emit("thinking")
-            reasoning = True
-            closed = False
-        emit("reasoning", text)
-
-    def feed(piece: str) -> None:
-        nonlocal in_thought, close_tag, held
-        buf = held + piece
-        held = ""
-        while buf:
-            if not in_thought:
-                lower = buf.lower()
-                found_at = -1
-                found_tag = ""
-                for tag in _OPEN_TAGS:
-                    at = lower.find(tag)
-                    if at != -1 and (found_at == -1 or at < found_at):
-                        found_at = at
-                        found_tag = tag
-                if found_at == -1:
-                    suffix = _tag_suffix(buf, _OPEN_TAGS)
-                    if suffix:
-                        head = buf[:-len(suffix)]
-                        if head:
-                            close_reasoning()
-                            state["text"] += head
-                        held = suffix
-                        return
-                    close_reasoning()
-                    state["text"] += buf
-                    return
-                if found_at:
-                    close_reasoning()
-                    state["text"] += buf[:found_at]
-                in_thought = True
-                close_tag = _CLOSE_TAGS[found_tag]
-                buf = buf[found_at + len(found_tag):]
-                continue
-            lower = buf.lower()
-            at = lower.find(close_tag)
-            if at == -1:
-                suffix = _tag_suffix(buf, (close_tag,))
-                if suffix:
-                    emit_reasoning(buf[:-len(suffix)])
-                    held = suffix
-                    return
-                emit_reasoning(buf)
-                return
-            end = at + len(close_tag)
-            if at:
-                emit_reasoning(buf[:at])
-            close_reasoning()
-            in_thought = False
-            close_tag = ""
-            buf = buf[end:]
 
     for chunk in stream:
         data = chunk.to_dict()
@@ -299,29 +220,26 @@ def _consume(stream, on_event, state: dict) -> None:
         delta = choices[0].get("delta") or {}
         if delta.get("extra_content") is not None:
             state["extra"] = delta["extra_content"]
-        if not in_thought and not state["text"] and not state["calls"]:
-            think = delta.get("reasoning_content") or delta.get("reasoning")
-            if isinstance(think, str) and think:
-                emit_reasoning(think)
+        think = delta.get("reasoning_content") or delta.get("reasoning")
+        if isinstance(think, str) and think:
+            if not reasoning:
+                emit("thinking")
+                reasoning = True
+            emit("reasoning", think)
         piece = delta.get("content")
         if isinstance(piece, str) and piece:
-            feed(piece)
-        items = delta.get("tool_calls") or []
-        if items:
-            if in_thought and held:
-                emit_reasoning(held)
-            elif held:
-                state["text"] += held
-            held = ""
-            in_thought = False
-            close_reasoning()
-            for item in items:
-                _merge_call(state["calls"], by_index, by_id, item)
-    if in_thought and held:
-        emit_reasoning(held)
-    elif held:
-        state["text"] += held
-    close_reasoning()
+            state["text"] += piece
+        for item in delta.get("tool_calls") or []:
+            _merge_call(state["calls"], by_index, by_id, item)
+    if reasoning:
+        emit("reasoning_end")
+    thought, answer = _split_thought(state["text"])
+    if thought.strip():
+        emit("thinking")
+        emit("reasoning", thought.strip())
+        emit("reasoning_end")
+    if answer != state["text"]:
+        state["text"] = answer.strip()
 
 def _merge_call(calls: list, by_index: dict, by_id: dict, delta: dict) -> None:
     fn = delta.get("function") or {}

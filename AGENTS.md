@@ -239,13 +239,12 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   stays a base URL plus an empty key, not a login.
 - REPL prompt is `user >> `. Reasoning streams live under `Thinking:` and
   closes with `Thought:` when a delta carries `reasoning_content` or
-  `reasoning`, or when content inlines a summary as `<thought>...</thought>`
-  (Qwen may use `<think>`). The Gemini create passes
-  `extra_body.extra_body.google.thinking_config` with `include_thoughts`
-  true and `thinking_level` `low`, because this model's default `minimal`
-  thinks but returns no summary. No `reasoning_effort`. Ollama does not get
-  that body. With no summary, neither label appears and there is no wait
-  line. Content is buffered per model step: the no-tool final answer prints
+  `reasoning`. After the step, one split pulls `<thought>` or `<think>` out
+  of the buffered content and shows that the same way. No tag is kept in
+  history. The Gemini create passes `include_thoughts: true` only. No
+  `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
+  With no summary, neither label appears and there is no wait line. Content
+  is buffered per model step: the no-tool final answer prints
   once after `minicode >>`; a tool preamble and abort/error partial text print
   without the prefix. Do not print `minicode >>` on reasoning, tool
   preambles, `Model Error:`, max-limit notices, or `[interrupted by user]`.
