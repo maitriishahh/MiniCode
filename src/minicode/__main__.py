@@ -132,11 +132,13 @@ def main() -> None:
 
         wrote = False
         reasoning = False
+        held_nl = ""
 
         def on_event(kind:str, piece:str = "", final: bool = False) -> None:
-            nonlocal wrote, reasoning
+            nonlocal wrote, reasoning, held_nl
             show = thinking["name"] == "on"
             if kind == "thinking":
+                held_nl = ""
                 if show:
                     print("\nThinking:\n---", flush=True)
                 else:
@@ -145,12 +147,23 @@ def main() -> None:
                 wrote = True
             elif kind == "reasoning":
                 if show:
-                    print(piece, end="", flush=True)
+                    text = held_nl + piece
+                    held_nl = ""
+                    end = len(text)
+                    while end and text[end - 1] == "\n":
+                        end -= 1
+                    if end < len(text):
+                        held_nl = text[end:]
+                        text = text[:end]
+                    if text:
+                        print(text, end="", flush=True)
                 reasoning = True
                 wrote = True
             elif kind == "reasoning_end":
                 if reasoning and show:
+                    held_nl = ""
                     print("\n---\n", flush=True)
+                held_nl = ""
                 reasoning = False
             elif kind == "text":
                 print(piece, end="", flush=True)

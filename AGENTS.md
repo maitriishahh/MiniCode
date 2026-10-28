@@ -247,7 +247,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `low` at startup. `/effort low|medium|high` changes it for the session.
   Both are handled before any model call. Restart restores both defaults.
   When display is on, reasoning streams as `Thinking:` then `---`, the text,
-  `---`, and a blank line. No `Thought:` closer. A `<thought>` or `<think>`
+  `---` on the next line, and a blank line. Trailing newlines in the summary
+  are not printed. A blank line in the middle of the summary is. No `Thought:` closer. A `<thought>` or `<think>`
   span is pulled out of content before it is printed as the answer. No tag
   is kept in history. The Gemini create passes `include_thoughts: true` and
   `thinking_level` from `effort`. Ollama gets `reasoning_effort` from

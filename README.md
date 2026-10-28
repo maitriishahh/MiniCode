@@ -208,8 +208,10 @@ Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
 If the model streams reasoning and `/thinking` is `on`, it appears as
-`Thinking:`, a `---` line, the text, a closing `---`, and a blank line, then
-the answer or the first tool line. `/thinking off` prints only `Thinking:`.
+`Thinking:`, a `---` line, the text, a closing `---` on the next line, and a
+blank line, then the answer or the first tool line. Trailing newlines in the
+summary are not printed. A blank line in the middle of the summary is.
+`/thinking off` prints only `Thinking:`.
 The default is `off`. Gemini is asked for a summary at the session effort,
 `low` unless `/effort` changed it. That summary is not part of the answer.
 Not every model sends reasoning; when it does not, the label does not

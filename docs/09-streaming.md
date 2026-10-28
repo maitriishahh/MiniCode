@@ -114,8 +114,10 @@ and why every id gets a result.
 
 `Thinking:` is the header. It is emitted lazily on the first reasoning
 delta, not before the create. When `/thinking` is `on`, the body follows
-under a `---` line and closes with `---` plus a blank line. When it is
-`off`, only `Thinking:` prints. Default is `off`. Do not print a `Thought:`
+under a `---` line and closes with `---` on the next line, then a blank
+line. Trailing newlines in the summary are not printed. A blank line in
+the middle of the summary is. When `/thinking` is `off`, only `Thinking:`
+prints. Default is `off`. Do not print a `Thought:`
 closer. Do not emit `Thinking:` when there is no reasoning content. A tool's
 own print is still the progress during a tool.
 
@@ -488,11 +490,13 @@ text.
 ```python
 reasoning = False
 wrote = False
+held_nl = ""
 
 def on_event(kind: str, piece: str = "", final: bool = False) -> None:
-    nonlocal reasoning, wrote
+    nonlocal reasoning, wrote, held_nl
     show = thinking["name"] == "on"
     if kind == "thinking":
+        held_nl = ""
         if show:
             print("\nThinking:\n---", flush=True)
         else:
@@ -501,12 +505,23 @@ def on_event(kind: str, piece: str = "", final: bool = False) -> None:
         wrote = True
     elif kind == "reasoning":
         if show:
-            print(piece, end="", flush=True)
+            text = held_nl + piece
+            held_nl = ""
+            end = len(text)
+            while end and text[end - 1] == "\n":
+                end -= 1
+            if end < len(text):
+                held_nl = text[end:]
+                text = text[:end]
+            if text:
+                print(text, end="", flush=True)
         reasoning = True
         wrote = True
     elif kind == "reasoning_end":
         if reasoning and show:
+            held_nl = ""
             print("\n---\n", flush=True)
+        held_nl = ""
         reasoning = False
     elif kind == "text":
         print(piece, end="", flush=True)
@@ -536,7 +551,9 @@ uv run python -m minicode --sandbox sandbox
 - A no-reasoning text reply shows no thinking block. The answer streams,
   then the status block. The answer is not printed twice.
 - `/thinking on`: a reasoning reply prints `Thinking:`, `---`, the reasoning,
-  `---`, a blank line, then streams the answer. `/thinking off` prints only
+  `---` on the next line after the last reasoning line, a blank line, then
+  streams the answer. Trailing newlines in the summary are not printed. A
+  blank line in the middle of the summary is. `/thinking off` prints only
   `Thinking:`. No `Thought:` line. No `minicode >>` prefix.
 - A reasoning reply with a tool call closes the block before the tool
   preamble or `|Tools Used|`; the next model step starts a new block.
