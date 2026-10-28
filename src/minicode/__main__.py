@@ -45,7 +45,7 @@ def _elapsed(seconds: float) -> str:
 
 def main() -> None:
     print(f"Sandbox: {SANDBOX}")
-    print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
+    print(f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
     messages = [
         {
             "role":"system",
