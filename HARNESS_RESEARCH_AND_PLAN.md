@@ -233,11 +233,11 @@ Permissions are implemented (Layer 7, `docs/08-permissions.md`): `allow` /
 `ask` / `deny`, last matching rule wins, `*` crosses `/`. Defaults are
 `read` / `glob` / `grep` / `edit` allow, `shell` allow except `.env` text,
 `external_directory`
-ask. `ask` is a REPL prompt (`once` / `always` / `deny`); `always` is
-in-memory and exact. No config file, no command scanner, no env scrubbing.
-`always` does not outlive the process; that waits with sessions. `glob` and
-`grep` return absolute forward-slash paths for a root outside the workspace,
-and workspace-relative paths for an inside root.
+ask. `ask` is a REPL prompt (`once` / `always` / `deny`); `always` is exact
+and saved in the session file. No config file, no command scanner, no env
+scrubbing. Resume restores `always`; `/new` and active delete clear it.
+`glob` and `grep` return absolute forward-slash paths for a root outside the
+workspace, and workspace-relative paths for an inside root.
 
 The default workspace is the launch directory (`_sandbox_root()`:
 `Path.cwd().resolve()`, `--sandbox path` overrides it). That is the
@@ -258,7 +258,7 @@ and edits allow. `shell` allows ordinary commands. It asks when the text
 contains `.env`, and in plan when a piece reads file contents, creates, or
 deletes. `external_directory` asks, so a path outside the sandbox is a
 prompt instead of a hard error. `.env` reads ask. `always` is exact and
-dies with the process. No config file. No scanner. Containerization stays
+session-scoped. No config file. No scanner. Containerization stays
 the real boundary for untrusted work.
 
 ---
@@ -336,7 +336,7 @@ network wait, and summed `total_tokens` counts the prompt once per step.
 |---|---|---|
 | Active model id | Context % (last `prompt_tokens` ÷ `context_window`) | Cost — deferred until more models are added |
 | Mode | Prompt-cache hits when `usage` reports cache tokens | Diff **viewer** UI |
-| Enabled tool names | | Sessions / resume |
+| Enabled tool names | Transcript export | Cache control |
 | `In` / `Out` / elapsed | | |
 
 The response `usage` object is enough for token counts —
@@ -358,6 +358,7 @@ src/minicode/            # package
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
   permissions.py         # allow / ask / deny gate
+  sessions.py            # session JSON, list, rename, delete
   tools/                 # read, write, edit, glob, grep, shell
 docs/                    # setup + build guides + STATUS
 AGENTS.md                # session start
@@ -415,8 +416,8 @@ Default workspace is launch cwd. `--sandbox path` overrides.
 `__main__.py`. Plan keeps `bash` / `powershell` in the tool list; rules
 restrict them, not a stricter prompt.
 
-**Layer 8 — streaming and abort.** Code in the working tree;
-`docs/09-streaming.md` is the guide. Conditional reasoning labels
+**Layer 8 — streaming and abort.** Done. `docs/09-streaming.md` is the guide.
+Conditional reasoning labels
 (`Thinking:` / `---` / text / `---` only when reasoning exists and display is on) and streamed answers
 with no `minicode >>` prefix are implemented.
 Gemini asks for thought summaries; the tags are stripped before history.
@@ -424,24 +425,34 @@ One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
 and a Ctrl+C that returns to `user >>` with a coherent history. No background
 shell. `Session` still excludes prompt tokens.
 
+**Layer 9 — sessions.** Done. `docs/10-sessions.md` is the guide.
+`sessions.py` persists one JSON file per conversation under the user data
+directory, keyed by workspace. `/sessions` lists newest first, resumes by
+number or full id, renames, and deletes. `/new` starts a clean conversation
+with inherited settings. Resume restores messages, settings, usage, and exact
+session-scoped `always` grants. A daemon title worker uses the active model
+after the first save; the fallback is local. Session files exclude the system
+prompt and reasoning. No export, reasoning capture, compaction, or database.
+
 **Known gaps by phase.** These are open, not new layers.
 
 | Phase | Open gap | Trigger / next |
 |---|---|---|
-| Layer 0 | `tool_from_fn` and the tools have no tests | Planned after the schema compiler; still open |
+| Layer 0 | `tool_from_fn`, the tools, and sessions have no automated tests | Ad-hoc checks only; still open |
 | Layer 0 | History is unbounded; no compaction | Deferred until the context gap hurts (§10) |
 | Layer 2 | `context_window` is `None`, so context `%` stays off | Set only a verified number |
-| Layer 2 | Cache tokens in `usage` are not displayed | Cache control, after sessions |
+| Layer 2 | Cache tokens in `usage` are not displayed | Cache control, after export |
 | Layer 3 | Sandbox is a path boundary, not a container; shell can leave it | Containerization is separate |
 | Layer 5 | Plan hides `write`/`edit` only; shell stays and asks | Tool-list restriction, not a shell deny |
-| Layer 7 | `always` approvals die with the process | Sessions/resume |
+| Layer 7 | No permissions config file; `always` is exact and session-scoped | Saved in the session file; deferred config |
 | Layer 7 | No env scrubbing; shell inherits the process environment | Not planned |
-| Layer 8 | Answer tokens stream; no `minicode >>` prefix | Sessions/resume next |
-| After Layer 8 | Sessions/resume, cache control, diff viewer, `AGENTS.md` injection | In that order |
+| Layer 8 | Answer tokens stream; no `minicode >>` prefix | Done |
+| Layer 9 | No transcript export; no reasoning in the session file | `docs/11-export.md` next |
+| After Layer 9 | Export, cache control, diff viewer, `AGENTS.md` injection | In that order |
 | — | Cost display | Deferred until more models are added |
 
-**Next:** sessions/resume → cache control → diff viewer → `AGENTS.md`
-injection into the system prompt.
+**Next:** transcript export (`docs/11-export.md`) → cache control → diff
+viewer → `AGENTS.md` injection into the system prompt.
 Cost is not in this chain. It is deferred until more models are added;
 when it lands it needs pricing on the Model record.
 A shell command can still `cd` out. Permissions asks before the command

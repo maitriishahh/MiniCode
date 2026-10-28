@@ -14,14 +14,14 @@ One Python loop over an OpenAI-compatible chat API.
   [ User / Terminal ]
          │
          ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/models`)
-  [ __main__.py ] (REPL loop, session usage tracking, elapsed time measurement)
+  [ __main__.py ] (REPL loop, sessions, title thread, usage tracking)
          │
-         ├─► Command handled locally? (/plan, /build, /models, exit)
+         ├─► Command handled locally? (/plan, /build, /models, /new, /sessions, exit)
          │
          ▼  (otherwise appends user message to history, calls agent)
   [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
          │
-         ├─► client.chat.completions.create(stream=True)
+         ├─► _create(...) (one chat.completions.create site)
          │        │
          │        ├─► Model API (Gemini / Ollama)
          │        │        │
@@ -64,10 +64,13 @@ One Python loop over an OpenAI-compatible chat API.
 
 | Caller | Callee | What crosses |
 |---|---|---|
-| `__main__` | `agent` | `agent(messages, on_event)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage |
-| `__main__` | `permissions` | registers `ask["fn"]` at import |
+| `__main__` | `agent` | `agent(messages, on_event)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage; calls `session_title` in a worker |
+| `__main__` | `sessions` | save, load, list, rename, delete at runtime |
+| `__main__` | `permissions` | registers `ask["fn"]` at import; restores `always` on resume |
 | `__main__` | `resolve_path` | reads `SANDBOX` at import |
-| `agent` | OpenAI API | one `chat.completions.create` site |
+| `sessions` | `permissions` | `snapshot_always` at save |
+| `sessions` | `resolve_path` | reads `SANDBOX` at import |
+| `agent` | OpenAI API | one `chat.completions.create` site inside `_create` |
 | `agent` | `permissions` | `decide` / `force_ask` / `plan_touches` |
 | `permissions` | `__main__` | calls the registered prompt (callback) |
 | `agent` | `resolve_path` | `classify` / `approve` / `clear_approved` |
@@ -76,10 +79,12 @@ One Python loop over an OpenAI-compatible chat API.
 | `schema_generator` | `tools` | wraps each function at import into a validating `run` |
 | `tools` | `resolve_path` | `_resolve` / `SANDBOX` |
 
-`agent.py` is the only model-call site. `permissions.py` only decides. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import.
+`agent.py` is the only model-call site. Both the agent loop and the background title call go through `_create`; there is exactly one `chat.completions.create` call inside it. `permissions.py` only decides and remembers grants. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import. The title worker does no file I/O or printing; the main thread saves.
 
 ## Features
 
+- Persistent sessions with live resume, rename, delete, and `/new`
+- Background LLM session titles with a local fallback
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
 - Exact-match edits with a terminal diff
@@ -89,6 +94,7 @@ One Python loop over an OpenAI-compatible chat API.
 - Workspace-bounded file access with `.env` protection
 - Permission prompts for `.env` access, plan-mode file-changing shell commands,
   and paths outside the workspace
+- Session-scoped `always` grants
 - Per-turn token and elapsed-time status
 
 ## Requirements
@@ -163,7 +169,9 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 3. Paths outside the workspace ask for permission. Shell asks for `.env`,
    and in plan mode for commands that read, create, or delete files.
 4. Type `/build` before asking for file changes.
-5. Leave with `exit`, `quit`, `bye`, or Ctrl+C at the prompt.
+5. MiniCode saves the conversation after the turn. Use `/sessions` to find it
+   again, or `/new` to start another.
+6. Leave with `exit`, `quit`, `bye`, or Ctrl+C at the prompt.
 
 ## Commands
 
@@ -175,6 +183,12 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 | `/models N` | Switch to model number `N` from that list. |
 | `/models <id>` | Switch to another loaded model by id for this session. |
 | `/model` | Not a command. Prints `Unknown command: /model. Use /models.` |
+| `/new` | Start a new session. Keep the current model, mode, thinking, effort, args, and output. |
+| `/sessions` | List saved sessions for this workspace, newest first. |
+| `/sessions N` | Resume session number `N`, or a full session id. |
+| `/sessions N rename` | Rename a session. Prompts when no name follows. |
+| `/sessions N rename New name` | Rename a session to `New name`. |
+| `/sessions N delete` | Delete a session after a `[y/N]` confirmation. |
 | `/thinking` | List `1 off` and `2 on`, with a blank line above and below. Marks `(active)`. |
 | `/thinking N` | Switch thinking to that number. |
 | `/thinking on` / `off` | Switch thinking by name. `on` shows the bars and the reasoning. `off` shows only `Thinking:`. |
@@ -190,8 +204,48 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 | `/help` | List every command, with a short description and an example. |
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
-Switching modes keeps the same conversation and history. Neither command is
-sent to the model.
+Switching modes keeps the same conversation and history. `/new` resets the
+conversation but keeps the current settings. None of these commands is sent to
+the model.
+
+## Sessions
+
+MiniCode writes one JSON file per conversation:
+
+```text
+~/.local/share/minicode/sessions/<project-key>/<session-id>.json
+```
+
+On Windows the root is `%USERPROFILE%\.local\share\minicode\sessions`. The
+project key is derived from the workspace path, so a different workspace has a
+different list. Session files are outside the sandbox and are never offered to
+the model as a file path.
+
+```text
+/sessions
+1 Fix login redirect - 2026-10-29 14:25 (active)
+2 New session - 2026-10-29 12:04
+
+/sessions 2
+/sessions 1 rename Fix the redirect
+/sessions 2 delete
+```
+
+`del` and `ren` are aliases. A number or a full session id works as the target;
+actions are case-insensitive.
+
+A resumed session restores its messages, model, mode, thinking, effort, args,
+output, `Session` count, and exact `always` grants. `/new` and deleting the
+active session clear `always` and reset `Session` to 0. Rename keeps the current
+ordering; newest sessions stay first. A rename is permanent.
+
+The title starts as `New session - YYYY-MM-DD HH:MM`. After the first message,
+MiniCode asks the active model in a background thread for a 3-6 word title. A
+failed or slow title call leaves the fallback. Title tokens never enter the
+status line or the conversation. No reasoning text is stored in the session.
+
+Session files may contain prompts, file contents, tool output, and command
+output. They stay on your machine and are not part of the repository.
 
 ## Example session
 
@@ -277,7 +331,8 @@ files. Use build mode deliberately.
 When prompted:
 
 - `o` or `once` allows this call.
-- `a` or `always` allows that exact value until MiniCode exits.
+- `a` or `always` allows that exact value for this session. It survives
+  resume, and clears on `/new` or when the active session is deleted.
 - `d`, an empty answer, or Ctrl+C denies the call.
 
 `.env` and `.env.*` ask on read. `.env.example` does not. Permission denials
@@ -308,7 +363,8 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 
 - `In` is the prompt size of the last model call.
 - `Out` is the output tokens for the turn.
-- `Session` is the total output tokens since startup.
+- `Session` is the total output tokens for this conversation. It survives
+  resume, and resets on `/new` or when the active session is deleted.
 - `Elapsed` is wall-clock time for the turn.
 
 ## Troubleshooting
@@ -324,10 +380,10 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 
 ## Not included yet
 
-Sessions and resume, cache control, cost display, compaction, a diff viewer,
-`AGENTS.md` injection, MCP, subagents, and a graphical interface. Context
-percentage stays off until a verified `context_window` is set. Cost display
-waits until more models are added. Ctrl+C during a model call or a tool call
+Transcript export, cache control, cost display, compaction, a diff viewer,
+`AGENTS.md` injection, MCP, subagents, and a graphical interface. Session files
+do not store reasoning text. Context percentage stays off until a verified
+`context_window` is set. Cost display waits until more models are added. Ctrl+C during a model call or a tool call
 aborts that step and returns to `user >>` when Python is between chunks. On
 Windows it does not abort a call blocked in a socket read; close the terminal
 tab. A click or middle-click paste can submit every line as a request. Both

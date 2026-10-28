@@ -2,7 +2,7 @@
 
 Do first: `docs/08-permissions.md`. Layer 7 is done. Streaming, abort, the
 conditional reasoning blocks, and streamed answers with no `minicode >>` prefix
-are implemented in the working tree. Sessions are next, not this layer.
+are implemented. Sessions are in `docs/10-sessions.md`, not this layer.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site stay in
 `agent.py`. The REPL, the status block, and the permission prompt stay in
@@ -10,8 +10,9 @@ Registry, loop, `SYSTEM`, and the one `chat.completions.create` site stay in
 in `resolve_path.py`. Shell stays in `tools/shell.py`. Do not add a module.
 Do not grow `__main__.py` with the loop.
 
-The create site is `chat.completions.create(..., stream=True, ...)` in the
-working tree. The assistant message is rebuilt from `chunk.to_dict()`, not
+The create site is `_create(...)`, which calls
+`chat.completions.create(..., stream=True, ...)` for the agent. The assistant
+message is rebuilt from `chunk.to_dict()`, not
 from a raw response body. A Gemini thought signature rides in that dict. Do
 not parse it. Preserve `extra_content`.
 
@@ -598,7 +599,7 @@ for it.
 - Partial shell output is lost on abort. The timeout path still returns
   whatever bytes arrived. Abort does not.
 - An aborted stream adds no usage. The status block still prints.
-- No sessions or resume. The coherent history lives in this process only.
+- Sessions and resume live in `docs/10-sessions.md`.
 - No atomic write. A `write` that is interrupted inside the tool is the
   tool's problem. This layer only keeps the history coherent.
 - No retry. A model error is a notice and a marker, not another create.
@@ -626,8 +627,9 @@ for it.
 
 ## Don't add yet
 
-Later, in order, not in the implement pass: sessions/resume, cache control,
-diff viewer, `AGENTS.md` injection. Cost display waits until more models
+Sessions/resume are implemented in `docs/10-sessions.md`. Later, in order:
+transcript export, cache control, diff viewer, `AGENTS.md` injection. Cost
+display waits until more models
 are added. Compaction waits until the context gap hurts. Windows paste and
 a stuck model read wait too. That one is an amendment to this guide, not a
 new file and not next.

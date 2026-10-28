@@ -31,7 +31,8 @@ loses, say what to change.
 
 A minimal coding agent: hand-written tool loop over the OpenAI client, `read`
 / `write` / `edit` inside a sandbox, plan and build as separate modes, a small
-model registry, and a REPL status line. Few features, each finished.
+model registry, persistent sessions, and a REPL status line. Few features,
+each finished.
 
 ## Stack (only these)
 
@@ -55,6 +56,7 @@ src/minicode/            # package
   schema_generator.py    # tool_from_fn
   resolve_path.py        # sandbox root + _resolve
   permissions.py         # allow / ask / deny gate
+  sessions.py            # session JSON, list, rename, delete
   tools/                 # read.py, write.py, edit.py, glob.py, grep.py, shell.py
 docs/                    # STATUS + setup + one build guide per layer
 .env.example             # copy to .env
@@ -67,8 +69,10 @@ A guide names the file and pastes the functions that belong there. "Not
 implemented" means those functions are not in `src/` yet. Do not say "grow
 `__main__.py`" instead of pasting the REPL functions. The loop stays in
 `agent.py`. A segment that only describes a function is not done. REPL, slash
-commands, and the status print live in `__main__.py`. The loop, `SYSTEM`,
-the registry, and the one `chat.completions.create` site live in `agent.py`.
+commands, sessions, the title thread, and the status print live in
+`__main__.py`. The loop, `SYSTEM`, the registry, and the one
+`chat.completions.create` site live in `agent.py`; both the agent and the title
+helper call it through `_create`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
@@ -137,16 +141,17 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   returns workspace-relative paths; a root outside returns absolute
   forward-slash paths. Never `relative_to(SANDBOX)` an outside hit — that
   raised, and the turn learned nothing.
-- Plan and build are one session. `mode = {"name": "plan"}` lives in
-  `agent.py`; a new session starts in plan. `/plan` and `/build` are
-  handled in `__main__.py` before any model call. Plan drops `write` and
-  `edit` from `tools=`
+- Plan and build are one conversation. `mode = {"name": "plan"}` lives in
+  `agent.py`; process startup starts in plan, and `/new` keeps the current
+  mode. `/plan` and `/build` are handled in `__main__.py` before any model
+  call. Plan drops `write` and `edit` from `tools=`
   (`active_schemas()`) and denies them at dispatch (`PLAN_DENIED`).
   `TOOLS` stays full. Only `messages[0]` swaps (`SYSTEM` vs
-  `SYSTEM + PLAN_SYSTEM`). A new session starts in plan, so `messages[0]`
-  is `SYSTEM + " " + PLAN_SYSTEM` at startup, not only after `/plan`.
-  `/plan` and `/build` always assign that pair, even when the mode is
-  already the one requested. History is not rewritten. `MAX_STEPS` is `16`.
+  `SYSTEM + PLAN_SYSTEM`). Startup uses plan, so `messages[0]` is
+  `SYSTEM + " " + PLAN_SYSTEM` then; a resumed session rebuilds it from the
+  restored mode. `/plan` and `/build` always assign that pair, even when the
+  mode is already the one requested. History is not rewritten. `MAX_STEPS` is
+  `16`.
   Plan mode may tell the model to read every `glob` match in one response,
   and it says a user-named file is read directly without a `glob` first.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
@@ -172,8 +177,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   gates `write` and `edit`); `shell` allow, except a command whose text
   contains `.env`, which asks; `read` of `*.env` and `*.env.*` asks,
   `*.env.example` allows; `external_directory` asks. Last matching rule
-  wins. `*` matches any character, including `/` and a newline. `always` is in-memory
-  and exact. A missing prompt denies. Plan keeps `write` / `edit` out of
+  wins. `*` matches any character, including `/` and a newline. `always` is
+  exact and session-scoped; it is saved in the session JSON, restored on
+  resume, and cleared by `/new` or deleting the active session. A missing
+  prompt denies. Plan keeps `write` / `edit` out of
   the schema. Shell stays in the schema. In plan, a command asks when a
   piece's first word is a content-read, create, or delete (`rm`, `touch`,
   `cat`, and the rest of that list) or the text contains `>`. `ls`, `pwd`,
@@ -187,6 +194,36 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   The prompt still shows the command. The tool string does not. A plan
   denial, a permission denial, and an unknown tool print that tool string.
   Still no `|Tool Used|` line.
+- Sessions are implemented in `docs/10-sessions.md`, `sessions.py`, and
+  `__main__.py`. One JSON file per session under
+  `~/.local/share/minicode/sessions/<project-key>/<session-id>.json`; Windows
+  uses `%USERPROFILE%\.local\share\minicode`; Unix honors `XDG_DATA_HOME`.
+  The project key is a sanitized `SANDBOX.name` plus a short SHA-1 of the
+  resolved path, case-folded on Windows. No file at startup. The first user
+  message creates the id and fallback title and saves. Save after a turn,
+  after a settings/mode change, before list/resume/rename/delete-non-active,
+  after active rename, and on exit. Schema version `1`; `messages` excludes
+  the system prompt; no reasoning field. Atomic writes; corrupt files are
+  skipped in lists and reported on direct load. Resume rebuilds
+  `messages[0]` from the current mode and restores settings, `Session`, and
+  exact `always` pairs. `/new` inherits settings, clears `always`, resets
+  `Session`, and creates no file until the next message. Deleting the active
+  session does the same after unlinking. `/sessions` is sorted by `created`
+  descending; resume and rename do not reorder. `/sessions N` or a full id
+  resumes. `/sessions N delete|del` asks `[y/N]`; `/sessions N rename|ren`
+  with no name prompts. Blank/EOF/Ctrl+C cancels. Names are
+  control-cleaned, non-empty, and capped at 200; duplicates allowed. Active
+  rename locks the title and saves at once; non-active rename loads, updates,
+  writes, and does not switch. Errors are `Unknown Session: N`,
+  `Unknown Session action: foo`, and `Session Error: ...`. No `/resume`,
+  `/rename`, `/delete`, or CLI resume flag. The title is an LLM summary of the
+  first prompt, generated by one daemon thread with the active model after the
+  first save: 3-6 words, same language, ≤60 chars, 2000-char input cap,
+  `max_tokens=32`, 10s timeout, no tools/stream/retry. Fallback
+  `New session - YYYY-MM-DD HH:MM`. The worker only assigns `title` under
+  `_TITLE_LOCK`; no file I/O, prints, messages, or usage. Main saves; join 2s
+  on exit. Rename wins. Title text and tokens never enter history or status.
+  No reasoning storage; export is later.
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the
@@ -291,8 +328,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   is set.
 - `last_usage` resets at the start of each turn. `prompt_tokens` is the last
   call only (overwrite) — that is `In`. `completion_tokens` **sums** across
-  steps — that is `Out`. `session_usage` is not cleared. It sums
-  `completion_tokens` for the process — that is `Session`. Do not add
+  steps — that is `Out`. `session_usage` is conversation lifetime. It sums
+  `completion_tokens`, is saved and restored on resume, and resets on `/new`
+  or deleting the active session — that is `Session`. Do not add
   `prompt_tokens` into it. A resent prompt is not new work. Cost display is
   deferred until more models are added; when it lands, pricing makes input
   part of a total. No Tok/s. A wall-clock rate is network wait, not model
@@ -307,7 +345,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
 - Streaming, abort, the conditional reasoning labels, and the
-  final-answer-only prefix are in the working tree. `KeyboardInterrupt` during
+  final-answer-only prefix are implemented. `KeyboardInterrupt` during
   a model call or a tool call is control flow, not a tool error. `tool_from_fn`
   catches `Exception` only. Do not catch it there. Never read a reasoning
   field to fill an empty `content` or add it to history. A click paste that
@@ -319,7 +357,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 
 ## Do not
 
-- Promote a deferred topic (MCP, subagents, compaction, sessions,
+- Promote a deferred topic (MCP, subagents, compaction, export,
   Rich, models.dev import, `/connect`, Windows paste / stuck Ctrl+C …) into
   the current layer without an explicit ask.
 - Add a feature without finishing it: unknown tools, escapes, and bad args

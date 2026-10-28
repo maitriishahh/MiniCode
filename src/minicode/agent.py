@@ -77,6 +77,12 @@ PLAN_SYSTEM = (
     "If the user named a file, read that path; do not glob first."
 )
 
+TITLE_SYSTEM = (
+    "Write a 3-6 word title for this coding session. "
+    "Use the same language as the user's request. "
+    "Use at most 60 characters. Return only the title, no quotes or Markdown."
+)
+
 
 TOOLS = {}
 SCHEMAS = []
@@ -223,6 +229,56 @@ def _apply_usage(usage: dict | None) -> None:
     step_out = usage.get("completion_tokens") or 0
     last_usage["completion_tokens"] += step_out
     session_usage["completion_tokens"] += step_out
+
+
+def _create(client, **kwargs):
+    return client.chat.completions.create(**kwargs)
+
+
+def _client_for(record: dict, max_retries: int | None = None) -> OpenAI:
+    api_key = os.getenv(record["api_key"])
+    base = record["api_base"]
+    if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
+        api_key = "ollama"
+    options = {"api_key": api_key, "base_url": base}
+    if max_retries is not None:
+        options["max_retries"] = max_retries
+    return OpenAI(**options)
+
+
+def _clean_title(text: str) -> str | None:
+    text = " ".join(text.split()).strip("\"'`* ")
+    if text.lower().startswith("title:"):
+        text = text[6:].strip()
+    text = text.strip("\"'`* ")
+    if not text:
+        return None
+    return text[:60].rstrip()
+
+
+def session_title(first_prompt: str, model_id: str) -> str | None:
+    record = MODELS.get(model_id)
+    if record is None:
+        return None
+    try:
+        client = _client_for(record, max_retries=0)
+        response = _create(
+            client,
+            model=record["id"],
+            messages=[
+                {"role": "system", "content": TITLE_SYSTEM},
+                {"role": "user", "content": first_prompt[:2000]},
+            ],
+            max_tokens=32,
+            stream=False,
+            timeout=10.0,
+        )
+        content = response.choices[0].message.content
+    except Exception:
+        return None
+    if not isinstance(content, str):
+        return None
+    return _clean_title(content)
 
 
 def _consume(stream, on_event, state: dict) -> None:
@@ -415,12 +471,9 @@ def agent(messages: list, on_event=None) -> str | None:
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
     record = MODELS[active["id"]]
-    api_key = os.getenv(record["api_key"])
     base = record["api_base"]
-    if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
-        api_key = "ollama"
     try:
-        client = OpenAI(api_key=api_key, base_url=base)
+        client = _client_for(record)
     except Exception as exc:
         return f"Model Error: {exc}"
     for step in range(MAX_STEPS):
@@ -439,7 +492,7 @@ def agent(messages: list, on_event=None) -> str | None:
                 create["extra_body"] = extra
             elif base.startswith(("http://127.0.0.1", "http://localhost")):
                 create["reasoning_effort"] = effort["name"]
-            stream = client.chat.completions.create(**create)
+            stream = _create(client, **create)
             _consume(stream, on_event, state)
             _apply_usage(state["usage"])
         except KeyboardInterrupt:

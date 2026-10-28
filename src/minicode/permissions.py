@@ -57,6 +57,24 @@ def remember(key: str, value: str) -> None:
     ALWAYS.add((key, norm(value)))
 
 
+def snapshot_always() -> list[list[str]]:
+    return [list(item) for item in sorted(ALWAYS)]
+
+
+def restore_always(items) -> None:
+    ALWAYS.clear()
+    if not isinstance(items, list):
+        return
+    for item in items:
+        if (
+            isinstance(item, (list, tuple))
+            and len(item) == 2
+            and isinstance(item[0], str)
+            and isinstance(item[1], str)
+        ):
+            ALWAYS.add((item[0], item[1]))
+
+
 def plan_touches(command: str) -> bool:
     if ">" in command:
         return True

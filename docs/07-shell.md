@@ -448,8 +448,9 @@ proved from this Windows machine. Do not add a CI job for it.
 
 Later, in order, not in the implement pass: permissions
 (`docs/08-permissions.md`), streaming and a Ctrl+C that leaves a coherent
-turn (`docs/09-streaming.md`, implemented), sessions. Background bash is deferred until it hurts. It is not in that
-chain. `/connect` stays with the catalog.
+turn (`docs/09-streaming.md`, implemented), sessions
+(`docs/10-sessions.md`, implemented). Background bash is deferred until it
+hurts. It is not in that chain. `/connect` stays with the catalog.
 
 Not scheduled. Do not add them as a follow-up: a shell-path env, `cmd.exe`,
 reading `SHELL` on Windows, `System32\bash.exe`, a path derived from

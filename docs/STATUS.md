@@ -1,12 +1,12 @@
 # STATUS.md — MiniCode
 
-Current code: layers 0–7 are committed. Layer 8 streaming, abort, the
-conditional reasoning blocks, and streamed answers with no `minicode >>` prefix
-are in the working tree. Startup default is `plan`. Plan drops `write` /
-`edit` only. `bash` / `powershell` stay in the list. Shell asks for `.env`
-text, and in plan for content-read, create, and delete verbs. Status line is
-`In | Out | Session | Elapsed: {_elapsed}`. Cost display waits until more
-models are added.
+Current code: layers 0–9 are committed. Layer 9 adds persistent sessions,
+live resume, rename, delete, `/new`, background LLM titles, and session-scoped
+`always` grants. Startup default is `plan`; `/new` keeps the current settings.
+Plan drops `write` / `edit` only. `bash` / `powershell` stay in the list.
+Shell asks for `.env` text, and in plan for content-read, create, and delete
+verbs. Status line is `In | Out | Session | Elapsed: {_elapsed}`. Cost display
+waits until more models are added.
 
 ## Done
 
@@ -64,8 +64,8 @@ models are added.
   and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
   gates `write` and `edit`); `shell` allows except `.env` text and plan
   verbs; `external_directory` asks.
-  `always` is in-memory and exact. Plan keeps `write` / `edit` out of the
-  schema; `bash` / `powershell` stay in and ask.
+  `always` is exact and session-scoped. Plan keeps `write` / `edit` out of
+  the schema; `bash` / `powershell` stay in and ask.
 - [x] Absolute-path fix: `read` / `write` / `edit` / `glob` / `grep` path
   docs say absolute or workspace-relative; outside asks permission. `glob`
   and `grep` return absolute forward-slash paths for an outside root, and
@@ -77,7 +77,7 @@ models are added.
   `PLAN_SYSTEM` adds: if the user named a file, read that path; do not glob
   first. It also says not to create or delete files with the shell, and to
   tell the user to run `/build`.
-- [x] Status line adds `Session`: process sum of `completion_tokens`.
+- [x] Status line adds `Session`: conversation sum of `completion_tokens`.
   `In` and `Out` are unchanged. Prompt tokens are not added.
 - [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one
   decimal. Then two largest of `s m h d w y`. Week is 7 days. Year is 365
@@ -100,8 +100,8 @@ models are added.
   The ask remains. Shell is not force-denied.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
-- [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort in the
-  working tree. Reasoning, when the provider sends it, prints inside a
+- [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort are
+  implemented. Reasoning, when the provider sends it, prints inside a
   `Thinking:` / `---` / text / `---` block when `/thinking` is `on`. Default
   is `off`, which prints only `Thinking:`. Answer tokens stream as they
   arrive. There is no `minicode >>` prefix. `/effort` is `low`, `medium`, or
@@ -112,12 +112,18 @@ models are added.
   `|Tool Used: `{name}``. `/output off` hides the shell block. The model
   still gets that output. `/help` prints the `COMMANDS` tuple in
   `__main__.py`. A new slash command adds a handler and a row there.
+- [x] Layer 9 (`docs/10-sessions.md`): `sessions.py`; session JSON under
+  `~/.local/share/minicode/sessions/<project-key>/`; `/new`; live `/sessions`
+  with resume, rename, and delete; LLM summary titles in a daemon thread;
+  restored settings and `Session`; session-scoped `always`; atomic writes.
+  No file at startup. No reasoning in the file.
 
 ## Open gaps
 
 Known and accepted. These are not the next layer.
 
-- No tests for `tool_from_fn` or the tools.
+- No automated tests for `tool_from_fn`, the tools, or sessions; ad-hoc checks
+  only.
 - History is unbounded; compaction is deferred until the context gap hurts.
 - `context_window` is `None`, so context `%` is off.
 - Cache tokens in `usage` are not displayed.
@@ -125,7 +131,6 @@ Known and accepted. These are not the next layer.
   inherits the process environment.
 - Plan hides `write` / `edit` only. Shell stays in the list. Plan asks for
   content-read, create, and delete verbs, not for `ls` or `git`.
-- `always` approvals are in-memory only.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
@@ -139,12 +144,11 @@ Known and accepted. These are not the next layer.
 
 ## Next
 
-1. Sessions/resume.
+1. `docs/11-export.md`: transcript export only. No reasoning capture.
 
 ## Deferred (do not start)
 
-sessions, a JSON permissions file (OpenCode-shaped
-rules, loaded at startup; `always` stays in memory until sessions; a
+A JSON permissions file (OpenCode-shaped rules, loaded at startup; a
 configured `deny` beats `always`), cache
 control, diff viewer, `AGENTS.md` injection, compaction (context gap
 on a real codebase; do not start it), cost (until more models are added;

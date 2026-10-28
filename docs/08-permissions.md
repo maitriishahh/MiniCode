@@ -42,9 +42,10 @@ not parse the command.
 missing prompt denies.
 
 - `once` — run this call.
-- `always` — remember that exact value until the process exits. `git status`
-  does not cover `git status --short`. A different file still asks. Nothing
-  is written to disk.
+- `always` — remember that exact value for the session. `git status` does not
+  cover `git status --short`. A different file still asks. It is saved in the
+  session file (`docs/10-sessions.md`) and restored on resume. `/new` and
+  deleting the active session clear it.
 - `deny` — the default for an empty answer, a bad answer, EOF, or Ctrl+C on
   that prompt.
 
@@ -67,9 +68,9 @@ command. `cd` and `Set-Location` can still leave. The ask is the gate. Do
 not claim `external_directory` stops that.
 
 v2's ordered list is the same idea. Do not import the rest: the experimental
-scanner, default-allow outside the project, or a durable approval file.
-Sessions are later. A saved approval that outlives the process waits with
-them.
+scanner, default-allow outside the project, or a separate durable approval
+file. The session file is the only durable place for `always`; it is not a
+JSON permissions config.
 
 ## Plan mode
 
@@ -459,7 +460,8 @@ still `cd` out after the user allows that exact command. Do not parse it.
 
 ## Open gaps at this layer
 
-- `always` is in-memory and exact; it dies with the process.
+- `always` is exact and session-scoped: it survives resume, then clears on
+  `/new` and active delete.
 - No env scrubbing. Shell commands inherit the process environment.
 - Permissions gate calls, not effects. A permitted shell command can leave
   the workspace or change files outside it.
@@ -468,11 +470,10 @@ still `cd` out after the user allows that exact command. Do not parse it.
 ## Don't add yet
 
 Later, in order, not in the implement pass: streaming and a Ctrl+C that
-leaves a coherent turn (`docs/09-streaming.md`, implemented), sessions.
-An OpenCode-shaped JSON permissions file is deferred, not next. `always`
-stays in memory until
-sessions. A configured `deny` beats `always`. Do not write the file now.
-Background bash stays
+leaves a coherent turn (`docs/09-streaming.md`, implemented), sessions
+(`docs/10-sessions.md`, implemented). An OpenCode-shaped JSON permissions
+file is deferred, not next. `always` lives in the session file. A configured
+`deny` beats `always`. Do not write a permissions config now. Background bash stays
 deferred. `/connect` stays with the catalog. Do not add the transport tag
 here.
 

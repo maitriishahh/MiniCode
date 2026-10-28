@@ -1,0 +1,837 @@
+# 10 — Sessions
+
+Do first: `docs/09-streaming.md`. Layer 8 is committed. This layer adds
+persistent sessions, live resume, rename, delete, `/new`, and one background
+LLM title call. It does not add export, reasoning storage, compaction, a
+database, or a second model client.
+
+Registry, loop, `SYSTEM`, `TITLE_SYSTEM`, and the one
+`client.chat.completions.create` call live in `agent.py`. The REPL, slash
+commands, title thread, and status print live in `__main__.py`. Tool code
+stays in `tools/`. Do not split a new package.
+
+## What it is
+
+One JSON file per session. `/sessions` lists the saved files for the current
+workspace, newest first. `/sessions N` resumes one. `/new` starts a clean
+session but keeps the current model, mode, thinking, effort, args, and output.
+The `Session` counter is conversation lifetime, not process lifetime.
+
+Sessions are written only when there is something to save. Startup shows no
+session and creates no file. The first user message creates the id, fallback
+title, and first file. Exit saves the current session.
+
+```
+~/.local/share/minicode/sessions/<project-key>/<session-id>.json
+```
+
+On Windows that is `%USERPROFILE%\.local\share\minicode\sessions`. On Unix,
+honor `XDG_DATA_HOME`. The project key is the sanitized workspace directory
+name plus a short SHA-1 of the resolved workspace path. On Windows the name
+and hash input are case-folded. A different workspace gets a different list.
+
+Do not put sessions in the project, `.env`, or the sandbox. Do not add a
+database. Do not commit session files.
+
+## File shape
+
+Version `1`. `created` and `updated` are UTC ISO 8601 strings. Display is
+local. `messages` excludes the system prompt; the current `SYSTEM` is
+rebuilt on resume. The raw assistant dicts, including `extra_content`, stay
+as they were written by `agent.py`.
+
+```json
+{
+  "version": 1,
+  "id": "20261029-142501-a1b2",
+  "title": "Fix login redirect",
+  "created": "2026-10-29T14:25:01+00:00",
+  "updated": "2026-10-29T14:27:10+00:00",
+  "cwd": "/home/me/project",
+  "sandbox": "/home/me/project",
+  "model": "gemini-3-flash",
+  "mode": "build",
+  "thinking": "on",
+  "effort": "medium",
+  "args": "off",
+  "output": "on",
+  "usage": {"completion_tokens": 1234},
+  "always": [["external_directory", "d:/other/file.py"]],
+  "messages": []
+}
+```
+
+`usage.completion_tokens` is the `Session` value at the last save. Restore
+it; do not add prompt tokens. `/new` and deleting the active session reset
+it to zero. `always` is a sorted list of exact `[key, value]` pairs already
+normalized by `permissions.py`. Resume restores it. `/new` and deleting the
+active session clear it.
+
+A corrupt, unreadable, unsupported, or mismatched file is skipped by the
+list and reported as `Session Error: ...`; a direct load raises. Writes are
+atomic: write a sibling `.tmp`, then `os.replace`.
+
+Session id is local `YYYYMMDD-HHMMSS-4hex`. The 4 hex comes from
+`secrets.token_hex(2)`. Retry on collision. File name is `<id>.json`.
+
+## Commands
+
+```
+/sessions
+/sessions N
+/sessions N delete
+/sessions N del
+/sessions N rename
+/sessions N ren
+/sessions N rename New name
+/sessions N ren New name
+/new
+```
+
+`N` is the list number or the full session id. Actions are case-insensitive;
+names preserve case. There is no `/resume`, `/rename`, or `/delete`, and no
+CLI resume flag.
+
+List rows:
+
+```
+1 Fix login redirect - 2026-10-29 14:25 (active)
+2 New session - 2026-10-29 12:04
+```
+
+Newest `created` first. Resume and rename do not reorder. A delete shifts
+later numbers down. Empty list prints `(no saved sessions)`.
+
+Errors:
+
+```
+Unknown Session: 9
+Unknown Session action: foo
+Session Error: <detail>
+```
+
+Delete asks `Delete session "title"? [y/N]`. Only `y` or `yes` confirms.
+Rename without a name asks `New name: `. Blank, EOF, Ctrl+C, or a non-yes
+delete answer prints `Cancelled` and does nothing.
+
+Rename cleanup: replace Unicode control characters with spaces, collapse
+whitespace, strip, reject empty, cap at 200 characters. Duplicate names are
+allowed. A rename is permanent; an active rename sets `title_locked` so a
+pending title thread cannot overwrite it.
+
+Active delete: confirm, unlink, then `/new` semantics. Settings stay, mode
+stays, `always` clears, `Session` resets, history returns to the system
+message only, and no file exists until the next user message.
+
+Non-active delete: current session is saved first, target file is removed,
+current session is unchanged.
+
+Active rename: lock title, update memory, update `updated`, save now.
+Non-active rename: save current, load target, change title and `updated`,
+write target, do not switch.
+
+## Title
+
+The title is an LLM summary of the first user prompt, not its first line.
+Use the model active when the first message is sent. Launch one daemon
+thread after the first message is saved. It runs alongside the agent turn.
+
+- Prompt: 3-6 words, same language as the request, at most 60 characters,
+  title only, no Markdown or quotes.
+- Input cap: first 2000 characters.
+- `max_tokens`: 32. `stream`: false. `timeout`: 10 seconds.
+- No tools, no reasoning display, no retries, no second attempt.
+- Fallback at creation: `New session - YYYY-MM-DD HH:MM` in local time.
+- The worker only calls the model, cleans the answer, and assigns
+  `session["title"]` under `_TITLE_LOCK`.
+- It does no file I/O, no printing, no message append, and no usage update.
+- The main thread saves. Join the worker for at most 2 seconds on exit,
+  then save.
+- Tokens used by the title call never enter `In`, `Out`, or `Session`.
+- Rename wins. Resume/new/delete makes the old worker stale; it must not
+  write into the new session.
+- No title text enters model history.
+
+## Skeleton
+
+**Keep** the loop shape, streaming, raw assistant dict append, `MAX_STEPS`,
+`SYSTEM`, `PLAN_SYSTEM`, mode swap, tool dispatch, status shape, and the no
+Tok/s rule.
+
+**Add** `src/minicode/sessions.py`:
+
+```python
+import hashlib
+import json
+import os
+import re
+import sys
+import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+from secrets import token_hex
+
+from minicode.permissions import snapshot_always
+from minicode.resolve_path import SANDBOX
+
+_VERSION = 1
+_ID_RE = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{4}$")
+
+
+class SessionError(Exception):
+    pass
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _data_root() -> Path:
+    if sys.platform == "win32":
+        base = Path.home() / ".local" / "share"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    return base / "minicode" / "sessions"
+
+
+def _project_key(sandbox: Path) -> str:
+    raw = str(sandbox.resolve())
+    folded = raw.casefold() if sys.platform == "win32" else raw
+    digest = hashlib.sha1(folded.encode("utf-8")).hexdigest()[:8]
+    label = sandbox.name.casefold() if sys.platform == "win32" else sandbox.name
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", label).strip("._-") or "workspace"
+    return f"{name[:40]}-{digest}"
+
+
+def _project_dir() -> Path:
+    return _data_root() / _project_key(SANDBOX)
+
+
+def _session_path(session_id: str) -> Path:
+    return _project_dir() / f"{session_id}.json"
+
+
+def new_id() -> str:
+    while True:
+        candidate = f"{datetime.now():%Y%m%d-%H%M%S}-{token_hex(2)}"
+        if not _session_path(candidate).exists():
+            return candidate
+
+
+def fallback_title(when: str | None = None) -> str:
+    try:
+        moment = datetime.fromisoformat(when) if when else datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        moment = datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return f"New session - {moment.astimezone():%Y-%m-%d %H:%M}"
+
+
+def _check(data, path: Path) -> dict:
+    if not isinstance(data, dict):
+        raise SessionError(f"{path.name}: invalid session")
+    if data.get("version") != _VERSION:
+        raise SessionError(f"{path.name}: unsupported session")
+    session_id = data.get("id")
+    if not isinstance(session_id, str) or session_id != path.stem or not _ID_RE.fullmatch(session_id):
+        raise SessionError(f"{path.name}: invalid session id")
+    if not isinstance(data.get("messages"), list):
+        raise SessionError(f"{path.name}: invalid messages")
+    if not isinstance(data.get("title"), str) or not data["title"].strip():
+        data["title"] = fallback_title(data.get("created"))
+    if not isinstance(data.get("created"), str):
+        data["created"] = _now()
+    if not isinstance(data.get("updated"), str):
+        data["updated"] = data["created"]
+    if not isinstance(data.get("usage"), dict):
+        data["usage"] = {"completion_tokens": 0}
+    if not isinstance(data.get("always"), list):
+        data["always"] = []
+    return data
+
+
+def _read(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SessionError(f"{path.name}: {exc}") from exc
+    return _check(data, path)
+
+
+def load(session_id: str) -> dict:
+    if not isinstance(session_id, str) or not _ID_RE.fullmatch(session_id):
+        raise SessionError("not found")
+    path = _session_path(session_id)
+    if not path.is_file():
+        raise SessionError("not found")
+    return _read(path)
+
+
+def _write(data: dict) -> None:
+    path = _session_path(data["id"])
+    temp = path.with_name(path.name + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with temp.open("w", encoding="utf-8", newline="\n") as handle:
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        os.replace(temp, path)
+    except (OSError, TypeError, ValueError) as exc:
+        try:
+            temp.unlink()
+        except OSError:
+            pass
+        raise SessionError(f"could not save {path.name}: {exc}") from exc
+
+
+def new_session(settings: dict) -> dict:
+    moment = _now()
+    return {
+        "version": _VERSION,
+        "id": new_id(),
+        "title": fallback_title(moment),
+        "created": moment,
+        "updated": moment,
+        "cwd": str(Path.cwd().resolve()),
+        "sandbox": str(SANDBOX),
+        **settings,
+        "usage": {"completion_tokens": 0},
+        "always": [],
+        "messages": [],
+    }
+
+
+def _snapshot(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> dict:
+    session.update(settings)
+    session["usage"] = {"completion_tokens": max(0, int(completion_tokens))}
+    session["always"] = snapshot_always()
+    session["messages"] = [
+        message for message in messages
+        if isinstance(message, dict) and message.get("role") != "system"
+    ]
+    session["updated"] = _now()
+    return session
+
+
+def save(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> None:
+    _write(_snapshot(session, messages, settings, completion_tokens))
+
+
+def clean_name(raw: str) -> str:
+    if not isinstance(raw, str):
+        return ""
+    text = "".join(
+        " " if unicodedata.category(char).startswith("C") else char
+        for char in raw
+    )
+    return " ".join(text.split())[:200]
+
+
+def rename(session_id: str, raw: str) -> str:
+    name = clean_name(raw)
+    if not name:
+        raise SessionError("name is empty")
+    data = load(session_id)
+    data["title"] = name
+    data["updated"] = _now()
+    _write(data)
+    return name
+
+
+def delete(session_id: str) -> None:
+    if not isinstance(session_id, str) or not _ID_RE.fullmatch(session_id):
+        raise SessionError("not found")
+    path = _session_path(session_id)
+    try:
+        path.unlink()
+    except FileNotFoundError as exc:
+        raise SessionError("not found") from exc
+    except OSError as exc:
+        raise SessionError(f"could not delete {path.name}: {exc}") from exc
+
+
+def list_sessions() -> tuple[list[dict], list[str]]:
+    folder = _project_dir()
+    try:
+        paths = sorted(folder.glob("*.json"))
+    except OSError as exc:
+        return [], [str(exc)]
+    found: list[dict] = []
+    errors: list[str] = []
+    for path in paths:
+        try:
+            found.append(_read(path))
+        except SessionError as exc:
+            errors.append(str(exc))
+    found.sort(
+        key=lambda item: (item.get("created", ""), item.get("id", "")),
+        reverse=True,
+    )
+    return found, errors
+```
+
+**Add** to `src/minicode/permissions.py`:
+
+```python
+def snapshot_always() -> list[list[str]]:
+    return [list(item) for item in sorted(ALWAYS)]
+
+
+def restore_always(items) -> None:
+    ALWAYS.clear()
+    if not isinstance(items, list):
+        return
+    for item in items:
+        if (
+            isinstance(item, (list, tuple))
+            and len(item) == 2
+            and isinstance(item[0], str)
+            and isinstance(item[1], str)
+        ):
+            ALWAYS.add((item[0], item[1]))
+```
+
+Update `always` docs: it lives for the session, not only the process.
+
+**Add** to `src/minicode/agent.py`:
+
+```python
+TITLE_SYSTEM = (
+    "Write a 3-6 word title for this coding session. "
+    "Use the same language as the user's request. "
+    "Use at most 60 characters. Return only the title, no quotes or Markdown."
+)
+
+
+def _create(client, **kwargs):
+    return client.chat.completions.create(**kwargs)
+
+
+def _client_for(record: dict, max_retries: int | None = None) -> OpenAI:
+    api_key = os.getenv(record["api_key"])
+    base = record["api_base"]
+    if not api_key and base.startswith(("http://127.0.0.1", "http://localhost")):
+        api_key = "ollama"
+    options = {"api_key": api_key, "base_url": base}
+    if max_retries is not None:
+        options["max_retries"] = max_retries
+    return OpenAI(**options)
+
+
+def _clean_title(text: str) -> str | None:
+    text = " ".join(text.split()).strip("\"'`* ")
+    if text.lower().startswith("title:"):
+        text = text[6:].strip()
+    text = text.strip("\"'`* ")
+    if not text:
+        return None
+    return text[:60].rstrip()
+
+
+def session_title(first_prompt: str, model_id: str) -> str | None:
+    record = MODELS.get(model_id)
+    if record is None:
+        return None
+    try:
+        client = _client_for(record, max_retries=0)
+        response = _create(
+            client,
+            model=record["id"],
+            messages=[
+                {"role": "system", "content": TITLE_SYSTEM},
+                {"role": "user", "content": first_prompt[:2000]},
+            ],
+            max_tokens=32,
+            stream=False,
+            timeout=10.0,
+        )
+        content = response.choices[0].message.content
+    except Exception:
+        return None
+    if not isinstance(content, str):
+        return None
+    return _clean_title(content)
+```
+
+**Replace** the client setup in `agent()`:
+
+```python
+    record = MODELS[active["id"]]
+    base = record["api_base"]
+    try:
+        client = _client_for(record)
+    except Exception as exc:
+        return f"Model Error: {exc}"
+```
+
+**Replace** the create call in `agent()`:
+
+```python
+            stream = _create(client, **create)
+```
+
+There is still exactly one `client.chat.completions.create` call site:
+inside `_create`.
+
+**Add** to `src/minicode/__main__.py`:
+
+```python
+_TITLE_LOCK = Lock()
+_title_thread: Thread | None = None
+_title_locked = False
+_STATE = {"session": None, "messages": []}
+
+
+def _system() -> dict:
+    content = SYSTEM + " " + PLAN_SYSTEM if mode["name"] == "plan" else SYSTEM
+    return {"role": "system", "content": content}
+
+
+def _settings() -> dict:
+    return {
+        "model": active["id"],
+        "mode": mode["name"],
+        "thinking": thinking["name"],
+        "effort": effort["name"],
+        "args": args_display["name"],
+        "output": shell_output["name"],
+    }
+
+
+def _save() -> bool:
+    session = _STATE["session"]
+    if session is None:
+        return True
+    try:
+        sessions.save(
+            session,
+            _STATE["messages"],
+            _settings(),
+            session_usage["completion_tokens"],
+        )
+    except sessions.SessionError as exc:
+        print(f"\nSession Error: {exc}\n")
+        return False
+    return True
+
+
+def _reset_current() -> None:
+    global _title_locked, _title_thread
+    _STATE["session"] = None
+    _STATE["messages"] = [_system()]
+    session_usage["completion_tokens"] = 0
+    last_usage["prompt_tokens"] = 0
+    last_usage["completion_tokens"] = 0
+    restore_always([])
+    with _TITLE_LOCK:
+        _title_locked = False
+        _title_thread = None
+
+
+def _join_title() -> None:
+    with _TITLE_LOCK:
+        thread = _title_thread
+    if thread is not None:
+        thread.join(2.0)
+
+
+def _start_title(target: dict, prompt: str, model_id: str) -> None:
+    global _title_thread, _title_locked
+
+    def work() -> None:
+        title = session_title(prompt, model_id)
+        if not title:
+            return
+        with _TITLE_LOCK:
+            if _title_locked or _STATE["session"] is not target:
+                return
+            target["title"] = title
+
+    with _TITLE_LOCK:
+        _title_locked = False
+        thread = Thread(target=work, daemon=True)
+        _title_thread = thread
+    thread.start()
+
+
+def _stamp(value: str) -> str:
+    try:
+        return datetime.fromisoformat(value).astimezone().strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError):
+        return str(value)[:16].replace("T", " ")
+
+
+def _target(items: list[dict], token: str) -> dict | None:
+    if token.isdigit():
+        number = int(token)
+        if 1 <= number <= len(items):
+            return items[number - 1]
+        return None
+    for item in items:
+        if item.get("id") == token:
+            return item
+    return None
+
+
+def _show_sessions(show: bool = True) -> list[dict]:
+    _save()
+    items, errors = sessions.list_sessions()
+    for error in errors:
+        print(f"\nSession Error: {error}\n")
+    if not show:
+        return items
+    if not items:
+        print("\n(no saved sessions)\n")
+        return []
+    current = _STATE["session"]
+    print()
+    for number, item in enumerate(items, 1):
+        mark = " (active)" if current is not None and item.get("id") == current.get("id") else ""
+        print(f"{number} {item.get('title', 'Untitled')} - {_stamp(item.get('created', ''))}{mark}")
+    print()
+    return items
+
+
+def _apply_session(data: dict) -> None:
+    global _title_locked, _title_thread
+    stored_model = data.get("model")
+    if stored_model in MODELS:
+        active["id"] = stored_model
+    if data.get("mode") in ("plan", "build"):
+        mode["name"] = data["mode"]
+    if data.get("thinking") in ("off", "on"):
+        thinking["name"] = data["thinking"]
+    if data.get("effort") in ("low", "medium", "high"):
+        effort["name"] = data["effort"]
+    if data.get("args") in ("off", "on"):
+        args_display["name"] = data["args"]
+    if data.get("output") in ("off", "on"):
+        shell_output["name"] = data["output"]
+    history = [
+        item for item in data.get("messages", [])
+        if isinstance(item, dict) and item.get("role") != "system"
+    ]
+    _STATE["messages"] = [_system()] + history
+    _STATE["session"] = data
+    usage = data.get("usage")
+    tokens = usage.get("completion_tokens") if isinstance(usage, dict) else 0
+    session_usage["completion_tokens"] = max(0, int(tokens)) if isinstance(tokens, int) else 0
+    last_usage["prompt_tokens"] = 0
+    last_usage["completion_tokens"] = 0
+    restore_always(data.get("always", []))
+    with _TITLE_LOCK:
+        _title_locked = False
+        _title_thread = None
+
+
+def _resume(target: dict) -> None:
+    try:
+        data = sessions.load(target["id"])
+    except sessions.SessionError as exc:
+        print(f"\nSession Error: {exc}\n")
+        return
+    _apply_session(data)
+    print(f"\nResumed: {data.get('title', 'Untitled')}\n")
+    _status()
+
+
+def _rename(target: dict, raw: str) -> None:
+    global _title_locked
+    name = sessions.clean_name(raw)
+    if not name:
+        print("\nSession Error: name is empty\n")
+        return
+    current = _STATE["session"]
+    if current is not None and target.get("id") == current.get("id"):
+        with _TITLE_LOCK:
+            _title_locked = True
+        current["title"] = name
+        if not _save():
+            return
+        print(f"\nRenamed: {name}\n")
+        return
+    try:
+        name = sessions.rename(target["id"], name)
+    except sessions.SessionError as exc:
+        print(f"\nSession Error: {exc}\n")
+        return
+    print(f"\nRenamed: {name}\n")
+
+
+def _delete(target: dict) -> None:
+    current = _STATE["session"]
+    active = current is not None and target.get("id") == current.get("id")
+    title = target.get("title", "Untitled")
+    try:
+        answer = input(f'Delete session "{title}"? [y/N] ').strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nCancelled\n")
+        return
+    if answer not in ("y", "yes"):
+        print("\nCancelled\n")
+        return
+    try:
+        sessions.delete(target["id"])
+    except sessions.SessionError as exc:
+        print(f"\nSession Error: {exc}\n")
+        return
+    if active:
+        _reset_current()
+    print(f"\nDeleted: {title}\n")
+
+
+def _new() -> None:
+    if not _save():
+        return
+    _reset_current()
+    print("\nNew session\n")
+```
+
+Add imports:
+
+```python
+from datetime import datetime
+from threading import Lock, Thread
+
+from minicode import sessions
+from minicode.permissions import ask as permission_ask, restore_always
+```
+
+**Replace** the startup message list:
+
+```python
+    _STATE["messages"] = [_system()]
+```
+
+**Replace** `/plan` and `/build` message assignment with:
+
+```python
+            _STATE["messages"][0] = _system()
+```
+
+**Add** `/new` and `/sessions` handling before the model call:
+
+```python
+        if stripped == "/new":
+            _new()
+            continue
+        if stripped == "/sessions" or stripped.startswith("/sessions "):
+            parts = stripped.split(maxsplit=3)
+            items = _show_sessions(show=len(parts) == 1)
+            if len(parts) == 1:
+                continue
+            token = parts[1]
+            target = _target(items, token)
+            if target is None:
+                print(f"\nUnknown Session: {token}\n")
+                continue
+            if len(parts) == 2:
+                _resume(target)
+                continue
+            action = parts[2].lower()
+            if action in ("delete", "del"):
+                if len(parts) > 3:
+                    print(f"\nUnknown Session action: {parts[2]} {parts[3]}\n")
+                    continue
+                _delete(target)
+                continue
+            if action in ("rename", "ren"):
+                if len(parts) == 4:
+                    name = parts[3]
+                else:
+                    try:
+                        name = input("New name: ")
+                    except (EOFError, KeyboardInterrupt):
+                        print("\nCancelled\n")
+                        continue
+                if not sessions.clean_name(name):
+                    print("\nCancelled\n")
+                    continue
+                _rename(target, name)
+                continue
+            print(f"\nUnknown Session action: {parts[2]}\n")
+            continue
+```
+
+**Add** `("/new", ...)` and `("/sessions", ...)` rows to `COMMANDS`.
+
+**Replace** the user append with:
+
+```python
+        fresh = _STATE["session"] is None
+        if fresh:
+            _STATE["session"] = sessions.new_session(_settings())
+            _STATE["messages"] = [_system()]
+        _STATE["messages"].append({"role": "user", "content": text})
+        if fresh:
+            _save()
+            _start_title(_STATE["session"], text, active["id"])
+```
+
+**Replace** the `agent(messages, on_event)` argument with
+`_STATE["messages"]`, and add `_save()` after `_status(...)`.
+
+**Add** after the REPL loop, before `main()` returns:
+
+```python
+    _join_title()
+    _save()
+```
+
+Call `_save()` after a successful `/plan`, `/build`, `/thinking`, `/effort`,
+`/args`, `/output`, or `/models` change. A command before the first user
+message has no session, so `_save()` is a no-op.
+
+## Edge cases
+
+- A path outside the workspace still asks. Session storage is outside the
+  sandbox and is never exposed to the model as a tool path.
+- `list_sessions()` catches bad files; a bad target prints
+  `Session Error: ...`.
+- `always` pairs are exact. `git status` still does not cover
+  `git status --short` after resume.
+- The session's `model` is restored only if that id is still loaded.
+  Otherwise keep the current model.
+- History from disk may include an interrupted assistant marker or a tool
+  error string. Restore it as plain dicts.
+- No system prompt from disk. Rebuild from current `SYSTEM` / `PLAN_SYSTEM`.
+- A title call failure is silent. The fallback stays. Do not retry.
+- A title call never changes `last_usage` or `session_usage`.
+- A corrupt session is not repaired in place by the list.
+- `exit`, `quit`, and `bye` join the title worker briefly, save, then leave.
+- No file at startup. No file after `/new` until the next message.
+
+## Verification
+
+- `uv run python -m compileall src`
+- `git diff --check`
+- Start in a temp workspace. Send one message. Check
+  `~/.local/share/minicode/sessions/<project-key>/<id>.json` exists and has
+  no system message, no reasoning field, and a local fallback title until
+  the summary lands.
+- `/sessions` shows newest first and marks the active row.
+- `/sessions 1` restores messages, model, mode, thinking, effort, args,
+  output, `always`, and `Session`.
+- Rename with spaces, rename with no name, blank name, 201 chars, control
+  characters, duplicate name, full-id target.
+- Delete active and non-active. Check cancel, `n`, EOF, and Ctrl+C.
+- Clear `always` on `/new` and active delete; preserve it on resume.
+- Check that a resumed session starts a new turn with the current system
+  prompt and that no system message is duplicated.
+- Check that `/new` keeps settings and resets `Session` to 0.
+- Corrupt one JSON file. The list skips it and prints `Session Error`;
+  `sessions.load(id)` raises the same error on direct load.
+- Run with `--sandbox sandbox`; confirm the list is separate from the
+  workspace-root list.
+- Exit immediately after the first answer. The fallback or summary is saved
+  within the 2-second join.
+- Confirm no title text appears in history and no title tokens appear in
+  `In`, `Out`, or `Session`.
+
+## Next
+
+`docs/11-export.md`: transcript export only. No reasoning capture in the
+session file. Export reads `messages` and writes a `.txt`; it does not change
+the session schema or add a model call. Cost display, cache control,
+compaction, and `AGENTS.md` injection remain deferred.
