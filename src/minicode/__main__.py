@@ -1,7 +1,7 @@
 import time
 
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, active_names, PLAN_SYSTEM
+from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, active_names, PLAN_SYSTEM
 from minicode.permissions import ask as permission_ask
 
 def _permission(key:str, value:str) -> str:
@@ -18,6 +18,7 @@ def _permission(key:str, value:str) -> str:
     return "deny"
 
 permission_ask["fn"] = _permission
+thinking = {"name": "off"}
 
 def _elapsed(seconds: float) -> str:
     if seconds < 60:
@@ -72,6 +73,30 @@ def main() -> None:
                 messages[0]["content"] = SYSTEM
             print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
             continue
+        if stripped == "/thinking" or stripped.startswith("/thinking "):
+            parts = stripped.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"\nThinking: {thinking['name']}\n")
+            else:
+                chosen = parts[1].strip().lower()
+                if chosen not in ("on", "off"):
+                    print(f"\nUnknown Thinking: {parts[1].strip()}\n")
+                else:
+                    thinking["name"] = chosen
+                    print(f"\nThinking: {thinking['name']}\n")
+            continue
+        if stripped == "/effort" or stripped.startswith("/effort "):
+            parts = stripped.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"\nEffort: {effort['name']}\n")
+            else:
+                chosen = parts[1].strip().lower()
+                if chosen not in ("low", "medium", "high"):
+                    print(f"\nUnknown Effort: {parts[1].strip()}\n")
+                else:
+                    effort["name"] = chosen
+                    print(f"\nEffort: {effort['name']}\n")
+            continue
         if stripped == "/model" or stripped.startswith("/model "):
             ids = list(MODELS)
             parts = stripped.split(maxsplit=1)
@@ -110,18 +135,23 @@ def main() -> None:
 
         def on_event(kind:str, piece:str = "", final: bool = False) -> None:
             nonlocal wrote, reasoning
+            show = thinking["name"] == "on"
             if kind == "thinking":
-                print("\n---\nThinking:", flush=True)
+                if show:
+                    print("\nThinking:\n---", flush=True)
+                else:
+                    print("\nThinking:", flush=True)
                 reasoning = True
                 wrote = True
             elif kind == "reasoning":
-                print(piece, end="", flush=True)
+                if show:
+                    print(piece, end="", flush=True)
                 reasoning = True
                 wrote = True
             elif kind == "reasoning_end":
-                if reasoning:
-                    print("\n---", flush=True)
-                    reasoning = False
+                if reasoning and show:
+                    print("\n---\n", flush=True)
+                reasoning = False
             elif kind == "text":
                 print(piece, end="", flush=True)
                 wrote = True
@@ -143,7 +173,7 @@ def main() -> None:
         print(
             f"---"
             f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
-            f"\nSandbox: {SANDBOX}"
+            f"\nSandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']}"
             f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session Usage | Elapsed: {_elapsed(elapsed)}{ctx}\n"
             f"---"
         )

@@ -174,6 +174,11 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 | `/model` | List the loaded models as `N id`, with a blank line above and below. |
 | `/model N` | Switch to model number `N` from that list. |
 | `/model <id>` | Switch to another loaded model by id for this session. |
+| `/thinking` | Show whether reasoning text is displayed. Default is `off`. |
+| `/thinking on` | Show `Thinking:`, the bars, and the reasoning. |
+| `/thinking off` | Show only `Thinking:` when the model sends reasoning. |
+| `/effort` | Show the session effort. Default is `low`. |
+| `/effort low` / `medium` / `high` | Set effort for this session. |
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. Neither command is
@@ -194,7 +199,7 @@ The project depends on openai, pydantic, and python-dotenv.
 
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project
+Sandbox: C:\path\to\project | Thinking: off | Effort: low
 1,204 In | 48 Out | 48 Session | Elapsed: 2.1s
 ---
 
@@ -202,12 +207,14 @@ user >> /build
 Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
-If the model streams reasoning, it appears between `---` lines, under
-`Thinking:`, and those lines close before the answer or the first tool line.
-Gemini is asked for a low summary; it is shown in that block and is not part
-of the answer. Not every model sends reasoning; when it does not, the block
-does not appear. The answer streams as the tokens arrive. There is no
-`minicode >>` prefix.
+If the model streams reasoning and `/thinking` is `on`, it appears as
+`Thinking:`, a `---` line, the text, a closing `---`, and a blank line, then
+the answer or the first tool line. `/thinking off` prints only `Thinking:`.
+The default is `off`. Gemini is asked for a summary at the session effort,
+`low` unless `/effort` changed it. That summary is not part of the answer.
+Not every model sends reasoning; when it does not, the label does not
+appear. The answer streams as the tokens arrive. There is no `minicode >>`
+prefix.
 
 If your shell tool is named `powershell` instead of `bash`, that is the Windows
 fallback.
@@ -278,7 +285,7 @@ After each turn:
 ```text
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project
+Sandbox: C:\path\to\project | Thinking: off | Effort: low
 1,204 In | 48 Out | 96 Session | Elapsed: 2.1s
 ---
 ```

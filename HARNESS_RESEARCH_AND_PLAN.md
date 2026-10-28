@@ -317,7 +317,8 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 ```
 
 Streaming, abort, and conditional reasoning are implemented per
-`docs/09-streaming.md`. A thinking block is `---` / `Thinking:` / `---`.
+`docs/09-streaming.md`. A thinking block is `Thinking:` / `---` / text / `---`
+when `/thinking` is `on`. Default is `off`. `/effort` defaults to `low`.
 Answer tokens stream. There is no `minicode >>` prefix. Gemini asks for a
 low thought summary; `<thought>` / `<think>` stay display-only. An aborted
 stream adds no usage. Do not put `prompt_tokens` into `Session`.
@@ -416,7 +417,7 @@ restrict them, not a stricter prompt.
 
 **Layer 8 — streaming and abort.** Code in the working tree;
 `docs/09-streaming.md` is the guide. Conditional reasoning labels
-(`---` / `Thinking:` / `---` only when reasoning exists) and streamed answers
+(`Thinking:` / `---` / text / `---` only when reasoning exists and display is on) and streamed answers
 with no `minicode >>` prefix are implemented.
 Gemini asks for thought summaries; the tags are stripped before history.
 One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,

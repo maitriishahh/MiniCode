@@ -209,7 +209,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   could not overwrite harness source in `src/`. It is now the dev override:
   `uv run python -m minicode --sandbox sandbox`. `sandbox/` is gitignored.
   REPL prints `Sandbox: {SANDBOX}` once at startup, and the status block
-  carries a `Sandbox: {SANDBOX}` line.
+  carries a `Sandbox: {SANDBOX} | Thinking: {on|off} | Effort: {low|medium|high}`
+  line.
 - `load_dotenv()` runs once in `agent.py`, before any `os.getenv`. No
   `LITELLM_LOG`.
 - Servers live in `_SERVERS`: `(id_env, key_env, base)`. The id comes from
@@ -227,8 +228,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
   `/connect` is not this layer. It arrives with the catalog (models.dev
-  import, `/models`, variants, a transport tag). Variants are reasoning
-  effort. Do not pass them on the current create call. Do not add an
+  import, `/models`, variants, a transport tag). Variants are a later
+  catalog. Do not pass a catalog variant on the current create call.
+  `/effort` is not that. It sets `thinking_level` on Gemini and
+  `reasoning_effort` on Ollama for the session. Do not add an
   OpenCode Console free model. Since 18 September 2026 that tier returns
   `403 FreeTierError` outside the official client. Do not fake client
   headers. The later
@@ -239,15 +242,18 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   secret into the record. Do not replace `os.getenv`. A key-only command is
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
-- REPL prompt is `user >> `. Reasoning streams live under `Thinking:` when
-  a delta carries `reasoning_content` or `reasoning`. No `Thought:` closer.
-  After the step, one split pulls `<thought>` or `<think>` out of the
-  buffered content and shows that the same way. No tag is kept in
-  history. The Gemini create passes `include_thoughts: true` and
-  `thinking_level: low`. No `reasoning_effort`. Ollama does not get that body.
-  With no summary, no thinking block appears and there is no wait line.
-  A thinking block is `---` / `Thinking:` / the text / `---`. Answer tokens
-  stream as they arrive. There is no `minicode >>` prefix. Tool lines,
+- REPL prompt is `user >> `. `/thinking` is `off` at startup. `/thinking on`
+  shows the body. `/thinking off` prints only `Thinking:`. `/effort` is
+  `low` at startup. `/effort low|medium|high` changes it for the session.
+  Both are handled before any model call. Restart restores both defaults.
+  When display is on, reasoning streams as `Thinking:` then `---`, the text,
+  `---`, and a blank line. No `Thought:` closer. A `<thought>` or `<think>`
+  span is pulled out of content before it is printed as the answer. No tag
+  is kept in history. The Gemini create passes `include_thoughts: true` and
+  `thinking_level` from `effort`. Ollama gets `reasoning_effort` from
+  `effort`, not the Gemini body. With no summary, no thinking label appears
+  and there is no wait line. Answer tokens stream as they arrive. There is
+  no `minicode >>` prefix. Tool lines,
   `Model Error:`, max-limit notices, and `[interrupted by user]` stay plain.
   `docs/09-streaming.md` specifies the event
   contract. Reasoning is display-only: never
@@ -258,7 +264,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   including in plan. A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tools Used|`. Status block
   after the answer, wrapped in `---`:
-  Model / Mode / Tools Loaded, `Sandbox: {SANDBOX}`, then
+  Model / Mode / Tools Loaded, `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}`, then
   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.
   `_elapsed` lives in `__main__.py`. Under 60s it keeps one decimal (`45.2s`,
   and `60.0` rolls to `1m`). After that it shows the two largest units from

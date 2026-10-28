@@ -28,7 +28,7 @@ models are added.
   Not `model_dump`. Tool line is `|Tools Used: \`name\`|`. `SYSTEM`
   routes whole-file `write` vs one-span `edit`.
 - [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
-  block carries a `Sandbox: {SANDBOX}` line.
+  block carries a `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}` line.
 - [x] `uv.lock` staged for commit (pins exact versions).
 - [x] Dedicated `sandbox/` dir at the project root is the dev override:
   `uv run python -m minicode --sandbox sandbox` (`sandbox/` is gitignored).
@@ -102,9 +102,11 @@ models are added.
   heredoc still asks. A denied ask still returns the short `/build` sentence.
 - [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort in the
   working tree. Reasoning, when the provider sends it, prints inside a
-  `---` / `Thinking:` / `---` block. Answer tokens stream as they arrive.
-  There is no `minicode >>` prefix. Gemini asks for a low thought summary
-  (`include_thoughts`, `thinking_level: low`). `<thought>` / `<think>` are
+  `Thinking:` / `---` / text / `---` block when `/thinking` is `on`. Default
+  is `off`, which prints only `Thinking:`. Answer tokens stream as they
+  arrive. There is no `minicode >>` prefix. `/effort` is `low`, `medium`, or
+  `high`, default `low`. Gemini sends that as `thinking_level`. Ollama sends
+  it as `reasoning_effort`. `<thought>` / `<think>` are
   display-only and are stripped before history.
 
 ## Open gaps

@@ -63,6 +63,7 @@ SYSTEM = (
 
 
 mode = {"name":"plan"}
+effort = {"name": "low"}
 PLAN_DENIED = ("write", "edit")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
@@ -174,7 +175,7 @@ def _gemini_extra(base: str) -> dict | None:
             "google": {
                 "thinking_config": {
                     "include_thoughts": True,
-                    "thinking_level": "low",
+                    "thinking_level": effort["name"],
                 }
             }
         }
@@ -413,6 +414,8 @@ def agent(messages: list, on_event=None) -> str | None:
             extra = _gemini_extra(base)
             if extra:
                 create["extra_body"] = extra
+            elif base.startswith(("http://127.0.0.1", "http://localhost")):
+                create["reasoning_effort"] = effort["name"]
             stream = client.chat.completions.create(**create)
             _consume(stream, on_event, state)
             _apply_usage(state["usage"])

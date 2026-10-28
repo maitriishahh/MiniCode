@@ -112,11 +112,12 @@ OpenCode's empty aborted assistant and an assistant `tool_calls` with no
 matching tool result 400 the next request. That is why the marker exists
 and why every id gets a result.
 
-`Thinking:` is the header for a reasoning block. It is emitted lazily on the
-first reasoning delta, or after the step when a `<thought>` / `<think>` span
-was in the buffered content. Not before the create. Do not print a
-`Thought:` closer. Do not emit `Thinking:` when there is no
-reasoning content. A tool's own print is still the progress during a tool.
+`Thinking:` is the header. It is emitted lazily on the first reasoning
+delta, not before the create. When `/thinking` is `on`, the body follows
+under a `---` line and closes with `---` plus a blank line. When it is
+`off`, only `Thinking:` prints. Default is `off`. Do not print a `Thought:`
+closer. Do not emit `Thinking:` when there is no reasoning content. A tool's
+own print is still the progress during a tool.
 
 A Qwen thinking model can finish with `content` null after the tools
 already ran. The REPL then prints `[empty response]`. That is
@@ -152,7 +153,8 @@ Cost display stays deferred until more models are added.
    append either to history.
 4. Add: `on_event` in the REPL. It renders `thinking`, `reasoning`,
    `reasoning_end`, and `text`. Answer tokens stream as they arrive. A
-   thinking block is `---` / `Thinking:` / `---`. There is no `minicode >>`
+   thinking block is `Thinking:` / `---` / text / `---` when display is on.
+   `/thinking` defaults to `off`. `/effort` defaults to `low`. There is no `minicode >>`
    prefix. Do not print streamed text again from the returned value.
 5. Add: abort handling in `agent`. `KeyboardInterrupt` is control flow, not
    a tool error. `tool_from_fn` catches `Exception` only, so Ctrl+C still
@@ -489,18 +491,23 @@ wrote = False
 
 def on_event(kind: str, piece: str = "", final: bool = False) -> None:
     nonlocal reasoning, wrote
+    show = thinking["name"] == "on"
     if kind == "thinking":
-        print("\n---\nThinking:", flush=True)
+        if show:
+            print("\nThinking:\n---", flush=True)
+        else:
+            print("\nThinking:", flush=True)
         reasoning = True
         wrote = True
     elif kind == "reasoning":
-        print(piece, end="", flush=True)
+        if show:
+            print(piece, end="", flush=True)
         reasoning = True
         wrote = True
     elif kind == "reasoning_end":
-        if reasoning:
-            print("\n---", flush=True)
-            reasoning = False
+        if reasoning and show:
+            print("\n---\n", flush=True)
+        reasoning = False
     elif kind == "text":
         print(piece, end="", flush=True)
         wrote = True
@@ -528,9 +535,9 @@ uv run python -m minicode --sandbox sandbox
 
 - A no-reasoning text reply shows no thinking block. The answer streams,
   then the status block. The answer is not printed twice.
-- A reasoning reply opens `---`, prints `Thinking:`, streams the reasoning,
-  closes with `---`, then streams the answer. No `Thought:` line. No
-  `minicode >>` prefix.
+- `/thinking on`: a reasoning reply prints `Thinking:`, `---`, the reasoning,
+  `---`, a blank line, then streams the answer. `/thinking off` prints only
+  `Thinking:`. No `Thought:` line. No `minicode >>` prefix.
 - A reasoning reply with a tool call closes the block before the tool
   preamble or `|Tools Used|`; the next model step starts a new block.
 - A reasoning-only reply with null content prints the reasoning block, then
