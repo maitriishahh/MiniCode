@@ -83,7 +83,7 @@ def _elapsed(seconds: float) -> str:
 
 def _status(usage: str | None = None) -> None:
     body = (
-        f"---\n"
+        f"\n---\n"
         f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n"
         f"Sandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']} "
         f"| Args: {args_display['name']} | Output: {shell_output['name']}"
@@ -93,8 +93,8 @@ def _status(usage: str | None = None) -> None:
     print(f"{body}\n---")
 
 def main() -> None:
+    print(f"\nType /help for available commands")
     _status()
-    print()
     messages = [
         {
             "role":"system",
@@ -103,7 +103,7 @@ def main() -> None:
     ]
     while True:
         try:
-            text = input("user >> ")
+            text = input(">>> ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
