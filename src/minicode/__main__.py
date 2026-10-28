@@ -1,8 +1,46 @@
 import time
 
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, active_names, PLAN_SYSTEM
+from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM
 from minicode.permissions import ask as permission_ask
+from minicode.tools.shell import output as shell_output
+
+COMMANDS = (
+    ("/plan", "Switch to plan mode. write and edit are disabled.", "/plan"),
+    ("/build", "Switch to build mode. All tools are available.", "/build"),
+    ("/models", "List loaded models. A number or an id switches for this session.", "/models\n/models 2"),
+    ("/thinking", "Show or hide reasoning. 1 off, 2 on. Default off.", "/thinking 2"),
+    ("/effort", "Set effort. 1 low, 2 medium, 3 high. Default low.", "/effort 2"),
+    ("/args", "Show or hide tool arguments. 1 off, 2 on. Default off.", "/args on"),
+    ("/output", "Show or hide the shell output block. 1 off, 2 on. Default off. The model still gets the output.", "/output on"),
+    ("/help", "List commands.", "/help"),
+    ("exit", "Leave. quit and bye do the same.", "exit"),
+)
+
+def _listed(label: str, choices: tuple[str, ...], current: dict, raw: str) -> None:
+    parts = raw.split(maxsplit=1)
+    if len(parts) == 1:
+        print()
+        for n, name in enumerate(choices, 1):
+            mark = " (active)" if name == current["name"] else ""
+            print(f"{n} {name}{mark}")
+        print()
+        return
+    chosen = parts[1].strip()
+    if chosen.isdigit():
+        n = int(chosen)
+        picked = choices[n - 1] if 1 <= n <= len(choices) else None
+        if picked is None:
+            print(f"\nUnknown {label}: {chosen}\n")
+            return
+        chosen = picked
+    else:
+        chosen = chosen.lower()
+    if chosen not in choices:
+        print(f"\nUnknown {label}: {parts[1].strip()}\n")
+        return
+    current["name"] = chosen
+    print(f"\n{label}: {current['name']}\n")
 
 def _permission(key:str, value:str) -> str:
     print(f"\nPermission: {key} | {value}")
@@ -124,6 +162,20 @@ def main() -> None:
                 else:
                     effort["name"] = chosen
                     print(f"\nEffort: {effort['name']}\n")
+            continue
+        if stripped == "/args" or stripped.startswith("/args "):
+            _listed("Args", ("off", "on"), args_display, stripped)
+            continue
+        if stripped == "/output" or stripped.startswith("/output "):
+            _listed("Output", ("off", "on"), shell_output, stripped)
+            continue
+        if stripped == "/help":
+            print()
+            for name, summary, example in COMMANDS:
+                print(name)
+                print(summary)
+                print(example)
+                print()
             continue
         if stripped == "/model" or stripped.startswith("/model "):
             print("\nUnknown command: /model. Use /models.\n")

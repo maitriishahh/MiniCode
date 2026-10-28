@@ -250,8 +250,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   for the session. Default is `off`. `/thinking off` prints only `Thinking:`.
   `/thinking on` shows the body. `/effort` lists `1 low`, `2 medium`, and
   `3 high` the same way. `/effort N` or `/effort low|medium|high` changes it.
-  Default is `low`. A bare integer is a number, not a name. Both are handled
-  before any model call. Restart restores both defaults.
+  Default is `low`. `/args` lists `1 off` and `2 on`. Default is `off`,
+  which prints only `|Tool Used: `{name}``. `/args on` is the one-liner or
+  the left rail. `/output` lists `1 off` and `2 on`. Default is `off`, which
+  hides the shell block. The model still gets that output. An edit diff
+  still prints. `/help` prints the `COMMANDS` tuple in `__main__.py` and
+  nothing else. A bare integer is a number, not a name. All of these are
+  handled before any model call. Restart restores every default.
   When display is on, reasoning streams as `Thinking:` then `---`, the text,
   `---` on the next line, and a blank line. Trailing newlines in the summary
   are not printed. A blank line in the middle of the summary is. No `Thought:` closer. A `<thought>` or `<think>`
@@ -267,11 +272,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   append it to history, never use it as `content`. Strip `<thought>` and
   `<think>` before history. Do not read `extra_content` as reasoning; it
   still carries the thought signature. Do not parse the signature. After a
-  successful tool run, print `|Tool Used: `{name}` ({args})|`,
-  including in plan. A JSON object with a string value that contains a
-  newline instead prints `|Tool Used: `{name}`` and then one `|` line per
-  real line, with the key on the first line of that value. No trailing `|`
-  on those lines. A short call stays the one-liner. Do not re-serialize it.
+  successful tool run, print `|Tool Used: `{name}`` when `/args` is `off`.
+  That is the default. When `/args` is `on`, print
+  `|Tool Used: `{name}` ({args})|`. A JSON object with a string value that
+  contains a newline instead prints `|Tool Used: `{name}`` and then one `|`
+  line per real line, with the key on the first line of that value. No
+  trailing `|` on those lines. A short call stays the one-liner. Do not
+  re-serialize it.
   A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tool Used|`. Status block
   after the answer, wrapped in `---`:
@@ -293,6 +300,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   speed, and summed `total_tokens` counts the prompt once per step. An
   aborted stream adds nothing. `docs/09-streaming.md` does not put
   `prompt_tokens` into `Session`.
+- A new slash command is a handler in `__main__.py` before any model call,
+  one row in `COMMANDS`, and a README commands-table row. `/help` prints
+  `COMMANDS` only. Do not write a second help string. Do not generate the
+  handlers from the tuple. Add an `AGENTS.md` sentence when the command is
+  a new rule.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
 - Streaming, abort, the conditional reasoning labels, and the

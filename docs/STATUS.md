@@ -108,6 +108,10 @@ models are added.
   `high`, default `low`. Gemini sends that as `thinking_level`. Ollama sends
   it as `reasoning_effort`. `<thought>` / `<think>` are
   display-only and are stripped before history.
+- [x] `/args` and `/output` default to `off`. `/args off` prints only
+  `|Tool Used: `{name}``. `/output off` hides the shell block. The model
+  still gets that output. `/help` prints the `COMMANDS` tuple in
+  `__main__.py`. A new slash command adds a handler and a row there.
 
 ## Open gaps
 

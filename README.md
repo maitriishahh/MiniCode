@@ -181,6 +181,13 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 | `/effort` | List `1 low`, `2 medium`, and `3 high`, with a blank line above and below. Marks `(active)`. |
 | `/effort N` | Switch effort to that number. |
 | `/effort low` / `medium` / `high` | Switch effort by name. |
+| `/args` | List `1 off` and `2 on`. Default is `off`, which prints only `\|Tool Used: \`name\``. |
+| `/args N` | Switch argument display to that number. |
+| `/args on` / `off` | `on` shows the one-liner or the left rail. `off` hides arguments. |
+| `/output` | List `1 off` and `2 on`. Default is `off`, which hides the shell output block. The model still gets it. |
+| `/output N` | Switch shell-output display to that number. |
+| `/output on` / `off` | Show or hide the `Shell` block. Does not hide edit diffs. |
+| `/help` | List every command, with a short description and an example. |
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. Neither command is
@@ -195,7 +202,7 @@ Mode: plan | Tools Loaded: read, glob, grep, bash
 
 user >> read pyproject.toml and summarize the dependencies
 
-|Tool Used: `read` ({"path": "pyproject.toml"})|
+|Tool Used: `read`
 
 The project depends on openai, pydantic, and python-dotenv.
 
@@ -236,10 +243,11 @@ fallback.
 
 `glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
 also skips `.env` contents. `glob` may list the name. Both tell the model
-to refine broad searches. A short tool call prints
-`|Tool Used: \`name\` ({args})|`. If an argument contains a newline, that
-call is a left `|` rail instead: `|Tool Used: \`name\`` and then one `|`
-line per real line. A denial does not print that line.
+to refine broad searches. `/args` defaults to `off`, so a tool call prints `|Tool Used: \`name\``.
+`/args on` prints `|Tool Used: \`name\` ({args})|`, or a left `|` rail when
+an argument contains a newline. `/output` defaults to `off` and hides the
+shell block. The model still gets that output. A denial does not print the
+tool line.
 
 ## Plan and build
 

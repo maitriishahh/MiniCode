@@ -334,7 +334,7 @@ else:
   on its own line. Unlike the diff, this text is sent to the model. The
   loop still prints `|Tool Used: \`bash\` ({args})|` or
   `|Tool Used: \`powershell\` ({args})|` after `run()` returns. Do not
-  print a second copy there. A command value with a newline is a left `|` rail from `_tool_line`, not a second copy of this block.
+  print a second copy there. A command value with a newline is a left `|` rail from `_tool_line`, not a second copy of this block. `/output` defaults to `off`. `_show` still returns the string. It prints the block only when `output["name"]` is `on`. An edit diff is not this block.
 - An empty command, a `.env` command, or a missing shell raises before
   `_show`. No shell block. `tool_from_fn` turns that into `Tool error:`.
 - A binary that disappears after resolve is `FileNotFoundError` →

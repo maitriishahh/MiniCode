@@ -130,7 +130,11 @@ def _cap(text: str) -> str:
     return f"... truncated — narrow the command\n{text[-CAP:]}"
 
 
+output = {"name": "off"}
+
 def _show(text: str) -> str:
+    if output["name"] == "off":
+        return text
     label = _RESOLVED[1] if _RESOLVED else "missing"
     print(
         f"---\nShell ({label}):\n{text}",

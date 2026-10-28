@@ -64,6 +64,7 @@ SYSTEM = (
 
 mode = {"name":"plan"}
 effort = {"name": "low"}
+args_display = {"name": "off"}
 PLAN_DENIED = ("write", "edit")
 PLAN_SYSTEM = (
     "You are in plan mode. Read, search, and reason. "
@@ -166,6 +167,8 @@ def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
 def _tool_line(name: str, args: str) -> str:
+    if args_display["name"] == "off":
+        return f"|Tool Used: `{name}`"
     one = f"|Tool Used: `{name}` ({args})|"
     try:
         data = json.loads(args)

@@ -537,8 +537,10 @@ elif answer:
 ```
 
 `In`, `Out`, `Session`, and `_elapsed` do not change. No Tok/s. No context
-`%` unless `context_window` is set. `/plan`, `/build`, `/models`, and `exit`
-stay before any create. They are not sent to the model.
+`%` unless `context_window` is set. Slash commands and `exit` stay before
+any create. They are not sent to the model. `/help` prints the `COMMANDS`
+tuple. A new slash command adds a handler and a `COMMANDS` row in the same
+pass.
 
 ## Soak
 
