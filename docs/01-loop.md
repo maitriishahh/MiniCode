@@ -375,8 +375,9 @@ if __name__ == "__main__":
     main()
 ```
 
-Now you can run `uv run python -m minicode` from the repo root. It prints
-`Sandbox: {SANDBOX}` once at startup. Status block: model id, mode, enabled
+Now you can run `uv run python -m minicode` from the repo root. Startup
+prints the status block with no usage line. `Sandbox: {SANDBOX}` is on the
+flag line. Status block: model id, mode, enabled
 tool names, sandbox path, last `prompt_tokens` (`In`), summed
 `completion_tokens` (`Out`), elapsed via `_elapsed`. No Tok/s.
 The live line also has `Session`. Do not restore `{elapsed:.1f}s`.

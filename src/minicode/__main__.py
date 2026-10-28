@@ -81,9 +81,20 @@ def _elapsed(seconds: float) -> str:
             break
     return " ".join(parts)
 
+def _status(usage: str | None = None) -> None:
+    body = (
+        f"---\n"
+        f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n"
+        f"Sandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']} "
+        f"| Args: {args_display['name']} | Output: {shell_output['name']}"
+    )
+    if usage is not None:
+        body += f"\n{usage}"
+    print(f"{body}\n---")
+
 def main() -> None:
-    print(f"Sandbox: {SANDBOX}")
-    print(f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
+    _status()
+    print()
     messages = [
         {
             "role":"system",
@@ -266,12 +277,8 @@ def main() -> None:
             print(f"\n{answer}\n")
 
         ctx = f" | {prompt_tokens / window:.1%} context" if window else ""
-        print(
-            f"---"
-            f"\nModel: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}"
-            f"\nSandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']}"
-            f"\n{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session Usage | Elapsed: {_elapsed(elapsed)}{ctx}\n"
-            f"---"
+        _status(
+            f"{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session Usage | Elapsed: {_elapsed(elapsed)}{ctx}"
         )
 
 if __name__ == "__main__":

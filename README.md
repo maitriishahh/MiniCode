@@ -196,9 +196,10 @@ sent to the model.
 ## Example session
 
 ```text
-Sandbox: C:\path\to\project
-
-Mode: plan | Tools Loaded: read, glob, grep, bash
+---
+Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
+Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
+---
 
 user >> read pyproject.toml and summarize the dependencies
 
@@ -208,7 +209,7 @@ The project depends on openai, pydantic, and python-dotenv.
 
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project | Thinking: off | Effort: low
+Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
 1,204 In | 48 Out | 48 Session | Elapsed: 2.1s
 ---
 
@@ -300,7 +301,7 @@ After each turn:
 ```text
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project | Thinking: off | Effort: low
+Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
 1,204 In | 48 Out | 96 Session | Elapsed: 2.1s
 ---
 ```

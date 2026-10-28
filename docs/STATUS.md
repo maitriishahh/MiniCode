@@ -27,8 +27,8 @@ models are added.
 - [x] History is the raw assistant message dict from the response JSON.
   Not `model_dump`. Tool line is `|Tool Used: \`name\`|`. `SYSTEM`
   routes whole-file `write` vs one-span `edit`.
-- [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
-  block carries a `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}` line.
+- [x] Observability: startup prints the status block with no usage line.
+  The flag line is `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name} | Args: {name} | Output: {name}`.
 - [x] `uv.lock` staged for commit (pins exact versions).
 - [x] Dedicated `sandbox/` dir at the project root is the dev override:
   `uv run python -m minicode --sandbox sandbox` (`sandbox/` is gitignored).

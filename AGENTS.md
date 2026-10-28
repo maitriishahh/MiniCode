@@ -209,9 +209,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   was the root-level `sandbox/` dir — that was the dev fence so tool tests
   could not overwrite harness source in `src/`. It is now the dev override:
   `uv run python -m minicode --sandbox sandbox`. `sandbox/` is gitignored.
-  REPL prints `Sandbox: {SANDBOX}` once at startup, and the status block
-  carries a `Sandbox: {SANDBOX} | Thinking: {on|off} | Effort: {low|medium|high}`
-  line.
+  Startup prints the status block with no usage line. The flag line is
+  `Sandbox: {SANDBOX} | Thinking: {on|off} | Effort: {low|medium|high} | Args: {on|off} | Output: {on|off}`.
 - `load_dotenv()` runs once in `agent.py`, before any `os.getenv`. No
   `LITELLM_LOG`.
 - Servers live in `_SERVERS`: `(id_env, key_env, base)`. The id comes from
@@ -282,7 +281,7 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   A plan denial, a permission denial, and an unknown
   tool print that tool string, not `|Tool Used|`. Status block
   after the answer, wrapped in `---`:
-  Model / Mode / Tools Loaded, `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}`, then
+  Model / Mode / Tools Loaded, `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name} | Args: {name} | Output: {name}`, then
   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.
   `_elapsed` lives in `__main__.py`. Under 60s it keeps one decimal (`45.2s`,
   and `60.0` rolls to `1m`). After that it shows the two largest units from

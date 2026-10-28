@@ -69,8 +69,8 @@ From the directory you want the agent to work in (product):
 uv run python -m minicode
 ```
 
-Startup prints `Sandbox: {SANDBOX}` where `{SANDBOX}` is that cwd. That is
-the check that the flip worked.
+Startup status block includes `Sandbox: {SANDBOX}` where `{SANDBOX}` is that
+cwd. That is the check that the flip worked.
 
 To preserve the old root-level `sandbox/` fence for harness development,
 from the repo root:

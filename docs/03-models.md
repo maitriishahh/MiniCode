@@ -234,7 +234,8 @@ print(
 )
 ```
 
-No cost line. No fake percent. No Tok/s. Startup `Sandbox:` line stays.
+No cost line. No fake percent. No Tok/s. Startup prints the status block
+without the usage line. Do not put the short `Sandbox:` print back.
 
 ## Your finished modules
 
