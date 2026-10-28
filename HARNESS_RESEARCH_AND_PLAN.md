@@ -302,7 +302,7 @@ anything to restrict is theater.
 No TUI yet. After a successful tool run, one line:
 
 ```
-|Tools Used: `read`|
+|Tool Used: `read`|
 ```
 
 Print **after** the tool returns, not before. Unknown tools stay silent on
@@ -385,7 +385,7 @@ Fix the five raw-loop bugs (`user_input = str`, unused `user_text`, `exit`
 sent to the model, `max_steps` raising, unbounded history — note it, don't
 build compaction). `tool_from_fn`. Sandbox. `read`. Tool line + status block.
 REPL that exits cleanly.
-Checkpoint: a session that reads a file, prints `|Tools Used: `read`|` on
+Checkpoint: a session that reads a file, prints `|Tool Used: `read`|` on
 a successful call, survives bad tool args, shows model/mode/tools/`In`/`Out`/elapsed,
 and exits without sending `"exit"` to Gemini.
 
