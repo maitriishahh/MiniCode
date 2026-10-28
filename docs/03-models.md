@@ -1,15 +1,15 @@
-# 03 — Model registry + `/model`
+# 03 — Model registry + `/models`
 
 Do first: `docs/02-file-tools.md`. Layer 1 is split under `src/minicode/`.
 This layer is implemented. Snippets below are the live code. Do not grow
 `__main__.py` with the loop. Do not change `SANDBOX`.
 
 Registry and the one `chat.completions.create` site live in `agent.py`.
-`/model` and the status id live in `__main__.py`.
+`/models` and the status id live in `__main__.py`.
 
 ## What it is
 
-A small model registry and a `/model` REPL command. Servers are a tuple.
+A small model registry and a `/models` REPL command. Servers are a tuple.
 Ids come from `.env`. Bases stay in code. Gemini is the startup default
 when `GEMINI_MODEL` is set. Ollama is the second server. Still one create
 site. Still no shell.
@@ -44,12 +44,12 @@ only reason to touch that append.
    unset. The record field is `api_key`, and its value is the env name, not
    the secret.
 3. `default_id` is read once from `GEMINI_MODEL`. `active["id"]` starts
-   there. `/model` may change it for the session. Restart restores
+   there. `/models` may change it for the session. Restart restores
    `default_id`.
 4. One `chat.completions.create`, via `with_raw_response`. Append the raw
    message dict. A raised call returns `Model Error:`. It must not kill
    the REPL.
-5. `__main__.py` handles `/model` and `/model <id>` before appending a user
+5. `__main__.py` handles `/models` and `/models <id>` before appending a user
    message, same as `exit`. Never sent to the model.
 6. Status shows `active["id"]`. Context `%` is appended only when
    `context_window` is set. Elapsed is `_elapsed`, not `{elapsed:.1f}s`.
@@ -94,7 +94,7 @@ exact model id. Do not invent one. Cost stays zeros and is not printed until
 more models are added; it then needs pricing on the record. `tools: True` is
 recorded, not acted on. `max_tokens` is stored and not passed to `create`.
 
-An empty `OLLAMA_MODEL` skips that server. `/model` lists only what was
+An empty `OLLAMA_MODEL` skips that server. `/models` lists only what was
 set at startup. The Ollama id must match a local tag. The layer is done
 even if Ollama is not installed. A later turn that calls it may fail on
 the network. That failure is `Model Error:`, not a dead REPL.
@@ -110,7 +110,7 @@ from minicode.agent import agent, TOOLS, last_usage, SYSTEM, active, MODELS
 ## Segment 2 — One create site
 
 File: `src/minicode/agent.py`. Read `record` once per turn, before the step
-loop, so a `/model` between turns is picked up and a switch mid-turn cannot
+loop, so a `/models` between turns is picked up and a switch mid-turn cannot
 happen. Dispatch with `call["function"]["name"]`, not attribute access.
 
 ```python
@@ -169,16 +169,20 @@ The dummy `"ollama"` is only for an empty key on a loopback base. A missing
 Gemini key must still fail. Do not pass `max_tokens`. Do not `model_dump`
 the assistant message. Do not rebuild `tool_calls`.
 
-## Segment 3 — `/model`
+## Segment 3 — `/models`
 
 File: `src/minicode/__main__.py`, in `main()`, after the empty-line
 `continue` and before `messages.append`. Same rule as `exit`: handled
-locally, never sent to the model. The space after `/model` is required.
-`/models` is not this command.
+locally, never sent to the model. The space after `/models` is required.
+`/model` is not this command. It prints `Unknown command: /model. Use /models.`
+and is not sent.
 
 ```python
 ids = list(MODELS)
 if stripped == "/model" or stripped.startswith("/model "):
+    print("\nUnknown command: /model. Use /models.\n")
+    continue
+if stripped == "/models" or stripped.startswith("/models "):
     parts = stripped.split(maxsplit=1)
     if len(parts) == 1:
         print()
@@ -203,10 +207,10 @@ if stripped == "/model" or stripped.startswith("/model "):
     continue
 ```
 
-Unknown id or number prints an error and does not switch. `/model` with no
+Unknown id or number prints an error and does not switch. `/models` with no
 argument lists every id loaded at startup, numbered from 1, and marks the
 active one. A blank line sits above and below that list, and above and below
-`Model:` / `Unknown Model:`. `/model N` and `/model <id>` both switch. A
+`Model:` / `Unknown Model:`. `/models N` and `/models <id>` both switch. A
 bare integer is a number, not an id. It does not add a model. It does not
 edit `.env`. Restart restores `default_id`.
 
@@ -235,7 +239,7 @@ No cost line. No fake percent. No Tok/s. Startup `Sandbox:` line stays.
 ## Your finished modules
 
 `agent.py` holds `_SERVERS`, `_entry`, `MODELS`, `default_id`, `active`,
-and the one `chat.completions.create`. `__main__.py` holds `/model` and the
+and the one `chat.completions.create`. `__main__.py` holds `/models` and the
 status id. Still no TOML. Still no new package dirs. Still no
 thought-signature parser.
 
@@ -253,7 +257,7 @@ flipping the sandbox default to cwd, a third server, passing `max_tokens`,
 a cost line (wait for more models), Tok/s, LiteLLM, one SDK per provider,
 a hardcoded model id, putting the catalog in `.env`.
 
-If `/model` lists the ids that were set at startup, an unknown id does not
+If `/models` lists the ids that were set at startup, an unknown id does not
 switch, the next real turn uses the active record's `model` / key /
 `base_url`, a down local endpoint returns `Model Error:`, a `read` then
 `edit` turn finishes, and the status id matches — stop.
@@ -261,7 +265,7 @@ switch, the next real turn uses the active record's `model` / key /
 ## Checkpoint
 
 1. Where does the active id get read, and how many create sites are there?
-2. What happens to `/model` — is it appended, sent to the model, or neither?
+2. What happens to `/models` — is it appended, sent to the model, or neither?
 3. What happens on an unknown id? On a create exception?
 4. Why is context `%` not a summed token count divided by `context_window`?
 5. Why is the Ollama id not a Python constant?

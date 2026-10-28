@@ -74,30 +74,61 @@ def main() -> None:
             print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
             continue
         if stripped == "/thinking" or stripped.startswith("/thinking "):
+            choices = ("off", "on")
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:
-                print(f"\nThinking: {thinking['name']}\n")
+                print()
+                for n, name in enumerate(choices, 1):
+                    mark = " (active)" if name == thinking["name"] else ""
+                    print(f"{n} {name}{mark}")
+                print()
             else:
-                chosen = parts[1].strip().lower()
-                if chosen not in ("on", "off"):
+                chosen = parts[1].strip()
+                if chosen.isdigit():
+                    n = int(chosen)
+                    picked = choices[n - 1] if 1 <= n <= len(choices) else None
+                    if picked is None:
+                        print(f"\nUnknown Thinking: {chosen}\n")
+                        continue
+                    chosen = picked
+                else:
+                    chosen = chosen.lower()
+                if chosen not in choices:
                     print(f"\nUnknown Thinking: {parts[1].strip()}\n")
                 else:
                     thinking["name"] = chosen
                     print(f"\nThinking: {thinking['name']}\n")
             continue
         if stripped == "/effort" or stripped.startswith("/effort "):
+            choices = ("low", "medium", "high")
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:
-                print(f"\nEffort: {effort['name']}\n")
+                print()
+                for n, name in enumerate(choices, 1):
+                    mark = " (active)" if name == effort["name"] else ""
+                    print(f"{n} {name}{mark}")
+                print()
             else:
-                chosen = parts[1].strip().lower()
-                if chosen not in ("low", "medium", "high"):
+                chosen = parts[1].strip()
+                if chosen.isdigit():
+                    n = int(chosen)
+                    picked = choices[n - 1] if 1 <= n <= len(choices) else None
+                    if picked is None:
+                        print(f"\nUnknown Effort: {chosen}\n")
+                        continue
+                    chosen = picked
+                else:
+                    chosen = chosen.lower()
+                if chosen not in choices:
                     print(f"\nUnknown Effort: {parts[1].strip()}\n")
                 else:
                     effort["name"] = chosen
                     print(f"\nEffort: {effort['name']}\n")
             continue
         if stripped == "/model" or stripped.startswith("/model "):
+            print("\nUnknown command: /model. Use /models.\n")
+            continue
+        if stripped == "/models" or stripped.startswith("/models "):
             ids = list(MODELS)
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:

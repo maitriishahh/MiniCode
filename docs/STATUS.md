@@ -36,7 +36,7 @@ models are added.
 - [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
   "\n---\n"` — closing `---` always lands on its own line.
 
-- [x] Layer 2: OpenAI client, `_SERVERS` registry, `/model`, raw message
+- [x] Layer 2: OpenAI client, `_SERVERS` registry, `/models`, raw message
   dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
   Status elapsed is `_elapsed`, not raw seconds. No Tok/s. No LiteLLM.
 - [x] Layer 3 (`docs/04-workspace.md`): default workspace is the launch cwd

@@ -13,10 +13,10 @@ One Python loop over an OpenAI-compatible chat API.
 ```text
   [ User / Terminal ]
          │
-         ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/model`)
+         ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/models`)
   [ __main__.py ] (REPL loop, session usage tracking, elapsed time measurement)
          │
-         ├─► Command handled locally? (/plan, /build, /model, exit)
+         ├─► Command handled locally? (/plan, /build, /models, exit)
          │
          ▼  (otherwise appends user message to history, calls agent)
   [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
@@ -85,7 +85,7 @@ One Python loop over an OpenAI-compatible chat API.
 - Exact-match edits with a terminal diff
 - Live model reasoning inside a `---` block when the provider sends it. Gemini is asked for a low thought summary; that summary is not part of the answer
 - Answer tokens stream as they arrive. There is no `minicode >>` prefix
-- Model switching with `/model`
+- Model switching with `/models`
 - Workspace-bounded file access with `.env` protection
 - Permission prompts for `.env` access, plan-mode file-changing shell commands,
   and paths outside the workspace
@@ -171,14 +171,16 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 |---|---|
 | `/plan` | Switch to plan mode. `write` and `edit` are disabled. |
 | `/build` | Switch to build mode. All tools are available. |
-| `/model` | List the loaded models as `N id`, with a blank line above and below. |
-| `/model N` | Switch to model number `N` from that list. |
-| `/model <id>` | Switch to another loaded model by id for this session. |
-| `/thinking` | Show whether reasoning text is displayed. Default is `off`. |
-| `/thinking on` | Show `Thinking:`, the bars, and the reasoning. |
-| `/thinking off` | Show only `Thinking:` when the model sends reasoning. |
-| `/effort` | Show the session effort. Default is `low`. |
-| `/effort low` / `medium` / `high` | Set effort for this session. |
+| `/models` | List the loaded models as `N id`, with a blank line above and below. |
+| `/models N` | Switch to model number `N` from that list. |
+| `/models <id>` | Switch to another loaded model by id for this session. |
+| `/model` | Not a command. Prints `Unknown command: /model. Use /models.` |
+| `/thinking` | List `1 off` and `2 on`, with a blank line above and below. Marks `(active)`. |
+| `/thinking N` | Switch thinking to that number. |
+| `/thinking on` / `off` | Switch thinking by name. `on` shows the bars and the reasoning. `off` shows only `Thinking:`. |
+| `/effort` | List `1 low`, `2 medium`, and `3 high`, with a blank line above and below. Marks `(active)`. |
+| `/effort N` | Switch effort to that number. |
+| `/effort low` / `medium` / `high` | Switch effort by name. |
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. Neither command is

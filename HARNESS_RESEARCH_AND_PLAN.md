@@ -110,7 +110,7 @@ OpenCode's shape, adapted, without the catalog:
 
 The `openai` package is the transport, not a provider catalog. What it does
 not give you is the product layer: a typed catalogue, context windows,
-cache flags, `/connect`, `/models`. Pricing waits for cost display. The Model
+cache flags, `/connect`, a catalog import with no slash yet. Pricing waits for cost display. The Model
 record is that layer, built to the size actually needed:
 
 ```
@@ -128,8 +128,8 @@ Servers are a `_SERVERS` tuple, not a catalog in `.env`. No models.dev
 scrape, no 75 providers, no OAuth yet, no LiteLLM, no SDK per brand.
 `/connect` waits with that catalog. It is not a key-writer on `_SERVERS`,
 and a name→base dict does not remove the tuple-plus-two-env-lines edit
-until a command looks the name up. `/model` lists ids from `.env` only.
-Fetching the list and context is `/models`. Cost is deferred until more
+until a command looks the name up. `/models` lists ids from `.env` only.
+Fetching the catalog and context is deferred and has no slash yet. Cost is deferred until more
 models are added. Variants are reasoning effort (`high`, `max`). They are
 not a flag on the current create call.
 Ollama local is a base URL, not a login.
@@ -154,8 +154,8 @@ not a registry redesign.
 
 **Day one:** Gemini via `.env` (`GEMINI_MODEL`, `GEMINI_API_KEY`) and the
 Gemini base URL on the record.
-**Layer 2:** implemented. `_SERVERS` plus `/model`. Startup default is
-`default_id` from `GEMINI_MODEL`. `/model <id>` changes `active["id"]` for
+**Layer 2:** implemented. `_SERVERS` plus `/models`. Startup default is
+`default_id` from `GEMINI_MODEL`. `/models <id>` changes `active["id"]` for
 the session only. Ollama is the second tuple; its id is `OLLAMA_MODEL`.
 
 **Caching — planned, not faked:**
@@ -325,7 +325,7 @@ stream adds no usage. Do not put `prompt_tokens` into `Session`.
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
 `completion_tokens` for the turn. `Session` is summed `completion_tokens`
-for the process. It is not cleared on `/plan` or `/model`. Do not add
+for the process. It is not cleared on `/plan` or `/models`. Do not add
 `prompt_tokens` into it. Elapsed is `_elapsed` in `__main__.py`: under 60s
 one decimal, then the two largest of `s m h d w y`. A week is 7 days. A year
 is 365 days. No months. No Tok/s — a wall-clock rate is
@@ -394,7 +394,7 @@ print. Still no shell.
 Checkpoint: the agent edits a local file correctly; a mismatched `old_text`
 returns a tool error and the model retries.
 
-**Layer 2 — model registry.** Done. `_SERVERS`, `/model`, OpenAI client.
+**Layer 2 — model registry.** Done. `_SERVERS`, `/models`, OpenAI client.
 Ids from `.env`. Bases in code.
 
 **Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.

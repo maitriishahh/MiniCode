@@ -537,7 +537,7 @@ elif answer:
 ```
 
 `In`, `Out`, `Session`, and `_elapsed` do not change. No Tok/s. No context
-`%` unless `context_window` is set. `/plan`, `/build`, `/model`, and `exit`
+`%` unless `context_window` is set. `/plan`, `/build`, `/models`, and `exit`
 stay before any create. They are not sent to the model.
 
 ## Soak

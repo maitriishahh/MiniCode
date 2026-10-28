@@ -4,7 +4,7 @@ Do first: `docs/03-models.md`. Layer 2 is done. This layer is implemented
 in `resolve_path.py`.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
-`agent.py`. `/model` and the status print live in `__main__.py`.
+`agent.py`. `/models` and the status print live in `__main__.py`.
 `tool_from_fn` stays in `schema_generator.py`. Sandbox stays in
 `resolve_path.py`. Do not grow `__main__.py` with the root.
 
@@ -102,7 +102,7 @@ errors under either root.
 
 `resolve_path.py` holds `_sandbox_root`, `SANDBOX`, and `_resolve`.
 `agent.py` holds the loop and registry. `__main__.py` holds the REPL,
-`/model`, and the status block. Still no new package dirs. Still no shell,
+`/models`, and the status block. Still no new package dirs. Still no shell,
 no search, no permissions change.
 
 ## Open gaps at this layer

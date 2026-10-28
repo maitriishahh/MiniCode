@@ -218,17 +218,19 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   lines. Do not hardcode an id. Do not put the catalog in `.env`. The
   record field is `api_key`, and its value is the env name, not the secret.
   Lookup is `os.getenv(record["api_key"])`. `default_id` is
-  `os.getenv("GEMINI_MODEL")` once. That is the startup choice. `/model`
-  lists `N id` with a blank line above and below. `/model N` or
-  `/model <id>` changes `active["id"]` for the session only. A bare integer
-  is a number, not an id. Restart restores
+  `os.getenv("GEMINI_MODEL")` once. That is the startup choice. `/models`
+  lists `N id` with a blank line above and below. `/models N` or
+  `/models <id>` changes `active["id"]` for the session only. A bare integer
+  is a number, not an id. `/model` is not a command. It prints
+  `Unknown command: /model. Use /models.` and is not sent. Restart restores
   `default_id`. An unset id env skips that server. An empty key on
   `127.0.0.1` or `localhost` becomes `"ollama"`. A missing Gemini key still
   fails. A raised call returns `Model Error:`. No `gemini/` or
   `ollama_chat/` prefix. Gemini's base is
   `https://generativelanguage.googleapis.com/v1beta/openai/`.
   `/connect` is not this layer. It arrives with the catalog (models.dev
-  import, `/models`, variants, a transport tag). Variants are a later
+  import, variants, a transport tag). The import has no slash yet. `/models`
+  is the loaded-list command, not that catalog. Variants are a later
   catalog. Do not pass a catalog variant on the current create call.
   `/effort` is not that. It sets `thinking_level` on Gemini and
   `reasoning_effort` on Ollama for the session. Do not add an
@@ -242,10 +244,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   secret into the record. Do not replace `os.getenv`. A key-only command is
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
-- REPL prompt is `user >> `. `/thinking` is `off` at startup. `/thinking on`
-  shows the body. `/thinking off` prints only `Thinking:`. `/effort` is
-  `low` at startup. `/effort low|medium|high` changes it for the session.
-  Both are handled before any model call. Restart restores both defaults.
+- REPL prompt is `user >> `. `/thinking` lists `1 off` and `2 on` with a
+  blank line above and below. `/thinking N` or `/thinking on|off` changes it
+  for the session. Default is `off`. `/thinking off` prints only `Thinking:`.
+  `/thinking on` shows the body. `/effort` lists `1 low`, `2 medium`, and
+  `3 high` the same way. `/effort N` or `/effort low|medium|high` changes it.
+  Default is `low`. A bare integer is a number, not a name. Both are handled
+  before any model call. Restart restores both defaults.
   When display is on, reasoning streams as `Thinking:` then `---`, the text,
   `---` on the next line, and a blank line. Trailing newlines in the summary
   are not printed. A blank line in the middle of the summary is. No `Thought:` closer. A `<thought>` or `<think>`

@@ -5,7 +5,7 @@ in `agent.py` and `__main__.py`. Shipped names have no leading underscore.
 Do not rename them.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site live in
-`agent.py`. `/plan`, `/build`, `/model`, and the status print live in
+`agent.py`. `/plan`, `/build`, `/models`, and the status print live in
 `__main__.py`. `tool_from_fn` stays in `schema_generator.py`. Sandbox stays
 in `resolve_path.py`. A new tool is `tools/<name>.py` plus one registry line
 in `agent.py`. Do not grow `__main__.py` with the loop.
@@ -43,7 +43,7 @@ gate, no lifecycle.
    denies `PLAN_DENIED` at dispatch even if the model guesses the name.
 4. Replace: `__main__.py` drops the local `MODE` constant, imports `mode`,
    handles `/plan` / `/build` before appending a user message (same rule
-   as `exit` and `/model`: handled locally, never sent to the model),
+   as `exit` and `/models`: handled locally, never sent to the model),
    swaps `messages[0]["content"]`, prints `Mode: {mode["name"]}`.
 5. Replace: status prints `Mode: {mode["name"]}` and
    `Tools Loaded: {', '.join(active_names())}` so the restriction is
@@ -171,7 +171,7 @@ What this locks:
 
 ## Segment 3 — `/plan` / `/build` + system swap + status
 
-File: `src/minicode/__main__.py`. Keep the loop, `/model`, `exit`,
+File: `src/minicode/__main__.py`. Keep the loop, `/models`, `exit`,
 `Sandbox: {SANDBOX}` startup print, `In | Out | Session | Elapsed: {_elapsed}`.
 No Tok/s.
 
@@ -211,7 +211,7 @@ def main() -> None:
                     messages[0]["content"] = SYSTEM
             print(f"\nMode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n")
             continue
-        if stripped == "/model" or stripped.startswith("/model "):
+        if stripped == "/models" or stripped.startswith("/models "):
             parts = stripped.split(maxsplit=1)
             if len(parts) == 1:
                 for mid in MODELS:
@@ -246,7 +246,7 @@ def main() -> None:
 What this locks:
 
 - `/plan` / `/build` are exact matches only. `/plans` is not this command.
-  Handled before `messages.append`, same as `exit` and `/model` — never
+  Handled before `messages.append`, same as `exit` and `/models` — never
   appended, never sent to the model.
 - Idempotent: switching to the current mode just prints `Mode: …` and
   `Tools Loaded:` and does not double-append `PLAN_SYSTEM`.
@@ -282,7 +282,7 @@ steps, prints
 `|Tools Used: \`read\||` / `|Tools Used: \`grep\||` on success, and never
 prints `|Tools Used: \`write\||` or `|Tools Used: \`edit\||`. A guessed
 `write`/`edit` call returns `Plan mode: … is disabled` as `role: "tool"`
-content. `user >> /build` restores full tools with no restart. `/model`
+content. `user >> /build` restores full tools with no restart. `/models`
 still lists/switches ids. `exit` still leaves before any create.
 
 ## Your finished modules
