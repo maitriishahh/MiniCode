@@ -406,7 +406,10 @@ until more models are added; it then needs pricing on the record.
   (`Thinking:` / `---` / text / `---` when `/thinking` is `on`) and streamed
   answers with no `minicode >>` prefix are implemented per
   `docs/09-streaming.md`. Gemini asks for thought summaries. Ctrl+C during a
-  model call or a tool call returns to `user >>`.
+  model call or a tool call returns to `user >>` when Python is between
+  chunks. A Windows socket read that has not returned does not. That abort,
+  and a click paste that submits every line, are deferred in
+  `docs/09-streaming.md`. Not next.
 - Cost display is deferred until more models are added.
 
 ## Don't add yet

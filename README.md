@@ -312,5 +312,7 @@ Sessions and resume, cache control, cost display, compaction, a diff viewer,
 `AGENTS.md` injection, MCP, subagents, and a graphical interface. Context
 percentage stays off until a verified `context_window` is set. Cost display
 waits until more models are added. Ctrl+C during a model call or a tool call
-aborts that step and returns to `user >>`. A grandchild shell process can
-survive.
+aborts that step and returns to `user >>` when Python is between chunks. On
+Windows it does not abort a call blocked in a socket read; close the terminal
+tab. A click or middle-click paste can submit every line as a request. Both
+are deferred. A grandchild shell process can survive.

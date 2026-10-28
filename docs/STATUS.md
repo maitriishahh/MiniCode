@@ -128,6 +128,10 @@ Known and accepted. These are not the next layer.
 - Answer tokens stream as they arrive. There is no `minicode >>` prefix.
   Gemini asks for a low thought summary. No `reasoning_effort`. A provider
   that sends no summary shows no thinking block.
+- A click or middle-click paste into `input()` submits every newline as a
+  request. On Windows, Ctrl+C does not abort a model call while httpx is
+  blocked in Winsock `recv`. Both are deferred. The shape is an amendment
+  to `docs/09-streaming.md`. Not next.
 
 ## Next
 
@@ -145,4 +149,10 @@ models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;
 fetched with the catalog, not a create flag), `reasoning_effort` (Gemini
-summaries use `include_thoughts` and `thinking_level: low`, not this flag).
+summaries use `include_thoughts` and `thinking_level: low`, not this flag),
+Windows paste and a stuck Ctrl+C (amendment to `docs/09-streaming.md`, not
+a new guide and not next: after `input()` returns, if the console already
+has more lines, do not send them; on interrupt, `FlushConsoleInputBuffer`;
+run the stream on a worker and `time.sleep` on the main thread so Ctrl+C
+can close the httpx stream; a second Ctrl+C calls `os._exit`. No TUI, no
+asyncio, no short read timeout, no `prompt_toolkit`).

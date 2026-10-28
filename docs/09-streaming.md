@@ -590,12 +590,45 @@ for it.
 - Gemini asks for a low summary (`include_thoughts`, `thinking_level: low`).
   No `reasoning_effort`. Ollama does not get that body.
 - No tests.
+- `input()` is cooked console input. A click or middle-click paste
+  (PyCharm middle-click, Windows Terminal right-click, mintty middle-click)
+  injects newlines, and each non-empty line is a user message and a model
+  call. Bracketed paste is not on. On Windows it is not reliable anyway: it
+  needs `ENABLE_VIRTUAL_TERMINAL_INPUT`, and PyCharm classic and ConPTY
+  often drop `ESC[200~`.
+- Ctrl+C during a stream that is back in Python between chunks returns to
+  `user >>`. Ctrl+C while httpx is blocked in Winsock `recv` does not.
+  CPython does not raise `KeyboardInterrupt` until that read returns
+  (cpython#85609). `time.sleep` and a console read do check. Ctrl+Break is
+  the same once Python has a handler. The client uses the SDK default
+  timeout of 600s and two retries, so a dead call can sit for about half an
+  hour. Closing the terminal tab is the escape today. A short read timeout
+  is not the fix: it also kills a slow thinking gap, and the SDK retries it.
 
 ## Don't add yet
 
 Later, in order, not in the implement pass: sessions/resume, cache control,
 diff viewer, `AGENTS.md` injection. Cost display waits until more models
-are added. Compaction waits until the context gap hurts.
+are added. Compaction waits until the context gap hurts. Windows paste and
+a stuck model read wait too. That one is an amendment to this guide, not a
+new file and not next.
+
+When that amendment is written, the shape is fixed. After `input()` returns,
+if the console already has more lines waiting (`PeekConsoleInput` /
+`msvcrt.kbhit`), read them and do not send. On interrupt,
+`FlushConsoleInputBuffer` before the next `input()`. Do not rely on
+bracketed paste in PyCharm. Run the stream on a worker thread. The main
+thread waits in short `time.sleep` calls, which Ctrl+C breaks on Windows.
+On interrupt, close the httpx stream from the main thread so the worker's
+`recv` fails, then keep the history cleanup this guide already specifies. A
+second Ctrl+C in the console handler calls `os._exit` if the close did not
+unblock. That handler runs on another thread. No `prompt_toolkit`, no Rich,
+no Textual, no asyncio, no client/server split, and no short read timeout
+used as cancel. OpenCode aborts with Escape via `session.interrupt` because
+the TUI is not the thread blocked in the provider socket. Pi aborts with
+Escape via `ctx.abort()`, then an outside kill. Claude Code aborts the fetch
+with an `AbortController`. Those are the comparison. They are not the
+implementation.
 
 Not this layer: async, a background shell, a process tree, a persistent
 shell, Rich, a test suite, using `reasoning_content` or a `<thought>` /

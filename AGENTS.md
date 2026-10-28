@@ -288,14 +288,18 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   final-answer-only prefix are in the working tree. `KeyboardInterrupt` during
   a model call or a tool call is control flow, not a tool error. `tool_from_fn`
   catches `Exception` only. Do not catch it there. Never read a reasoning
-  field to fill an empty `content` or add it to history.
+  field to fill an empty `content` or add it to history. A click paste that
+  submits every `input()` line, and a Ctrl+C that does not land while httpx
+  is blocked in Winsock `recv`, are deferred. The shape is an amendment to
+  `docs/09-streaming.md`, not next and not a new guide. Do not add
+  `prompt_toolkit`, asyncio, a TUI, or a short read timeout for it.
 - Do not commit secrets, session dumps, or transcripts.
 
 ## Do not
 
 - Promote a deferred topic (MCP, subagents, compaction, sessions,
-  Rich, models.dev import, `/connect` …) into the current layer without an
-  explicit ask.
+  Rich, models.dev import, `/connect`, Windows paste / stuck Ctrl+C …) into
+  the current layer without an explicit ask.
 - Add a feature without finishing it: unknown tools, escapes, and bad args
   must all behave before the layer is done.
 - Send `exit`, secrets, or half-built scaffolding to the model.
