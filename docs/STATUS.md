@@ -1,7 +1,7 @@
 # STATUS.md — MiniCode
 
 Current code: layers 0–7 are committed. Layer 8 streaming, abort, the
-conditional reasoning labels, and the final-answer-only `minicode >>` prefix
+conditional reasoning blocks, and streamed answers with no `minicode >>` prefix
 are in the working tree. Startup default is `plan`. Plan drops `write` /
 `edit` only. `bash` / `powershell` stay in the list. Shell asks for `.env`
 text, and in plan for content-read, create, and delete verbs. Status line is
@@ -101,13 +101,11 @@ models are added.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
 - [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort in the
-  working tree. Conditional reasoning (`Thinking:` only when reasoning
-  exists; no `Thought:` closer) and the final-answer-only `minicode >>` prefix with
-  buffered content are implemented. Content buffers per model step, so the
-  final answer is not token-streamed; reasoning still streams live. Gemini
-  asks for thought summaries with `include_thoughts` only. No
-  `thinking_level`. `<thought>` / `<think>` are split once after the step
-  and stripped before history.
+  working tree. Reasoning, when the provider sends it, prints inside a
+  `---` / `Thinking:` / `---` block. Answer tokens stream as they arrive.
+  There is no `minicode >>` prefix. Gemini asks for a low thought summary
+  (`include_thoughts`, `thinking_level: low`). `<thought>` / `<think>` are
+  display-only and are stripped before history.
 
 ## Open gaps
 
@@ -125,10 +123,9 @@ Known and accepted. These are not the next layer.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
-- Content buffers per model step, so the final answer is not token-streamed;
-  reasoning still streams live. Gemini asks for thought summaries with
-  `include_thoughts` only. No `thinking_level`. No `reasoning_effort`. A
-  provider that sends no summary still shows neither label.
+- Answer tokens stream as they arrive. There is no `minicode >>` prefix.
+  Gemini asks for a low thought summary. No `reasoning_effort`. A provider
+  that sends no summary shows no thinking block.
 
 ## Next
 
@@ -145,5 +142,5 @@ then pricing on the Model record), tests (still not written),
 models.dev import, `/connect` (with that catalog; transport tag on the
 tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;
-fetched with the catalog, not a create flag), `reasoning_effort` and
-`thinking_level` (Gemini summaries use `include_thoughts` only).
+fetched with the catalog, not a create flag), `reasoning_effort` (Gemini
+summaries use `include_thoughts` and `thinking_level: low`, not this flag).

@@ -111,7 +111,7 @@ def main() -> None:
         def on_event(kind:str, piece:str = "", final: bool = False) -> None:
             nonlocal wrote, reasoning
             if kind == "thinking":
-                print("\nThinking:", flush=True)
+                print("\n---\nThinking:", flush=True)
                 reasoning = True
                 wrote = True
             elif kind == "reasoning":
@@ -119,12 +119,11 @@ def main() -> None:
                 reasoning = True
                 wrote = True
             elif kind == "reasoning_end":
-                reasoning = False
+                if reasoning:
+                    print("\n---", flush=True)
+                    reasoning = False
             elif kind == "text":
-                if final:
-                    print(f"\nminicode >> {piece}", flush=True)
-                else:
-                    print(f"\n{piece}", flush=True)
+                print(piece, end="", flush=True)
                 wrote = True
 
         answer = agent(messages, on_event)

@@ -164,6 +164,8 @@ session_usage = {"completion_tokens": 0}
 def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
+_OPEN_TAGS = (("<thought>", "</thought>"), ("<think>", "</think>"))
+
 def _gemini_extra(base: str) -> dict | None:
     if "generativelanguage.googleapis.com" not in base:
         return None
@@ -172,21 +174,23 @@ def _gemini_extra(base: str) -> dict | None:
             "google": {
                 "thinking_config": {
                     "include_thoughts": True,
+                    "thinking_level": "low",
                 }
             }
         }
     }
 
-def _split_thought(text: str) -> tuple[str, str]:
-    lower = text.lower()
-    for open_tag, close_tag in (("<thought>", "</thought>"), ("<think>", "</think>")):
-        start = lower.find(open_tag)
-        end = lower.find(close_tag)
-        if start != -1 and end > start:
-            inside = text[start + len(open_tag):end]
-            rest = text[:start] + text[end + len(close_tag):]
-            return inside, rest
-    return "", text
+def _tag_suffix(text: str, tags: tuple[str, ...]) -> str:
+    best = ""
+    lowered = text.lower()
+    for tag in tags:
+        limit = min(len(text), len(tag) - 1)
+        for n in range(limit, 0, -1):
+            if lowered.endswith(tag[:n]):
+                if n > len(best):
+                    best = text[-n:]
+                break
+    return best
 
 def _apply_usage(usage: dict | None) -> None:
     if not usage:
@@ -205,10 +209,87 @@ def _consume(stream, on_event, state: dict) -> None:
     by_index: dict = {}
     by_id: dict = {}
     reasoning = False
+    in_thought = False
+    close_tag = ""
+    held = ""
+    state["streamed"] = False
 
     def emit(kind: str, piece: str = "") -> None:
         if on_event:
             on_event(kind, piece)
+
+    def close_reasoning() -> None:
+        nonlocal reasoning
+        if reasoning:
+            emit("reasoning_end")
+            reasoning = False
+
+    def emit_reasoning(text: str) -> None:
+        nonlocal reasoning
+        if not text:
+            return
+        if not reasoning:
+            if not text.strip():
+                return
+            emit("thinking")
+            reasoning = True
+        emit("reasoning", text)
+
+    def emit_text(piece: str) -> None:
+        if not piece:
+            return
+        close_reasoning()
+        state["text"] += piece
+        state["streamed"] = True
+        emit("text", piece)
+
+    def feed(piece: str) -> None:
+        nonlocal held, in_thought, close_tag
+        buf = held + piece
+        held = ""
+        while buf:
+            if not in_thought:
+                lower = buf.lower()
+                found_at = -1
+                found_open = ""
+                found_close = ""
+                for open_tag, close in _OPEN_TAGS:
+                    at = lower.find(open_tag)
+                    if at != -1 and (found_at == -1 or at < found_at):
+                        found_at = at
+                        found_open = open_tag
+                        found_close = close
+                if found_at == -1:
+                    suffix = _tag_suffix(buf, tuple(tag for tag, _ in _OPEN_TAGS))
+                    if suffix:
+                        emit_text(buf[:-len(suffix)])
+                        held = suffix
+                        return
+                    emit_text(buf)
+                    return
+                if found_at:
+                    emit_text(buf[:found_at])
+                in_thought = True
+                close_tag = found_close
+                buf = buf[found_at + len(found_open):]
+                continue
+            lower = buf.lower()
+            at = lower.find(close_tag)
+            if at == -1:
+                suffix = _tag_suffix(buf, (close_tag,))
+                if suffix:
+                    emit_reasoning(buf[:-len(suffix)])
+                    held = suffix
+                    return
+                emit_reasoning(buf)
+                return
+            end = at + len(close_tag)
+            if at:
+                emit_reasoning(buf[:at])
+            close_reasoning()
+            in_thought = False
+            close_tag = ""
+            buf = buf[end:]
 
     for chunk in stream:
         data = chunk.to_dict()
@@ -222,24 +303,26 @@ def _consume(stream, on_event, state: dict) -> None:
             state["extra"] = delta["extra_content"]
         think = delta.get("reasoning_content") or delta.get("reasoning")
         if isinstance(think, str) and think:
-            if not reasoning:
-                emit("thinking")
-                reasoning = True
-            emit("reasoning", think)
+            emit_reasoning(think)
         piece = delta.get("content")
         if isinstance(piece, str) and piece:
-            state["text"] += piece
-        for item in delta.get("tool_calls") or []:
-            _merge_call(state["calls"], by_index, by_id, item)
-    if reasoning:
-        emit("reasoning_end")
-    thought, answer = _split_thought(state["text"])
-    if thought.strip():
-        emit("thinking")
-        emit("reasoning", thought.strip())
-        emit("reasoning_end")
-    if answer != state["text"]:
-        state["text"] = answer.strip()
+            feed(piece)
+        items = delta.get("tool_calls") or []
+        if items:
+            if in_thought and held:
+                emit_reasoning(held)
+            elif held:
+                emit_text(held)
+            held = ""
+            in_thought = False
+            close_reasoning()
+            for item in items:
+                _merge_call(state["calls"], by_index, by_id, item)
+    if in_thought and held:
+        emit_reasoning(held)
+    elif held:
+        emit_text(held)
+    close_reasoning()
 
 def _merge_call(calls: list, by_index: dict, by_id: dict, delta: dict) -> None:
     fn = delta.get("function") or {}
@@ -341,7 +424,7 @@ def agent(messages: list, on_event=None) -> str | None:
                 "content": _marked(state["text"], "[interrupted by user]"),
                 **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
             })
-            if state["text"] and on_event:
+            if state["text"] and on_event and not state.get("streamed"):
                 on_event("text", state["text"])
             return None
         except Exception as exc:
@@ -352,19 +435,19 @@ def agent(messages: list, on_event=None) -> str | None:
                 "content": _marked(state["text"], "[model error]"),
                 **({"extra_content": state["extra"]} if state["extra"] is not None else {}),
             })
-            if state["text"] and on_event:
+            if state["text"] and on_event and not state.get("streamed"):
                 on_event("text", state["text"])
             return f"Model Error: {exc}"
         msg = _assistant(state["text"], state["calls"], state["extra"])
         messages.append(msg)
         appended = True
         if not state["calls"]:
-            if on_event:
-                on_event("text", msg["content"], final=True)
+            if on_event and not state.get("streamed"):
+                on_event("text", msg["content"])
             return ""
         done: set[str] = set()
         try:
-            if state["text"] and on_event:
+            if state["text"] and on_event and not state.get("streamed"):
                 on_event("text", state["text"])
             for call in msg["tool_calls"]:
                 name = call["function"]["name"]

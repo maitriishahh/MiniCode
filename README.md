@@ -35,7 +35,7 @@ One Python loop over an OpenAI-compatible chat API.
          │        │        └─► Appends interrupted/error assistant message, returns None / error
          │        │
          │        ▼ (No tool calls)
-         ├─► Final Answer Buffer ──► on_event("text", piece, final=True) ──► Printed via `minicode >>`
+         ├─► Answer tokens stream as they arrive. No `minicode >>` prefix
          │
          └─► Tool Calls Present?
                   │
@@ -83,8 +83,8 @@ One Python loop over an OpenAI-compatible chat API.
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
 - Exact-match edits with a terminal diff
-- Live model reasoning under `Thinking:` when the provider sends it. Gemini is asked for a thought summary; that summary is not part of the answer
-- Final answers printed once with `minicode >>`; tool preambles print without it
+- Live model reasoning inside a `---` block when the provider sends it. Gemini is asked for a low thought summary; that summary is not part of the answer
+- Answer tokens stream as they arrive. There is no `minicode >>` prefix
 - Model switching with `/model`
 - Workspace-bounded file access with `.env` protection
 - Permission prompts for `.env` access, plan-mode file-changing shell commands,
@@ -190,7 +190,7 @@ user >> read pyproject.toml and summarize the dependencies
 
 |Tools Used: `read` ({"path": "pyproject.toml"})|
 
-minicode >> The project depends on openai, pydantic, and python-dotenv.
+The project depends on openai, pydantic, and python-dotenv.
 
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
@@ -202,14 +202,12 @@ user >> /build
 Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
-If the model streams reasoning, it appears under `Thinking:` and then the
-answer or first tool line. There is no `Thought:` closer. Gemini is asked
-for that summary; it is shown under `Thinking:` and is not part of the
-answer. Not every model sends reasoning; when it does not, the label does
-not appear. Only
-the final answer gets `minicode >>`; tool preambles and error notices do not.
-Content is buffered per model step so the harness can tell a final answer
-from a tool preamble; the final answer is not streamed token by token.
+If the model streams reasoning, it appears between `---` lines, under
+`Thinking:`, and those lines close before the answer or the first tool line.
+Gemini is asked for a low summary; it is shown in that block and is not part
+of the answer. Not every model sends reasoning; when it does not, the block
+does not appear. The answer streams as the tokens arrive. There is no
+`minicode >>` prefix.
 
 If your shell tool is named `powershell` instead of `bash`, that is the Windows
 fallback.

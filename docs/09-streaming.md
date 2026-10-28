@@ -1,7 +1,7 @@
 # 09 — Streaming and abort
 
 Do first: `docs/08-permissions.md`. Layer 7 is done. Streaming, abort, the
-conditional reasoning labels, and the final-answer-only `minicode >>` prefix
+conditional reasoning blocks, and streamed answers with no `minicode >>` prefix
 are implemented in the working tree. Sessions are next, not this layer.
 
 Registry, loop, `SYSTEM`, and the one `chat.completions.create` site stay in
@@ -20,8 +20,8 @@ not parse it. Preserve `extra_content`.
 Reasoning arrives as it is generated. Content is buffered for the whole
 model step, because the REPL cannot know whether a step will end with a tool
 call until the stream finishes. A no-tool step is the final answer and prints
-once after `minicode >>`; a tool-call step prints its text once without the
-prefix. Reasoning still streams live. Ctrl+C during a model call or a tool
+as the tokens arrive. A tool-call step streams its preamble the same way,
+then prints the tool line. Reasoning still streams live inside a `---` block. Ctrl+C during a model call or a tool
 call returns to `user >>` with a history the next request can send.
 
 `agent(messages, on_event=None) -> str | None`.
@@ -35,8 +35,8 @@ Content is accumulated, not emitted. Those tags are stripped before the
 buffer. After the step, `agent` emits `text(final=True)` for the no-tool
 answer (or `[empty response]`) and `text(final=False)` for a tool preamble or
 abort/error partial text. The REPL prints `Thinking:` and the reasoning only
-when reasoning exists. No `Thought:` closer. It prints `minicode >>` only when
-`final=True`. Reasoning is display-only: it never enters history and never
+when reasoning exists, between `---` lines. There is no `minicode >>` prefix
+and no `Thought:` closer. Reasoning is display-only: it never enters history and never
 fills `content`.
 
 | Event | History | Screen | Returns |
@@ -46,9 +46,9 @@ fills `content`.
 | Ctrl+C mid-stream | partial text plus `[interrupted by user]`; incomplete tool calls and reasoning dropped | partial text without prefix, then `[interrupted by user]` | `None` |
 | Ctrl+C during a tool | assistant calls kept; completed results kept; missing ids get `Interrupted by user.` | `[interrupted by user]` | `None` |
 | API or model error | partial text plus `[model error]` if no final answer was appended; reasoning not stored | partial text without prefix, then `Model Error: ...` | the notice |
-| Empty completion | `[empty response]` | `minicode >> [empty response]`, once | `""` |
-| Reasoning only, content null | `[empty response]`; reasoning not stored | reasoning block, then `minicode >> [empty response]` | `""` |
-| Normal answer | assistant message | printed once after the step with `minicode >>` | `""` |
+| Empty completion | `[empty response]` | `[empty response]`, once | `""` |
+| Reasoning only, content null | `[empty response]`; reasoning not stored | reasoning block, then `[empty response]` | `""` |
+| Normal answer | assistant message | streamed as the tokens arrive | `""` |
 
 If Ctrl+C lands after the final assistant entry was appended, return `""`
 and print no marker.
@@ -56,7 +56,7 @@ and print no marker.
 Partial text is `text.rstrip() + "\n\n[interrupted by user]"` when it has
 non-whitespace. Otherwise the marker alone. Keep `extra_content` if a chunk
 already carried it. Do not invent a signature. The partial text is displayed
-without the `minicode >>` prefix because it is not a final answer.
+without reprinting text that already streamed.
 
 Invariants: no empty assistant message, no partial tool call in history, no
 assistant `tool_calls` without one result per id, no consecutive user
@@ -87,11 +87,11 @@ Reasoning is optional. A delta may carry `reasoning_content` (Qwen/DeepSeek
 shape) or `reasoning`. Display either as it arrives. Gemini's OpenAI layer
 does not use those names. It may inline a summary as `<thought>...</thought>`
 inside `content` when the create asks for it. The Gemini base passes
-`extra_body={"extra_body": {"google": {"thinking_config": {"include_thoughts": True}}}}`.
-No `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
-After the step, split `<thought>` or `<think>` out of the buffered content
-once. Show the inside under `Thinking:`. No `Thought:` closer. Keep the rest as the
-answer. Do not read `extra_content` as reasoning; it carries the thought
+`extra_body={"extra_body": {"google": {"thinking_config": {"include_thoughts": True, "thinking_level": "low"}}}}`.
+No `reasoning_effort`. Ollama does not get that body.
+Split `<thought>` or `<think>` out of `content` before those characters are
+printed as the answer. Show the inside in the thinking block. Keep the rest
+as the answer. Do not read `extra_content` as reasoning; it carries the thought
 signature. Do not parse it. If the provider sends no reasoning, `Thinking:`
 does not appear; the buffered answer prints normally with its prefix.
 
@@ -119,7 +119,7 @@ was in the buffered content. Not before the create. Do not print a
 reasoning content. A tool's own print is still the progress during a tool.
 
 A Qwen thinking model can finish with `content` null after the tools
-already ran. The REPL then prints `minicode >> [empty response]`. That is
+already ran. The REPL then prints `[empty response]`. That is
 an empty completion, not a dropped reply. Emit `[empty response]` once.
 Reasoning may be displayed, but do not copy `reasoning`, `reasoning_content`,
 a `<thought>` / `<think>` span, or a thought signature into `content` or
@@ -151,11 +151,9 @@ Cost display stays deferred until more models are added.
    for display only. Split `<thought>` and `<think>` out of `content`. Never
    append either to history.
 4. Add: `on_event` in the REPL. It renders `thinking`, `reasoning`,
-   `reasoning_end`, and `text(final=...)`. `agent` buffers content for the
-   step: a no-tool `text(final=True)` is the only text that gets
-   `minicode >>`; a tool preamble and abort/error partial text use
-   `text(final=False)`. Print the final answer once, at step end. Do not
-   print it again from the returned value.
+   `reasoning_end`, and `text`. Answer tokens stream as they arrive. A
+   thinking block is `---` / `Thinking:` / `---`. There is no `minicode >>`
+   prefix. Do not print streamed text again from the returned value.
 5. Add: abort handling in `agent`. `KeyboardInterrupt` is control flow, not
    a tool error. `tool_from_fn` catches `Exception` only, so Ctrl+C still
    leaves `run()`. Catch it in `agent`, not in `shell.py` and not in
@@ -478,12 +476,12 @@ return to `user >>`.
 ## Segment 4 — REPL
 
 File: `src/minicode/__main__.py`. Replace the `agent(messages)` call. The
-status block stays. `""` prints nothing more. `agent` already printed the
-final text with `minicode >>`, including `[empty response]` when that was
-the whole reply. Print the interrupt marker when `answer is None`, even
+status block stays. `""` prints nothing more. `agent` already streamed the
+answer, including `[empty response]` when that was the whole reply and
+nothing was streamed. Print the interrupt marker when `answer is None`, even
 after partial text. A non-empty `answer` is a `Model Error:` or max-limit
-notice, not a final answer: print it without the prefix. Do not fall back to
-`minicode >> {answer}`.
+notice, not the answer: print it as a plain notice. Do not reprint streamed
+text.
 
 ```python
 reasoning = False
@@ -492,7 +490,7 @@ wrote = False
 def on_event(kind: str, piece: str = "", final: bool = False) -> None:
     nonlocal reasoning, wrote
     if kind == "thinking":
-        print("\nThinking:", flush=True)
+        print("\n---\nThinking:", flush=True)
         reasoning = True
         wrote = True
     elif kind == "reasoning":
@@ -500,12 +498,11 @@ def on_event(kind: str, piece: str = "", final: bool = False) -> None:
         reasoning = True
         wrote = True
     elif kind == "reasoning_end":
-        reasoning = False
+        if reasoning:
+            print("\n---", flush=True)
+            reasoning = False
     elif kind == "text":
-        if final:
-            print(f"\nminicode >> {piece}", flush=True)
-        else:
-            print(f"\n{piece}", flush=True)
+        print(piece, end="", flush=True)
         wrote = True
 
 answer = agent(messages, on_event)
@@ -529,22 +526,19 @@ From the launch dir, with the dev fence:
 uv run python -m minicode --sandbox sandbox
 ```
 
-- A no-reasoning text reply shows no `Thinking:`. The final answer prints
-  once after `minicode >>` when the step ends, then the status block. The
-  answer is not printed twice.
-- A reasoning reply shows `Thinking:` on the first reasoning delta, streams
-  the reasoning, then prints the final answer after `minicode >>`. No
-  `Thought:` closer. The answer itself is buffered, not streamed.
+- A no-reasoning text reply shows no thinking block. The answer streams,
+  then the status block. The answer is not printed twice.
+- A reasoning reply opens `---`, prints `Thinking:`, streams the reasoning,
+  closes with `---`, then streams the answer. No `Thought:` line. No
+  `minicode >>` prefix.
 - A reasoning reply with a tool call closes the block before the tool
   preamble or `|Tools Used|`; the next model step starts a new block.
-- A reasoning-only reply with null content prints the reasoning, then
-  `minicode >> [empty response]`, and keeps reasoning out of history.
-- A tool turn prints its preamble without a prefix, then the tool line after
-  the result is in history; the later final answer gets the prefix. Plan
-  still denies `write` / `edit` with the existing sentence and no
-  `|Tools Used|` line.
-- A multi-step turn prints each tool preamble without a prefix and gives
-  `minicode >>` only to the final no-tool answer. The final answer is not
+- A reasoning-only reply with null content prints the reasoning block, then
+  `[empty response]`, and keeps reasoning out of history.
+- A tool turn streams its preamble, then the tool line after the result is
+  in history. Plan still denies `write` / `edit` with the existing sentence
+  and no `|Tools Used|` line.
+- A multi-step turn streams each step's text. Already streamed text is not
   reprinted.
 - A Gemini tool turn, then a second turn, does not 400 on
   `thought_signature`. If it does, the merge dropped `extra_content`. Do
@@ -563,9 +557,9 @@ uv run python -m minicode --sandbox sandbox
 - Ctrl+C at `user >>` exits.
 - `/plan` still proposes and says `/build`. `/build` still writes. A
   denied plan-mode shell ask still returns the short `/build` sentence.
-- An empty completion prints `minicode >> [empty response]` once, then the
+- An empty completion prints `[empty response]` once, then the
   status block.
-- A `Model Error:` or max-limit notice prints without `minicode >>`.
+- A `Model Error:` or max-limit notice prints as a plain notice.
 - `python calculator.py` may open a window and block. Ctrl+C returns to
   `user >>`. Do not add a background shell to make the window survive.
 
@@ -582,14 +576,12 @@ for it.
 - No atomic write. A `write` that is interrupted inside the tool is the
   tool's problem. This layer only keeps the history coherent.
 - No retry. A model error is a notice and a marker, not another create.
-- Content is buffered per model step so the REPL can reserve `minicode >>`
-  for the final answer. The final answer is not token-streamed; only
-  reasoning is. A tool preamble is also printed at step end.
-- A provider that sends no reasoning shows no `Thinking:` and no
-  wait line. The first visible output is the buffered final answer at step
-  end.
-- Gemini asks for summaries with `include_thoughts` only. No
-  `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
+- Answer tokens stream as they arrive. There is no `minicode >>` prefix.
+  A tool preamble streams the same way, then the tool line.
+- A provider that sends no reasoning shows no thinking block and no wait
+  line. The first visible output is the answer as it streams.
+- Gemini asks for a low summary (`include_thoughts`, `thinking_level: low`).
+  No `reasoning_effort`. Ollama does not get that body.
 - No tests.
 
 ## Don't add yet
@@ -618,7 +610,6 @@ step is final.
    and what fills the gap?
 6. Why does `[empty response]` exist, and why is a reasoning field never
    copied into `content` or history even when it is displayed?
-7. Why is content buffered per step, and why does only `text(final=True)`
-   get `minicode >>`?
-8. Why does a `Model Error:` notice not get the prefix?
+7. Why do answer tokens stream, and why is there no `minicode >>` prefix?
+8. Why does a `Model Error:` notice stay a plain notice?
 9. Why does a Tk window still block, and what is the escape?

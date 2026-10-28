@@ -316,12 +316,10 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
 ---
 ```
 
-Streaming, abort, conditional reasoning (`Thinking:` only when reasoning
-exists; no `Thought:` closer), and the final-answer-only `minicode >>` prefix
-with buffered content are implemented per `docs/09-streaming.md`. Reasoning
-streams live; content buffers per model step, so the final answer prints
-once with the prefix and tool preambles print without it. Gemini asks for
-thought summaries; `<thought>` / `<think>` stay display-only. An aborted
+Streaming, abort, and conditional reasoning are implemented per
+`docs/09-streaming.md`. A thinking block is `---` / `Thinking:` / `---`.
+Answer tokens stream. There is no `minicode >>` prefix. Gemini asks for a
+low thought summary; `<thought>` / `<think>` stay display-only. An aborted
 stream adds no usage. Do not put `prompt_tokens` into `Session`.
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
@@ -418,8 +416,8 @@ restrict them, not a stricter prompt.
 
 **Layer 8 — streaming and abort.** Code in the working tree;
 `docs/09-streaming.md` is the guide. Conditional reasoning labels
-(`Thinking:` only when reasoning exists; no `Thought:` closer) and the
-final-answer-only `minicode >>` prefix with buffered content are implemented.
+(`---` / `Thinking:` / `---` only when reasoning exists) and streamed answers
+with no `minicode >>` prefix are implemented.
 Gemini asks for thought summaries; the tags are stripped before history.
 One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
 and a Ctrl+C that returns to `user >>` with a coherent history. No background
@@ -437,7 +435,7 @@ shell. `Session` still excludes prompt tokens.
 | Layer 5 | Plan hides `write`/`edit` only; shell stays and asks | Tool-list restriction, not a shell deny |
 | Layer 7 | `always` approvals die with the process | Sessions/resume |
 | Layer 7 | No env scrubbing; shell inherits the process environment | Not planned |
-| Layer 8 | Content buffers per step; the final answer is not token-streamed | Sessions/resume next |
+| Layer 8 | Answer tokens stream; no `minicode >>` prefix | Sessions/resume next |
 | After Layer 8 | Sessions/resume, cache control, diff viewer, `AGENTS.md` injection | In that order |
 | — | Cost display | Deferred until more models are added |
 

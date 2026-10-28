@@ -243,15 +243,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   a delta carries `reasoning_content` or `reasoning`. No `Thought:` closer.
   After the step, one split pulls `<thought>` or `<think>` out of the
   buffered content and shows that the same way. No tag is kept in
-  history. The Gemini create passes `include_thoughts: true` only. No
-  `thinking_level`. No `reasoning_effort`. Ollama does not get that body.
-  With no summary, neither label appears and there is no wait line. Content
-  is buffered per model step: the no-tool final answer prints
-  once after `minicode >>`; a tool preamble and abort/error partial text print
-  without the prefix. Do not print `minicode >>` on reasoning, tool
-  preambles, `Model Error:`, max-limit notices, or `[interrupted by user]`.
-  The final answer is not token-streamed; that is the cost of reserving the
-  prefix for the final step. `docs/09-streaming.md` specifies the event
+  history. The Gemini create passes `include_thoughts: true` and
+  `thinking_level: low`. No `reasoning_effort`. Ollama does not get that body.
+  With no summary, no thinking block appears and there is no wait line.
+  A thinking block is `---` / `Thinking:` / the text / `---`. Answer tokens
+  stream as they arrive. There is no `minicode >>` prefix. Tool lines,
+  `Model Error:`, max-limit notices, and `[interrupted by user]` stay plain.
+  `docs/09-streaming.md` specifies the event
   contract. Reasoning is display-only: never
   append it to history, never use it as `content`. Strip `<thought>` and
   `<think>` before history. Do not read `extra_content` as reasoning; it
