@@ -34,7 +34,7 @@ before anything else writes.
    routing rule must live in `SYSTEM`, not in per-tool docstrings.)
 5. A successful `edit` prints a stdlib `difflib.unified_diff` to stdout, then
    returns a short string to the model. The existing
-   `|Tools Used: `{name}`|` line still prints after the tool returns.
+   `|Tool Used: `{name}`|` line still prints after the tool returns.
 
 ## Segment 1 — `_resolve` error text
 
@@ -86,7 +86,7 @@ YOLO inside the sandbox (HARNESS §5). Missing `content` is a `ValidationError`
 string from `tool_from_fn`, not a crash. `write` is never used for partial
 changes: "add X to the file" means `read` then `edit`, not `write`.
 
-**Expected:** "write hello.txt with hello" → `|Tools Used: `write`|`,
+**Expected:** "write hello.txt with hello" → `|Tool Used: `write`|`,
 file on disk, status `Tools Loaded:` lists `read,write,edit` once the registry
 includes them. `../secret` or `.env` → tool-error string.
 
@@ -171,12 +171,12 @@ that stays deferred. `difflib` is
 stdlib; do not add a package.
 
 Print the diff **inside** `edit`, before the function returns. Then
-`agent` prints `|Tools Used: `edit`|` as it already does for any
+`agent` prints `|Tool Used: `edit`|` as it already does for any
 successful tool. Do not add a special case in the loop.
 
 **Expected:** unique `old_text` → file changes, a `---\nDiff: {path}` block
 with `a/{path} (before)` / `b/{path} (after)` headers on stdout,
-`|Tools Used: `edit`|`. Zero matches or two copies of `old_text` →
+`|Tool Used: `edit`|`. Zero matches or two copies of `old_text` →
 `Tool error: …` as `role: "tool"` content, file unchanged, model retries.
 Missing file → `Tool error:` from the exception.
 

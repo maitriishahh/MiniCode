@@ -33,7 +33,7 @@ gate, no lifecycle.
 **Keep the loop. Keep the registry. Swap the view.**
 
 1. Keep: tools, `SYSTEM`, message flow, `_resolve`, `.env` denial, escape
-   error, tool line `|Tools Used: \`name\` ({args})|`, status block
+   error, tool line `|Tool Used: \`name\` ({args})|`, status block
    `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `agent.py` keeps `mode = {"name": "plan"}` (same dict pattern as
    `active` and `last_usage` so `main()` reassigns without `global`),
@@ -143,7 +143,7 @@ def agent(messages: list) -> str:
                 if run:
                     args = call["function"]["arguments"]
                     content = run(args)
-                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+                    print(f"\n{_tool_line(name, args)}\n")
                 else:
                     content = f"Unknown tool: {name}"
             messages.append(
@@ -164,7 +164,7 @@ What this locks:
 - The `mode["name"] == "plan"` dispatch check is the backstop: a guessed
   name, a stale history replay, or a cached reply still returns a
   `role: "tool"` string, never a write. Tool code never raises out of the
-  loop. Unknown tools stay silent on stdout (no `|Tools Used:|` line).
+  loop. Unknown tools stay silent on stdout (no `|Tool Used:|` line).
 - `last_usage` still overwrites `prompt_tokens` (`In`) and sums
   `completion_tokens` (`Out`). Still one `chat.completions.create` site.
   Still no `max_tokens`, no `model_dump`, no thought-signature parser.
@@ -279,8 +279,8 @@ Mode: build | Tools Loaded: read, write, edit, glob, grep
 **Expected:** startup prints `Mode: plan` and
 `Tools Loaded: read, glob, grep`. Asking for an edit in plan proposes
 steps, prints
-`|Tools Used: \`read\||` / `|Tools Used: \`grep\||` on success, and never
-prints `|Tools Used: \`write\||` or `|Tools Used: \`edit\||`. A guessed
+`|Tool Used: \`read\||` / `|Tool Used: \`grep\||` on success, and never
+prints `|Tool Used: \`write\||` or `|Tool Used: \`edit\||`. A guessed
 `write`/`edit` call returns `Plan mode: … is disabled` as `role: "tool"`
 content. `user >> /build` restores full tools with no restart. `/models`
 still lists/switches ids. `exit` still leaves before any create.

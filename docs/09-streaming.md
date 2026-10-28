@@ -452,7 +452,7 @@ def agent(messages: list, on_event=None) -> str | None:
                 if note:
                     _tool_note(content)
                 elif ran:
-                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+                    print(f"\n{_tool_line(name, args)}\n")
         except KeyboardInterrupt:
             for call in msg["tool_calls"]:
                 if call["id"] not in done:
@@ -556,12 +556,12 @@ uv run python -m minicode --sandbox sandbox
   blank line in the middle of the summary is. `/thinking off` prints only
   `Thinking:`. No `Thought:` line. No `minicode >>` prefix.
 - A reasoning reply with a tool call closes the block before the tool
-  preamble or `|Tools Used|`; the next model step starts a new block.
+  preamble or `|Tool Used|`; the next model step starts a new block.
 - A reasoning-only reply with null content prints the reasoning block, then
   `[empty response]`, and keeps reasoning out of history.
 - A tool turn streams its preamble, then the tool line after the result is
   in history. Plan still denies `write` / `edit` with the existing sentence
-  and no `|Tools Used|` line.
+  and no `|Tool Used|` line.
 - A multi-step turn streams each step's text. Already streamed text is not
   reprinted.
 - A Gemini tool turn, then a second turn, does not 400 on

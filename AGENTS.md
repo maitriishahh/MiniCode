@@ -72,7 +72,8 @@ the registry, and the one `chat.completions.create` site live in `agent.py`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
-`user >>`, `|Tools Used: \`name\` ({args})|`, and
+`user >>`, `|Tool Used: \`name\` ({args})|` (a newline in an argument is a
+left `|` rail, not that one-liner), and
 `{In} | {Out} | {Session} | Elapsed: {_elapsed}`.
 No Tok/s. Future guides must not say `from litellm import completion`,
 `ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
@@ -181,11 +182,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   permissions file is deferred, not next. `agent.py` holds
   `ask = {"fn": None}`; `__main__.py` registers the prompt. A denial is
   `Permission denied: {key} {value}` as `role: "tool"`, with no
-  `|Tools Used|` line. A plan-mode shell ask that the user denies returns
+  `|Tool Used|` line. A plan-mode shell ask that the user denies returns
   `Plan mode: that command was denied. Do not try another shell command to create or change a file. Tell the user to run /build.`
   The prompt still shows the command. The tool string does not. A plan
   denial, a permission denial, and an unknown tool print that tool string.
-  Still no `|Tools Used|` line.
+  Still no `|Tool Used|` line.
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the
@@ -266,9 +267,13 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   append it to history, never use it as `content`. Strip `<thought>` and
   `<think>` before history. Do not read `extra_content` as reasoning; it
   still carries the thought signature. Do not parse the signature. After a
-  successful tool run, print `|Tools Used: `{name}` ({args})|`,
-  including in plan. A plan denial, a permission denial, and an unknown
-  tool print that tool string, not `|Tools Used|`. Status block
+  successful tool run, print `|Tool Used: `{name}` ({args})|`,
+  including in plan. A JSON object with a string value that contains a
+  newline instead prints `|Tool Used: `{name}`` and then one `|` line per
+  real line, with the key on the first line of that value. No trailing `|`
+  on those lines. A short call stays the one-liner. Do not re-serialize it.
+  A plan denial, a permission denial, and an unknown
+  tool print that tool string, not `|Tool Used|`. Status block
   after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}`, then
   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.

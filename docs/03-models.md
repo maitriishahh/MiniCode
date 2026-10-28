@@ -149,7 +149,7 @@ def agent(messages: list) -> str:
             run = TOOLS.get(name)
             if run:
                 content = run(call["function"]["arguments"])
-                print(f"|Tools Used: `{name}`|")
+                print(f"|Tool Used: `{name}`|")
             else:
                 content = f"Unknown tool: {name}"
             messages.append(

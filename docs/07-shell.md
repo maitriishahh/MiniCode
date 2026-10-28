@@ -62,7 +62,7 @@ root to "fix" that. The product soak launches in the repo, with no
 
 1. Keep: message flow, the raw assistant dict append, `MAX_STEPS = 16`,
    `PLAN_SYSTEM`, `__main__.py`, `SANDBOX`, `_resolve`, the tool line
-   `|Tools Used: \`name\` ({args})|`, status
+   `|Tool Used: \`name\` ({args})|`, status
    `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `src/minicode/tools/shell.py`. Stdlib only (`os`, `shutil`,
    `subprocess`, `sys`, `pathlib`). No new dep. No `shell=True`. No
@@ -332,9 +332,9 @@ else:
   Streaming is `docs/09-streaming.md` and is in the working tree. The
   separator matches `edit`: the closing `---` lands
   on its own line. Unlike the diff, this text is sent to the model. The
-  loop still prints `|Tools Used: \`bash\` ({args})|` or
-  `|Tools Used: \`powershell\` ({args})|` after `run()` returns. Do not
-  print a second copy there.
+  loop still prints `|Tool Used: \`bash\` ({args})|` or
+  `|Tool Used: \`powershell\` ({args})|` after `run()` returns. Do not
+  print a second copy there. A command value with a newline is a left `|` rail from `_tool_line`, not a second copy of this block.
 - An empty command, a `.env` command, or a missing shell raises before
   `_show`. No shell block. `tool_from_fn` turns that into `Tool error:`.
 - A binary that disappears after resolve is `FileNotFoundError` →
@@ -420,7 +420,7 @@ user >> run git status
 ```
 
 Build prints one `Shell (bash):` block, then
-`|Tools Used: \`bash\` ({args})|`, then the answer. The block starts with
+`|Tool Used: \`bash\` ({args})|`, then the answer. The block starts with
 `exit 0` or another code, not `Tool error:`, when the command actually ran.
 
 The fence is still for file tools:
@@ -465,7 +465,7 @@ process tree, `-ExecutionPolicy Bypass`, `shell=True`.
 2. Why is `System32\bash.exe` skipped?
 3. Where does the process start? What does `--sandbox sandbox` do to `git`?
 4. What comes back on exit code 1 — a tool error, or what?
-5. What does the human see before `|Tools Used|`? Does the model get that
+5. What does the human see before `|Tool Used|`? Does the model get that
    same text?
 6. What stops a guessed `powershell` in plan when the winner was `bash`?
 7. Why must `SYSTEM` not say `&&`?

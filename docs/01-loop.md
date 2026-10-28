@@ -33,7 +33,7 @@ once.
    `tool_calls`? return text → else run each tool (never raise out), append
    one `role: "tool"` per call with the same `tool_call_id` → repeat.
 3. `max_steps` reached → return a message the user can act on. Never raise.
-4. After a successful tool run, print `|Tools Used: `{name}`|`. Unknown
+4. After a successful tool run, print `|Tool Used: `{name}`|`. Unknown
    tools stay silent on stdout. REPL then prints `minicode >> {answer}` and
    a status block: model, mode, tools, sandbox, `{In} | {Out} | {elapsed}`.
    No Tok/s.
@@ -305,7 +305,7 @@ def agent(messages: list) -> str:
             run = TOOLS.get(name)
             if run:
                 content = run(call["function"]["arguments"])
-                print(f"|Tools Used: `{name}`|")
+                print(f"|Tool Used: `{name}`|")
             else:
                 content = f"Unknown tool: {name}"
             messages.append(
@@ -321,14 +321,14 @@ def agent(messages: list) -> str:
 Reset `last_usage` at the start of each turn. `prompt_tokens` is the last
 call only (`In`). `completion_tokens` sums across steps (`Out`). A read
 turn is two create calls — summing `prompt_tokens` would count the prompt
-twice. Print `|Tools Used: `{name}`|` **after** a successful run, not
+twice. Print `|Tool Used: `{name}`|` **after** a successful run, not
 before, and not for unknown tools. History stores the assistant message as
 the raw JSON object from the response body. Do not `model_dump` it. Do not
 rebuild `tool_calls`. A Gemini thought signature rides in that dict if the
 server sent one. Do not parse it.
 
 **Expected:** ask "read `pyproject.toml`" (or any sandbox file) and see
-`|Tools Used: `read`|`. Numbered contents go to the model as `role: "tool"`;
+`|Tool Used: `read`|`. Numbered contents go to the model as `role: "tool"`;
 Gemini may quote them or summarize — both are fine. Ask for a missing file
 or `../` escape → a tool-error string the model acknowledges, not a traceback.
 

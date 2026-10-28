@@ -105,7 +105,7 @@ Behavior the guide locks:
   append one line: `... and N more — refine pattern`. An empty result says
   `(no matches)`.
 
-**Expected:** "find test files" → `|Tools Used: `glob`|` and a short path
+**Expected:** "find test files" → `|Tool Used: `glob`|` and a short path
 list. `../secret` or `.env` → tool-error string the model acknowledges.
 
 ## Segment 2 — `grep` (content)
@@ -139,7 +139,7 @@ Behavior the guide locks:
 - Invalid regex is a tool error (`re.error` as a string) so the model can
   retry — same contract as `ValidationError` strings from `tool_from_fn`.
 
-**Expected:** "where is `_sandbox_root` defined" → `|Tools Used: `grep`|`
+**Expected:** "where is `_sandbox_root` defined" → `|Tool Used: `grep`|`
 plus `resolve_path.py:4: def _sandbox_root...`. A bad pattern → tool-error
 string, model retries.
 

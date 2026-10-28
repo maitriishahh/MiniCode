@@ -49,7 +49,7 @@ missing prompt denies.
   that prompt.
 
 A deny is `Permission denied: {key} {value}` with `role: "tool"`. No
-`|Tools Used|` line. `always` does not override a `deny`. If no rule
+`|Tool Used|` line. `always` does not override a `deny`. If no rule
 matches, the action is `deny`.
 
 ## Why this shape
@@ -76,7 +76,7 @@ them.
 `PLAN_DENIED` shrinks to `("write", "edit")`. Those stay out of the schema.
 The existing message stays:
 `Plan mode: \`write\` is disabled. Propose the change and ask to run /build.`
-Same sentence for `edit`. Do not prompt. Do not print `|Tools Used|`.
+Same sentence for `edit`. Do not prompt. Do not print `|Tool Used|`.
 
 `bash` and `powershell` stay in the schema in plan. Plan asks when a piece's
 first word is a content-read, create, or delete, or the text contains `>`.
@@ -111,7 +111,7 @@ This is a search-output fix, not a permission-model change. The approved
 
 1. Keep: message flow, the raw assistant dict append, `MAX_STEPS = 16`,
    `SYSTEM`, `PLAN_SYSTEM`, `TOOLS` full, tool line
-   `|Tools Used: \`name\` ({args})|` after a call that actually ran, status
+   `|Tool Used: \`name\` ({args})|` after a call that actually ran, status
    `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`. No Tok/s.
 2. Add: `src/minicode/permissions.py`. Stdlib only (`re`, `sys`). No new
    dep.
@@ -370,14 +370,14 @@ returns. `_resolve` has to see the path.
                             content = denied
                         else:
                             content = run(args)
-                            print(f"\n|Tools Used: `{name}` ({args})|\n")
+                            print(f"\n{_tool_line(name, args)}\n")
                     finally:
                         clear_approved()
                 else:
                     content = f"Unknown tool: {name}"
 ```
 
-`|Tools Used|` prints only when `run()` was called, including when `run()`
+`|Tool Used|` prints only when `run()` was called, including when `run()`
 returns `Tool error:`. A gate denial does not print it. An unknown name
 does not print it. A plan denial does not print it.
 
@@ -432,10 +432,10 @@ uv run python -m minicode
 This machine registers `bash`. The same checks apply if the winner is
 `powershell`. Do not soak with `&&`.
 
-1. In-sandbox `write` runs with no prompt, then prints `|Tools Used|`.
+1. In-sandbox `write` runs with no prompt, then prints `|Tool Used|`.
 2. `run git status` does not prompt. `touch notes.txt` in plan does.
    `deny` returns `Permission denied: shell …`, does not print a `Shell (`
-   block, and does not print `|Tools Used|`. `always` skips the prompt only
+   block, and does not print `|Tool Used|`. `always` skips the prompt only
    for that exact command.
 3. A path outside the sandbox, such as `C:/Windows/win.ini` on this
    machine, prints `Permission: external_directory` and the resolved

@@ -165,6 +165,26 @@ session_usage = {"completion_tokens": 0}
 def _tool_note(content: str) -> None:
     print(f"\n{content}\n")
 
+def _tool_line(name: str, args: str) -> str:
+    one = f"|Tool Used: `{name}` ({args})|"
+    try:
+        data = json.loads(args)
+    except json.JSONDecodeError:
+        return one
+    if not isinstance(data, dict):
+        return one
+    if not any(isinstance(v, str) and "\n" in v for v in data.values()):
+        return one
+    lines = [f"|Tool Used: `{name}`"]
+    for key, value in data.items():
+        text = value if isinstance(value, str) else json.dumps(value)
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        parts = text.split("\n")
+        lines.append(f"|{key}: {parts[0]}")
+        for part in parts[1:]:
+            lines.append(f"|{part}")
+    return "\n".join(lines)
+
 _OPEN_TAGS = (("<thought>", "</thought>"), ("<think>", "</think>"))
 
 def _gemini_extra(base: str) -> dict | None:
@@ -483,7 +503,7 @@ def agent(messages: list, on_event=None) -> str | None:
                 if note:
                     _tool_note(content)
                 elif ran:
-                    print(f"\n|Tools Used: `{name}` ({args})|\n")
+                    print(f"\n{_tool_line(name, args)}\n")
         except KeyboardInterrupt:
             for call in msg["tool_calls"]:
                 if call["id"] not in done:

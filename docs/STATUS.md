@@ -25,7 +25,7 @@ models are added.
 - [x] `docs/02-file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
   Registry in `agent.py`.
 - [x] History is the raw assistant message dict from the response JSON.
-  Not `model_dump`. Tool line is `|Tools Used: \`name\`|`. `SYSTEM`
+  Not `model_dump`. Tool line is `|Tool Used: \`name\`|`. `SYSTEM`
   routes whole-file `write` vs one-span `edit`.
 - [x] Observability: REPL prints `Sandbox: {SANDBOX}` at startup; status
   block carries a `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name}` line.
@@ -45,7 +45,7 @@ models are added.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
   Status is last prompt (`In`) + summed output tokens (`Out`) + `Session`
-  + `_elapsed`. No Tok/s. Tool line is `|Tools Used: \`name\`|`.
+  + `_elapsed`. No Tok/s. Tool line is `|Tool Used: \`name\`|`.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
 - [x] Layer 4 (`docs/05-search.md`): `glob` and `grep` in `tools/`. Capped
@@ -94,7 +94,7 @@ models are added.
   `/plan` and `/build` always assign `messages[0]`. `PLAN_SYSTEM` forbids
   pasting file contents and ends a create-or-change request with `/build`.
   A plan denial, a permission denial, and an unknown tool print that tool
-  string. Still no `|Tools Used|` line for those.
+  string. Still no `|Tool Used|` line for those.
 - [x] A denied plan-mode shell ask returns a short `/build` sentence. The
   command stays in the prompt and is not copied into the tool string.
   The ask remains. Shell is not force-denied.

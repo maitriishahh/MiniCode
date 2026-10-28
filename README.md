@@ -195,7 +195,7 @@ Mode: plan | Tools Loaded: read, glob, grep, bash
 
 user >> read pyproject.toml and summarize the dependencies
 
-|Tools Used: `read` ({"path": "pyproject.toml"})|
+|Tool Used: `read` ({"path": "pyproject.toml"})|
 
 The project depends on openai, pydantic, and python-dotenv.
 
@@ -236,7 +236,10 @@ fallback.
 
 `glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
 also skips `.env` contents. `glob` may list the name. Both tell the model
-to refine broad searches.
+to refine broad searches. A short tool call prints
+`|Tool Used: \`name\` ({args})|`. If an argument contains a newline, that
+call is a left `|` rail instead: `|Tool Used: \`name\`` and then one `|`
+line per real line. A denial does not print that line.
 
 ## Plan and build
 
