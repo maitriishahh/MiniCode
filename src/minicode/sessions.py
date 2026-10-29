@@ -88,7 +88,7 @@ def _check(data, path: Path) -> dict:
         turn = {}
     prompt = turn.get("prompt_tokens")
     completion = turn.get("completion_tokens")
-    elapsed = turn.get("Elapsed")
+    elapsed = turn.get("Elapsed") if turn.get("Elapsed") is not None else turn.get("elapsed")
     data["last_turn"] = {
         "prompt_tokens": max(0, int(prompt)) if isinstance(prompt, int) else 0,
         "completion_tokens": max(0, int(completion)) if isinstance(completion, int) else 0,
@@ -163,7 +163,7 @@ def _snapshot(
     session["last_turn"] = {
         "prompt_tokens": max(0, int(last_turn.get("prompt_tokens") or 0)),
         "completion_tokens": max(0, int(last_turn.get("completion_tokens") or 0)),
-        "Elapsed": last_turn.get("Elapsed"),
+        "Elapsed": last_turn.get("Elapsed") if last_turn.get("Elapsed") is not None else last_turn.get("elapsed"),
     }
     session["always"] = snapshot_always()
     session["messages"] = [

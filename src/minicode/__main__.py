@@ -4,7 +4,7 @@ from threading import Lock, Thread
 
 from minicode import sessions
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM, session_title, _tool_line
+from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM, session_title, _tool_line, default_id
 from minicode.permissions import ask as permission_ask, restore_always
 from minicode.tools.shell import output as shell_output
 
@@ -152,6 +152,18 @@ def _save() -> bool:
 def _reset_current() -> None:
     global _title_locked, _title_thread
     _STATE["session"] = None
+
+    # Reset all parameters back to default
+    if default_id in MODELS:
+        active["id"] = default_id
+    elif MODELS:
+        active["id"] = next(iter(MODELS))
+    mode["name"] = "plan"
+    thinking["name"] = "off"
+    effort["name"] = "low"
+    args_display["name"] = "off"
+    shell_output["name"] = "off"
+
     _STATE["messages"] = [_system()]
     session_usage["completion_tokens"] = 0
     last_usage["prompt_tokens"] = 0
@@ -188,7 +200,7 @@ def _start_title(target: dict, prompt: str, model_id: str) -> None:
 
 def _stamp(value: str) -> str:
     try:
-        return datetime.fromisoformat(value).astimezone().strftime("%Y-%m-%d %H:%M")
+        return datetime.fromisoformat(value).astimezone().strftime("%d-%m-%Y %H:%M")
     except (TypeError, ValueError):
         return str(value)[:16].replace("T", " ")
 
@@ -217,7 +229,9 @@ def _show_sessions(show: bool = True) -> list[dict]:
     print()
     for number, item in enumerate(items, 1):
         mark = " (active)" if current is not None and item.get("id") == current.get("id") else ""
-        print(f"{number} {item.get('title', 'Untitled')} - {_stamp(item.get('created', ''))}{mark}")
+        title = item.get("title", "New Session").split(" - 20")[0].strip()
+        stamp = _stamp(item.get("created", ""))
+        print(f"{number} {title} - {stamp}{mark}")
     print()
     return items
 
@@ -248,7 +262,11 @@ def _apply_session(data: dict) -> None:
     turn = data.get("last_turn") if isinstance(data.get("last_turn"), dict) else {}
     last_usage["prompt_tokens"] = max(0, int(turn.get("prompt_tokens") or 0))
     last_usage["completion_tokens"] = max(0, int(turn.get("completion_tokens") or 0))
-    seconds = turn.get("Elapsed")
+    seconds = turn.get("Elapsed") if turn.get("Elapsed") is not None else turn.get("elapsed")
+    # If resuming an existing session that had null Elapsed, default to 0.0 so the tokens line always prints
+    if seconds is None and (history or session_usage["completion_tokens"] or last_usage["prompt_tokens"]):
+        seconds = 0.0
+
     last_turn["Elapsed"] = float(seconds) if isinstance(seconds, (int, float)) else None
     restore_always(data.get("always", []))
     with _TITLE_LOCK:
@@ -292,6 +310,7 @@ def _resume(target: dict) -> None:
     _replay()
     _status()
 
+
 def _rename(target: dict, raw: str) -> None:
     global _title_locked
     name = sessions.clean_name(raw)
@@ -319,7 +338,7 @@ def _delete(target: dict) -> None:
     active = current is not None and target.get("id") == current.get("id")
     title = target.get("title", "Untitled")
     try:
-        answer = input(f'Delete session "{title}"? [y/N] ').strip().lower()
+        answer = input(f'Delete session "{title}"? [Y/N] ').strip().lower()
     except (EOFError, KeyboardInterrupt):
         print("\nCancelled\n")
         return

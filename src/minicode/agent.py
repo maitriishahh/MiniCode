@@ -78,9 +78,10 @@ PLAN_SYSTEM = (
 )
 
 TITLE_SYSTEM = (
-    "Write a 3-6 word title for this coding session. "
-    "Use the same language as the user's request. "
-    "Use at most 60 characters. Return only the title, no quotes or Markdown."
+    "Extract a concise 2 to 5 word title from the user prompt. "
+    "Capitalize major words and keep minor words like 'in', 'of', 'the', 'and' in lowercase "
+    "(example: 'The Evolution of Artificial Intelligence'). "
+    "Output only the title."
 )
 
 
@@ -247,21 +248,21 @@ def _client_for(record: dict, max_retries: int | None = None) -> OpenAI:
 
 
 def _clean_title(text: str) -> str | None:
-    text = " ".join(text.split()).strip("\"'`* ")
+    if not isinstance(text, str):
+        return None
+    for tag in ("<thought>", "</thought>", "<think>", "</think>"):
+        text = text.replace(tag, "")
+    text = text.strip("\"'`*#: \n")
     if text.lower().startswith("title:"):
         text = text[6:].strip()
-    text = text.strip("\"'`* ")
-    if not text:
-        return None
-    return text[:60].rstrip()
-
+    return text[:60].strip() or None
 
 def session_title(first_prompt: str, model_id: str) -> str | None:
     record = MODELS.get(model_id)
     if record is None:
         return None
     try:
-        client = _client_for(record, max_retries=0)
+        client = _client_for(record, max_retries=1)
         response = _create(
             client,
             model=record["id"],
@@ -269,16 +270,62 @@ def session_title(first_prompt: str, model_id: str) -> str | None:
                 {"role": "system", "content": TITLE_SYSTEM},
                 {"role": "user", "content": first_prompt[:2000]},
             ],
-            max_tokens=32,
+            max_tokens=64,
             stream=False,
-            timeout=10.0,
+            timeout=30.0,
         )
-        content = response.choices[0].message.content
+        return _clean_title(response.choices[0].message.content)
     except Exception:
         return None
-    if not isinstance(content, str):
-        return None
-    return _clean_title(content)
+
+    # record = MODELS.get(model_id)
+    # if record is None:
+    #     return None
+    # base = record["api_base"]
+    #
+    # # 45s timeout and 512 max_tokens so reasoning models have room to finish
+    # create_kwargs = {
+    #     "model": record["id"],
+    #     "messages": [
+    #         {"role": "system", "content": TITLE_SYSTEM},
+    #         {"role": "user", "content": first_prompt[:2000]},
+    #     ],
+    #     "max_tokens": 512,
+    #     "stream": False,
+    #     "timeout": 45.0,
+    # }
+    #
+    # # Use thinking_level: minimal (valid for Gemini 3.x) with double-nested extra_body
+    # if "generativelanguage.googleapis.com" in base:
+    #     create_kwargs["extra_body"] = {
+    #         "extra_body": {
+    #             "google": {
+    #                 "thinking_config": {
+    #                     "thinking_level": "minimal",
+    #                     "include_thoughts": False,
+    #                 }
+    #             }
+    #         }
+    #     }
+    # elif base.startswith(("http://127.0.0.1", "http://localhost")):
+    #     create_kwargs["reasoning_effort"] = "low"
+    #
+    # try:
+    #     client = _client_for(record, max_retries=2)
+    #     response = _create(client, **create_kwargs)
+    #     content = response.choices[0].message.content
+    #     title = _clean_title(content)
+    #     if title:
+    #         return title
+    # except Exception:
+    #     pass
+    #
+    # # Safe fallback: extract first 5-6 words from prompt if API call fails
+    # words = [w for w in first_prompt.strip().split() if w]
+    # if words:
+    #     clean_prompt = " ".join(words[:6]).strip("\"'`*# ")
+    #     return clean_prompt[:60]
+    # return None
 
 
 def _consume(stream, on_event, state: dict) -> None:
