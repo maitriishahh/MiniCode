@@ -3,9 +3,9 @@ from datetime import datetime
 from threading import Lock, Thread
 
 from minicode import sessions
-from minicode.resolve_path import SANDBOX
+from minicode.resolve_path import SANDBOX, classify
 from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM, session_title, _tool_line, default_id
-from minicode.permissions import ask as permission_ask, restore_always
+from minicode.permissions import ask as permission_ask, restore_always, decide
 from minicode.tools.shell import output as shell_output
 
 COMMANDS = (
@@ -14,6 +14,7 @@ COMMANDS = (
     ("/models", "List loaded models. A number or an id switches for this session.", "/models 2"),
     ("/new", "Start a new session. Current settings are kept.", ""),
     ("/sessions", "List saved sessions. A number resumes. delete and rename are actions.", "/sessions 2, /sessions 2 rename Fix login, /sessions 2 delete"),
+    ("/export", "Write this session's transcript to a .txt in the workspace.", "/export notes/session.txt"),
     ("/thinking", "Show or hide reasoning. 1 off, 2 on. Default off.", "/thinking 2"),
     ("/effort", "Set effort. 1 low, 2 medium, 3 high. Default low.", "/effort 2"),
     ("/args", "Show or hide tool arguments. 1 off, 2 on. Default off.", "/args on"),
@@ -275,7 +276,8 @@ def _apply_session(data: dict) -> None:
 
 _NOTE_PREFIXES = ("Plan mode:", "Permission denied:", "Unknown tool:", "Tool error:", "Model Error:")
 
-def _replay() -> None:
+
+def _transcript() -> list[str]:
     results: dict[str, str] = {}
     for message in _STATE["messages"][1:]:
         if message.get("role") == "tool" and isinstance(message.get("content"), str):
@@ -295,7 +297,12 @@ def _replay() -> None:
                 if results.get(call.get("id", ""), "").startswith(_NOTE_PREFIXES):
                     continue
                 function = call.get("function") or {}
-                blocks.append(_tool_line(function.get("name", "?"), function.get("arguments", "")))
+                line = _tool_line(function.get("name", "?"), function.get("arguments", ""))
+                blocks.append(line)
+    return blocks
+
+def _replay() -> None:
+    blocks = _transcript()
     if blocks:
         print("\n\n".join(blocks))
 
@@ -309,6 +316,59 @@ def _resume(target: dict) -> None:
     print(f"\nResumed: {data.get('title', 'Untitled')}\n")
     _replay()
     _status()
+
+def _export_name(session_id: str) -> str:
+    parts = session_id.split("-")
+    if(
+        len(parts) == 3
+        and len(parts[0]) == 8
+        and len(parts[1]) == 6
+        and len(parts[2]) == 4
+    ):
+        day, clock, tail = parts
+        stamp = f"{day[6:8]}-{day[4:6]}-{day[:4]}-{clock[:2]}-{clock[2:4]}-{clock[4:6]}"
+        return f"minicode-{stamp}-{tail}.txt"
+    return f"minicode-{session_id}.txt"
+
+def _export(raw: str) -> None:
+    session = _STATE["session"]
+    if session is None:
+        print("\nNothing to export yet\n")
+        return
+    blocks = _transcript()
+    text = (
+         f"{session.get('title', 'Untitled')} - {_stamp(session.get('created', ''))}\n"
+        f"Exported: {datetime.now():%Y-%m-%d %H:%M}\n"
+    )
+    if blocks:
+        text += "\n" + "\n\n".join(blocks) + "\n"
+    target = None
+    kind = "inside"
+    given = raw.strip()
+    if given:
+        kind, target = classify(given)
+        if kind == "dotenv":
+            print("\nExport Error: refusing to write .env files\n")
+            return
+        if kind == "external":
+            shown = target.as_posix()
+            if decide("external_directory", shown) == "deny":
+                print(f"\nPermission denied: external_directory {shown}\n")
+                return
+    if target is None:
+        target = SANDBOX / _export_name(session["id"])
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+    except OSError as exc:
+        print(f"\nExport Error: {exc}\n")
+        return
+    if kind == "inside":
+        shown = target.relative_to(SANDBOX).as_posix()
+    else:
+        shown = target.as_posix()
+    print(f"\nExported {len(text.encode('utf-8'))} bytes to {shown}\n")
 
 
 def _rename(target: dict, raw: str) -> None:
@@ -415,6 +475,9 @@ def main() -> None:
                 _rename(target, name)
                 continue
             print(f"\nUnknown Session action: {parts[2]}\n")
+            continue
+        if stripped == "/export" or stripped.startswith("/export "):
+            _export(stripped[len("/export"):])
             continue
         if stripped == "/plan" or stripped == "/build":
             want = stripped[1:]
