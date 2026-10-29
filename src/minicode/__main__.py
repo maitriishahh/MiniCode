@@ -9,17 +9,17 @@ from minicode.permissions import ask as permission_ask, restore_always
 from minicode.tools.shell import output as shell_output
 
 COMMANDS = (
-    ("/plan", "Switch to plan mode. write and edit are disabled.", "/plan"),
-    ("/build", "Switch to build mode. All tools are available.", "/build"),
-    ("/models", "List loaded models. A number or an id switches for this session.", "/models\n/models 2"),
-    ("/new", "Start a new session. Current settings are kept.", "/new"),
-    ("/sessions", "List saved sessions. A number resumes. delete and rename are actions.", "/sessions\n/sessions 2\n/sessions 2 rename Fix login\n/sessions 2 delete"),
+    ("/plan", "Switch to plan mode. write and edit are disabled.", ""),
+    ("/build", "Switch to build mode. All tools are available.", ""),
+    ("/models", "List loaded models. A number or an id switches for this session.", "/models 2"),
+    ("/new", "Start a new session. Current settings are kept.", ""),
+    ("/sessions", "List saved sessions. A number resumes. delete and rename are actions.", "/sessions 2, /sessions 2 rename Fix login, /sessions 2 delete"),
     ("/thinking", "Show or hide reasoning. 1 off, 2 on. Default off.", "/thinking 2"),
     ("/effort", "Set effort. 1 low, 2 medium, 3 high. Default low.", "/effort 2"),
     ("/args", "Show or hide tool arguments. 1 off, 2 on. Default off.", "/args on"),
     ("/output", "Show or hide the shell output block. 1 off, 2 on. Default off. The model still gets the output.", "/output on"),
-    ("/help", "List commands.", "/help"),
-    ("exit", "Leave. quit and bye do the same.", "exit"),
+    ("/help", "List commands.", ""),
+    ("exit", "Leave. exit, quit and bye do the same.", ""),
 )
 
 def _listed(label: str, choices: tuple[str, ...], current: dict, raw: str) -> None:
@@ -420,9 +420,9 @@ def main() -> None:
         if stripped == "/help":
             print()
             for name, summary, example in COMMANDS:
-                print(name)
-                print(summary)
-                print(example)
+                print(f"{name}: {summary}")
+                if example != "":
+                    print(f"example: {example}")
                 print()
             continue
         if stripped == "/model" or stripped.startswith("/model "):
