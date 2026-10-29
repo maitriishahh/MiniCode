@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime
 from threading import Lock, Thread
 
@@ -200,10 +201,12 @@ def _start_title(target: dict, prompt: str, model_id: str) -> None:
     thread.start()
 
 def _stamp(value: str) -> str:
+    if not value:
+        return ""
     try:
         return datetime.fromisoformat(value).astimezone().strftime("%d-%m-%Y %H:%M")
     except (TypeError, ValueError):
-        return str(value)[:16].replace("T", " ")
+        return str(value)
 
 def _target(items: list[dict], token: str) -> dict | None:
     if token.isdigit():
@@ -317,18 +320,15 @@ def _resume(target: dict) -> None:
     _replay()
     _status()
 
-def _export_name(session_id: str) -> str:
-    parts = session_id.split("-")
-    if(
-        len(parts) == 3
-        and len(parts[0]) == 8
-        and len(parts[1]) == 6
-        and len(parts[2]) == 4
-    ):
-        day, clock, tail = parts
-        stamp = f"{day[6:8]}-{day[4:6]}-{day[:4]}-{clock[:2]}-{clock[2:4]}-{clock[4:6]}"
-        return f"minicode-{stamp}-{tail}.txt"
-    return f"minicode-{session_id}.txt"
+_INVALID_CHARS = re.compile(r'[\\/*?:"<>|]')
+_TRAILING_STAMP_RE = re.compile(r"\s*-\s*\d{2,4}[-/]\d{2}[-/]\d{2,4}\s+\d{2}:\d{2}$")
+
+def _export_name(title: str) -> str:
+    # Remove any trailing date stamp like "- 2026-10-29 21:36"
+    clean = _TRAILING_STAMP_RE.sub("", title).strip()
+    # Remove characters not allowed in filenames
+    safe = _INVALID_CHARS.sub("", clean).strip()
+    return f"{safe or 'New Session'}.txt"
 
 def _export(raw: str) -> None:
     session = _STATE["session"]
@@ -336,9 +336,10 @@ def _export(raw: str) -> None:
         print("\nNothing to export yet\n")
         return
     blocks = _transcript()
+
     text = (
-         f"{session.get('title', 'Untitled')} - {_stamp(session.get('created', ''))}\n"
-        f"Exported: {datetime.now():%Y-%m-%d %H:%M}\n"
+        f"{session.get('title', 'Untitled')} - {_stamp(session.get('created', ''))}\n"
+        f"Exported: {datetime.now():%d-%m-%Y %H:%M}\n"
     )
     if blocks:
         text += "\n" + "\n\n".join(blocks) + "\n"
@@ -355,8 +356,11 @@ def _export(raw: str) -> None:
             if decide("external_directory", shown) == "deny":
                 print(f"\nPermission denied: external_directory {shown}\n")
                 return
+
+    # Use the session title for the filename
     if target is None:
-        target = SANDBOX / _export_name(session["id"])
+        target = SANDBOX / _export_name(session.get("title", "New Session"))
+
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("w", encoding="utf-8", newline="\n") as handle:
@@ -364,12 +368,13 @@ def _export(raw: str) -> None:
     except OSError as exc:
         print(f"\nExport Error: {exc}\n")
         return
+
     if kind == "inside":
         shown = target.relative_to(SANDBOX).as_posix()
     else:
         shown = target.as_posix()
-    print(f"\nExported {len(text.encode('utf-8'))} bytes to {shown}\n")
 
+    print(f"\nExported as {shown}\n")
 
 def _rename(target: dict, raw: str) -> None:
     global _title_locked

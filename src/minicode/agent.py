@@ -59,6 +59,7 @@ SYSTEM = (
     "A path the user already named is read with `read`, not `glob` and not the shell. "
     "Locate an unknown file with `glob`, then `grep`, then `read`. "
     f"Run tests and git with `{shell.__name__}`. Do not use it to read or search files."
+    "You can find all the sessions created in minicode at 'C:/Users/hp/.local/share/minicode/sessions' "
 )
 
 

@@ -64,6 +64,8 @@ def fallback_title(when: str | None = None) -> str:
         moment = moment.replace(tzinfo=timezone.utc)
     return f"New session - {moment.astimezone():%Y-%m-%d %H:%M}"
 
+def _now() -> str:
+    return datetime.now().astimezone().strftime("%d-%m-%Y %H:%M")
 
 def _check(data, path: Path) -> dict:
     if not isinstance(data, dict):
@@ -77,10 +79,27 @@ def _check(data, path: Path) -> dict:
         raise SessionError(f"{path.name}: invalid messages")
     if not isinstance(data.get("title"), str) or not data["title"].strip():
         data["title"] = fallback_title(data.get("created"))
-    if not isinstance(data.get("created"), str):
+
+    created_val = data.get("created")
+    if not isinstance(created_val, str):
         data["created"] = _now()
-    if not isinstance(data.get("updated"), str):
+    elif "T" in created_val or "+" in created_val or "Z" in created_val:
+        try:
+            dt = datetime.fromisoformat(created_val)
+            data["created"] = dt.astimezone().strftime("%d-%m-%Y %H:%M")
+        except (ValueError, TypeError):
+            pass
+
+    updated_val = data.get("updated")
+    if not isinstance(updated_val, str):
         data["updated"] = data["created"]
+    elif "T" in updated_val or "+" in updated_val or "Z" in updated_val:
+        try:
+            dt = datetime.fromisoformat(updated_val)
+            data["updated"] = dt.astimezone().strftime("%d-%m-%Y %H:%M")
+        except (ValueError, TypeError):
+            pass
+
     if not isinstance(data.get("usage"), dict):
         data["usage"] = {"completion_tokens": 0}
     turn = data.get("last_turn")
@@ -231,7 +250,7 @@ def list_sessions() -> tuple[list[dict], list[str]]:
         except SessionError as exc:
             errors.append(str(exc))
     found.sort(
-        key=lambda item: (item.get("created", ""), item.get("id", "")),
-        reverse=True,
+        key=lambda item: item.get("id",""),
+        reverse=True
     )
     return found, errors
