@@ -299,22 +299,25 @@ anything to restrict is theater.
 
 ## 7. Observability — early, in the REPL
 
-No TUI yet. After a successful tool run, one line:
+No TUI yet. After a successful tool run, one line. `/args` defaults to `off`:
 
 ```
-|Tool Used: `read`|
+|Tool Used: `read`
 ```
 
-Print **after** the tool returns, not before. Unknown tools stay silent on
-stdout. After the model's reply, a status block:
+`/args on` makes it `|Tool Used: `read` ({args})|`, or a left `|` rail when
+an argument contains a newline. Print **after** the tool returns, not before.
+Unknown tools stay silent on stdout. After the model's reply, a status block:
 
 ```
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read
-Sandbox: D:\Pycharm_Projects\MiniCode\sandbox
+Sandbox: D:\Pycharm_Projects\MiniCode\sandbox | Thinking: off | Effort: low | Args: off | Output: off
 398 In | 12 Out | 12 Session | Elapsed: 1.7s
 ---
 ```
+
+Startup prints the same block with no usage line. `/new` does too.
 
 Streaming, abort, and conditional reasoning are implemented per
 `docs/09-streaming.md`. A thinking block is `Thinking:` / `---` / text / `---`
@@ -325,10 +328,11 @@ stream adds no usage. Do not put `prompt_tokens` into `Session`.
 
 `In` is the last call's `prompt_tokens` (overwrite). `Out` is summed
 `completion_tokens` for the turn. `Session` is summed `completion_tokens`
-for the process. It is not cleared on `/plan` or `/models`. Do not add
-`prompt_tokens` into it. Elapsed is `_elapsed` in `__main__.py`: under 60s
-one decimal, then the two largest of `s m h d w y`. A week is 7 days. A year
-is 365 days. No months. No Tok/s — a wall-clock rate is
+for the conversation. It is restored on resume and reset by `/new` or
+deleting the active session. It is not cleared on `/plan` or `/models`. Do
+not add `prompt_tokens` into it. Elapsed is `_elapsed` in `__main__.py`:
+under 60s one decimal, then the two largest of `s m h d w y`. A week is 7
+days. A year is 365 days. No months. No Tok/s — a wall-clock rate is
 network wait, and summed `total_tokens` counts the prompt once per step.
 `AGENTS.md` wins if this section and the REPL ever disagree.
 
@@ -422,7 +426,7 @@ Conditional reasoning labels
 with no `minicode >>` prefix are implemented.
 Gemini asks for thought summaries; the tags are stripped before history.
 One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
-and a Ctrl+C that returns to `user >>` with a coherent history. No background
+and a Ctrl+C that returns to `>>> ` with a coherent history. No background
 shell. `Session` still excludes prompt tokens.
 
 **Layer 9 — sessions.** Done. `docs/10-sessions.md` is the guide.
@@ -430,9 +434,14 @@ shell. `Session` still excludes prompt tokens.
 directory, keyed by workspace. `/sessions` lists newest first, resumes by
 number or full id, renames, and deletes. `/new` starts a clean conversation
 with inherited settings. Resume restores messages, settings, usage, and exact
-session-scoped `always` grants. A daemon title worker uses the active model
+session-scoped `always` grants, replays the transcript, and restores
+`last_turn` so the status line matches the one from before the session was
+left. `/new` prints the status block with no usage line. Any unmatched
+`/...` input prints `Unknown command: ... Use /help.` and is never sent.
+A daemon title worker uses the active model
 after the first save; the fallback is local. Session files exclude the system
-prompt and reasoning. No export, reasoning capture, compaction, or database.
+prompt and reasoning. No export yet (Layer 10), no reasoning capture, no
+compaction, and no database.
 
 **Known gaps by phase.** These are open, not new layers.
 

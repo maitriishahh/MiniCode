@@ -25,7 +25,7 @@ waits until more models are added.
 - [x] `docs/02-file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
   Registry in `agent.py`.
 - [x] History is the raw assistant message dict from the response JSON.
-  Not `model_dump`. Tool line is `|Tool Used: \`name\`|`. `SYSTEM`
+  Not `model_dump`. Tool line is `|Tool Used: \`name\``. `SYSTEM`
   routes whole-file `write` vs one-span `edit`.
 - [x] Observability: startup prints the status block with no usage line.
   The flag line is `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name} | Args: {name} | Output: {name}`.
@@ -45,7 +45,7 @@ waits until more models are added.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
   `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
   Status is last prompt (`In`) + summed output tokens (`Out`) + `Session`
-  + `_elapsed`. No Tok/s. Tool line is `|Tool Used: \`name\`|`.
+  + `_elapsed`. No Tok/s. Tool line is `|Tool Used: \`name\``.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
 - [x] Layer 4 (`docs/05-search.md`): `glob` and `grep` in `tools/`. Capped
@@ -121,6 +121,11 @@ waits until more models are added.
   prints the same last line as before, rebuilt from `last_turn`
   (`prompt_tokens`, `completion_tokens`, `Elapsed`). Any unmatched `/...`
   prints `Unknown command: ... Use /help.` and is not sent to the model.
+- [x] `docs/11-export.md` written. `/export` is not implemented yet. The
+  guide specifies the id-derived default
+  `minicode-YYYY-MM-DD-HH-MM-SS-<4hex>.txt`, an explicit path, an
+  `external_directory` ask, a `.env` refusal, and a header plus the replay
+  blocks. No model call.
 
 ## Open gaps
 
@@ -148,7 +153,8 @@ Known and accepted. These are not the next layer.
 
 ## Next
 
-1. `docs/11-export.md`: transcript export only. No reasoning capture.
+1. Implement `docs/11-export.md`. No code from it has landed yet.
+2. `docs/12-cache.md`.
 
 ## Deferred (do not start)
 
