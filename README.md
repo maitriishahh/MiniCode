@@ -16,7 +16,7 @@ One Python loop over an OpenAI-compatible chat API.
          ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/models`)
   [ __main__.py ] (REPL loop, sessions, title thread, usage tracking)
          │
-         ├─► Command handled locally? (/plan, /build, /models, /new, /sessions, exit)
+         ├─► Command handled locally? (any slash command, or exit/quit/bye)
          │
          ▼  (otherwise appends user message to history, calls agent)
   [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
@@ -159,8 +159,8 @@ uv run python -m minicode --sandbox C:\path\to\project
 `--sandbox` accepts a relative or absolute path and creates it if missing.
 Without it, the workspace is the directory you launch from.
 
-Startup prints the workspace, mode, and loaded tools. The default mode is
-`plan`.
+Startup prints `Type /help for available commands`, then the same status block
+you see after a turn, with no usage line. The default mode is `plan`.
 
 ## First session
 
@@ -205,8 +205,10 @@ Startup prints the workspace, mode, and loaded tools. The default mode is
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. `/new` resets the
-conversation but keeps the current settings. None of these commands is sent to
-the model.
+conversation but keeps the current settings, then prints the status block.
+None of these commands is sent to the model. Any input that starts with `/`
+and matches no command prints `Unknown command: ... Use /help.` and is not
+sent either.
 
 ## Sessions
 
@@ -235,9 +237,28 @@ the model as a file path.
 actions are case-insensitive.
 
 A resumed session restores its messages, model, mode, thinking, effort, args,
-output, `Session` count, and exact `always` grants. `/new` and deleting the
-active session clear `always` and reset `Session` to 0. Rename keeps the current
-ordering; newest sessions stay first. A rename is permanent.
+output, `Session` count, exact `always` grants, and the last turn's `In`,
+`Out`, and `Elapsed`. It replays the conversation, then prints the same status
+block the session showed before you left it:
+
+```text
+>>> /sessions 2
+
+Resumed: The Evolution of Artificial Intelligence
+
+>>> write an essay on ai evolution
+
+The Evolution of Artificial Intelligence: ...
+
+|Tool Used: `bash`
+
+1,225 In | 315 Out | 315 Session | Elapsed: 7.3s
+```
+
+Replay prints your prompts, the answers, and one tool line per successful
+call. File contents and command output are not reprinted. `/new` and deleting
+the active session clear `always` and reset `Session` to 0. Rename keeps the
+current ordering; newest sessions stay first. A rename is permanent.
 
 The title starts as `New session - YYYY-MM-DD HH:MM`. After the first message,
 MiniCode asks the active model in a background thread for a 3-6 word title. A
@@ -250,12 +271,14 @@ output. They stay on your machine and are not part of the repository.
 ## Example session
 
 ```text
+Type /help for available commands
+
 ---
 Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
 Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
 ---
 
-user >> read pyproject.toml and summarize the dependencies
+>>> read pyproject.toml and summarize the dependencies
 
 |Tool Used: `read`
 
@@ -267,7 +290,7 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 1,204 In | 48 Out | 48 Session | Elapsed: 2.1s
 ---
 
-user >> /build
+>>> /build
 Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
 ```
 
@@ -384,7 +407,7 @@ Transcript export, cache control, cost display, compaction, a diff viewer,
 `AGENTS.md` injection, MCP, subagents, and a graphical interface. Session files
 do not store reasoning text. Context percentage stays off until a verified
 `context_window` is set. Cost display waits until more models are added. Ctrl+C during a model call or a tool call
-aborts that step and returns to `user >>` when Python is between chunks. On
+aborts that step and returns to `>>> ` when Python is between chunks. On
 Windows it does not abort a call blocked in a socket read; close the terminal
 tab. A click or middle-click paste can submit every line as a request. Both
 are deferred. A grandchild shell process can survive.

@@ -56,16 +56,19 @@ as they were written by `agent.py`.
   "args": "off",
   "output": "on",
   "usage": {"completion_tokens": 1234},
+  "last_turn": {"prompt_tokens": 512, "completion_tokens": 96, "Elapsed": 4.2},
   "always": [["external_directory", "d:/other/file.py"]],
   "messages": []
 }
 ```
 
 `usage.completion_tokens` is the `Session` value at the last save. Restore
-it; do not add prompt tokens. `/new` and deleting the active session reset
-it to zero. `always` is a sorted list of exact `[key, value]` pairs already
-normalized by `permissions.py`. Resume restores it. `/new` and deleting the
-active session clear it.
+it; do not add prompt tokens. `last_turn` holds the last finished turn's `In`,
+`Out`, and wall-clock `Elapsed` so a resume prints the same last status line.
+A file without `last_turn` loads with zeros and `Elapsed: null`. `/new` and
+deleting the active session reset both. `always` is a sorted list of exact
+`[key, value]` pairs already normalized by `permissions.py`. Resume restores
+it. `/new` and deleting the active session clear it.
 
 A corrupt, unreadable, unsupported, or mismatched file is skipped by the
 list and reported as `Session Error: ...`; a direct load raises. Writes are
@@ -246,6 +249,17 @@ def _check(data, path: Path) -> dict:
         data["updated"] = data["created"]
     if not isinstance(data.get("usage"), dict):
         data["usage"] = {"completion_tokens": 0}
+    turn = data.get("last_turn")
+    if not isinstance(turn, dict):
+        turn = {}
+    prompt = turn.get("prompt_tokens")
+    completion = turn.get("completion_tokens")
+    elapsed = turn.get("Elapsed")
+    data["last_turn"] = {
+        "prompt_tokens": max(0, int(prompt)) if isinstance(prompt, int) else 0,
+        "completion_tokens": max(0, int(completion)) if isinstance(completion, int) else 0,
+        "Elapsed": float(elapsed) if isinstance(elapsed, (int, float)) else None,
+    }
     if not isinstance(data.get("always"), list):
         data["always"] = []
     return data
@@ -297,14 +311,26 @@ def new_session(settings: dict) -> dict:
         "sandbox": str(SANDBOX),
         **settings,
         "usage": {"completion_tokens": 0},
+        "last_turn": {"prompt_tokens": 0, "completion_tokens": 0, "Elapsed": None},
         "always": [],
         "messages": [],
     }
 
 
-def _snapshot(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> dict:
+def _snapshot(
+    session: dict,
+    messages: list[dict],
+    settings: dict,
+    completion_tokens: int,
+    last_turn: dict,
+) -> dict:
     session.update(settings)
     session["usage"] = {"completion_tokens": max(0, int(completion_tokens))}
+    session["last_turn"] = {
+        "prompt_tokens": max(0, int(last_turn.get("prompt_tokens") or 0)),
+        "completion_tokens": max(0, int(last_turn.get("completion_tokens") or 0)),
+        "Elapsed": last_turn.get("Elapsed"),
+    }
     session["always"] = snapshot_always()
     session["messages"] = [
         message for message in messages
@@ -314,8 +340,14 @@ def _snapshot(session: dict, messages: list[dict], settings: dict, completion_to
     return session
 
 
-def save(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> None:
-    _write(_snapshot(session, messages, settings, completion_tokens))
+def save(
+    session: dict,
+    messages: list[dict],
+    settings: dict,
+    completion_tokens: int,
+    last_turn: dict,
+) -> None:
+    _write(_snapshot(session, messages, settings, completion_tokens, last_turn))
 
 
 def clean_name(raw: str) -> str:
@@ -509,6 +541,11 @@ def _save() -> bool:
             _STATE["messages"],
             _settings(),
             session_usage["completion_tokens"],
+            {
+                "prompt_tokens": last_usage["prompt_tokens"],
+                "completion_tokens": last_usage["completion_tokens"],
+                "Elapsed": last_turn["Elapsed"],
+            },
         )
     except sessions.SessionError as exc:
         print(f"\nSession Error: {exc}\n")
@@ -523,6 +560,7 @@ def _reset_current() -> None:
     session_usage["completion_tokens"] = 0
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
+    last_turn["Elapsed"] = None
     restore_always([])
     with _TITLE_LOCK:
         _title_locked = False
@@ -617,12 +655,43 @@ def _apply_session(data: dict) -> None:
     usage = data.get("usage")
     tokens = usage.get("completion_tokens") if isinstance(usage, dict) else 0
     session_usage["completion_tokens"] = max(0, int(tokens)) if isinstance(tokens, int) else 0
-    last_usage["prompt_tokens"] = 0
-    last_usage["completion_tokens"] = 0
+    turn = data.get("last_turn") if isinstance(data.get("last_turn"), dict) else {}
+    last_usage["prompt_tokens"] = max(0, int(turn.get("prompt_tokens") or 0))
+    last_usage["completion_tokens"] = max(0, int(turn.get("completion_tokens") or 0))
+    seconds = turn.get("Elapsed")
+    last_turn["Elapsed"] = float(seconds) if isinstance(seconds, (int, float)) else None
     restore_always(data.get("always", []))
     with _TITLE_LOCK:
         _title_locked = False
         _title_thread = None
+
+
+_NOTE_PREFIXES = ("Plan mode:", "Permission denied:", "Unknown tool:", "Tool error:", "Model Error:")
+
+
+def _replay() -> None:
+    results: dict[str, str] = {}
+    for message in _STATE["messages"][1:]:
+        if message.get("role") == "tool" and isinstance(message.get("content"), str):
+            results[message.get("tool_call_id", "")] = message["content"]
+    blocks: list[str] = []
+    for message in _STATE["messages"][1:]:
+        role = message.get("role")
+        if role == "user":
+            blocks.append(f">>> {message.get('content', '')}")
+        elif role == "assistant":
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                blocks.append(content)
+            for call in message.get("tool_calls") or []:
+                if not isinstance(call, dict):
+                    continue
+                if results.get(call.get("id", ""), "").startswith(_NOTE_PREFIXES):
+                    continue
+                function = call.get("function") or {}
+                blocks.append(_tool_line(function.get("name", "?"), function.get("arguments", "")))
+    if blocks:
+        print("\n\n".join(blocks))
 
 
 def _resume(target: dict) -> None:
@@ -633,6 +702,7 @@ def _resume(target: dict) -> None:
         return
     _apply_session(data)
     print(f"\nResumed: {data.get('title', 'Untitled')}\n")
+    _replay()
     _status()
 
 
@@ -685,7 +755,48 @@ def _new() -> None:
     if not _save():
         return
     _reset_current()
-    print("\nNew session\n")
+    print("\nNew session")
+    _status()
+```
+
+**Replace** the status fence with one helper that serves startup, `/new`, a
+turn, and a resume:
+
+```python
+def _usage() -> str | None:
+    if last_turn["Elapsed"] is None:
+        return None
+    window = MODELS.get(active["id"], {}).get("context_window")
+    ctx = f" | {last_usage['prompt_tokens'] / window:.1%} context" if window else ""
+    return (
+        f"{last_usage['prompt_tokens']:,} In | {last_usage['completion_tokens']:,} Out | "
+        f"{session_usage['completion_tokens']:,} Session | Elapsed: {_elapsed(last_turn['Elapsed'])}{ctx}"
+    )
+
+
+def _status() -> None:
+    body = (
+        f"\n---\n"
+        f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n"
+        f"Sandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']} "
+        f"| Args: {args_display['name']} | Output: {shell_output['name']}"
+    )
+    usage = _usage()
+    if usage is not None:
+        body += f"\n{usage}"
+    print(f"{body}\n---")
+```
+
+Declare `last_turn = {"Elapsed": None}` next to `_TITLE_LOCK`. No usage line
+at startup or after `/new`; a turn and a resume include it. Import
+`_tool_line` from `minicode.agent` for the replay.
+
+**Add** at the end of each turn, replacing the inline `ctx` and fence:
+
+```python
+        last_turn["Elapsed"] = elapsed
+        _status()
+        _save()
 ```
 
 Add imports:
@@ -756,6 +867,15 @@ from minicode.permissions import ask as permission_ask, restore_always
 
 **Add** `("/new", ...)` and `("/sessions", ...)` rows to `COMMANDS`.
 
+**Add** the unknown-command guard after the `/models` handler and before the
+user append:
+
+```python
+        if stripped.startswith("/"):
+            print(f"\nUnknown command: {stripped.split(maxsplit=1)[0]}. Use /help.\n")
+            continue
+```
+
 **Replace** the user append with:
 
 ```python
@@ -770,7 +890,8 @@ from minicode.permissions import ask as permission_ask, restore_always
 ```
 
 **Replace** the `agent(messages, on_event)` argument with
-`_STATE["messages"]`, and add `_save()` after `_status(...)`.
+`_STATE["messages"]`, set `last_turn["Elapsed"] = elapsed` before `_status()`,
+and keep `_save()` after it.
 
 **Add** after the REPL loop, before `main()` returns:
 
@@ -801,6 +922,21 @@ message has no session, so `_save()` is a no-op.
 - A corrupt session is not repaired in place by the list.
 - `exit`, `quit`, and `bye` join the title worker briefly, save, then leave.
 - No file at startup. No file after `/new` until the next message.
+- An older file without `last_turn` loads with zeros and `Elapsed: null`, so
+  its resume block has no last line until its next turn.
+- Replay skips every `role: "tool"` body, so file contents and command output
+  never reappear. A call whose result is a plan denial, a permission denial,
+  an unknown tool, a tool error, or a model error prints no tool line.
+- Replay uses the restored `/args` value: `off` prints the name only, `on`
+  prints the one-liner or the left rail.
+- A replay block ends before `_status()` so the fence adds the only blank
+  line before it.
+- An empty session prints the title and the block with nothing between.
+- A prompt that begins with `/` and matches no handler prints
+  `Unknown command: {first word}. Use /help.` and is not appended. `/plan`,
+  `/build`, `/new`, and `/help` with an argument land there too.
+- A lone POSIX path such as `/d/project` is rejected as a command. Wrap it in
+  a sentence or use the drive form.
 
 ## Verification
 
@@ -812,7 +948,11 @@ message has no session, so `_save()` is a no-op.
   the summary lands.
 - `/sessions` shows newest first and marks the active row.
 - `/sessions 1` restores messages, model, mode, thinking, effort, args,
-  output, `always`, and `Session`.
+  output, `always`, `Session`, and the last `In`, `Out`, and `Elapsed`, then
+  replays the transcript and prints the same last line as before.
+- `/new` prints the block with no last line and resets `Session` to 0.
+- `/export` prints `Unknown command: /export. Use /help.` and does not call
+  the model.
 - Rename with spaces, rename with no name, blank name, 201 chars, control
   characters, duplicate name, full-id target.
 - Delete active and non-active. Check cancel, `n`, EOF, and Ctrl+C.

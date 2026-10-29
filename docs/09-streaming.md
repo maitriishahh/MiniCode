@@ -23,7 +23,7 @@ model step, because the REPL cannot know whether a step will end with a tool
 call until the stream finishes. A no-tool step is the final answer and prints
 as the tokens arrive. A tool-call step streams its preamble the same way,
 then prints the tool line. Reasoning still streams live inside a `---` block. Ctrl+C during a model call or a tool
-call returns to `user >>` with a history the next request can send.
+call returns to `>>> ` with a history the next request can send.
 
 `agent(messages, on_event=None) -> str | None`.
 
@@ -42,7 +42,7 @@ fills `content`.
 
 | Event | History | Screen | Returns |
 |---|---|---|---|
-| Ctrl+C at `user >>` | none | exit | n/a |
+| Ctrl+C at `>>> ` | none | exit | n/a |
 | Ctrl+C at the permission prompt | denial tool result | no exit | continues |
 | Ctrl+C mid-stream | partial text plus `[interrupted by user]`; incomplete tool calls and reasoning dropped | partial text without prefix, then `[interrupted by user]` | `None` |
 | Ctrl+C during a tool | assistant calls kept; completed results kept; missing ids get `Interrupted by user.` | `[interrupted by user]` | `None` |
@@ -167,7 +167,7 @@ Cost display stays deferred until more models are added.
 6. Do not change `shell.py`. Timeout stays 120 seconds. No background
    process. No process tree. A GUI that does not exit still blocks until
    the timeout or until Ctrl+C. After this layer, that Ctrl+C aborts the
-   step and returns to `user >>`. It does not end the REPL.
+   step and returns to `>>> `. It does not end the REPL.
 
 ## Segment 1 — stream and usage
 
@@ -468,7 +468,7 @@ def agent(messages: list, on_event=None) -> str | None:
 ```
 
 `max_steps` still returns that notice. It does not raise. Ctrl+C at
-`user >>` still exits. Do not change that handler. Ctrl+C on the permission
+`>>> ` still exits. Do not change that handler. Ctrl+C on the permission
 prompt still denies that call. Do not change `_permission`. `shell.py`
 stays. `subprocess.run` kills the direct child on timeout. On Ctrl+C it
 raises `KeyboardInterrupt`, which `run()` does not catch. `agent` catches
@@ -476,7 +476,7 @@ that, fills missing ids, and returns `None`. Grandchildren can survive. Do
 not kill a process tree in this layer. A `python calculator.py` that opens
 a window still blocks until the window closes, the 120-second timeout, or
 Ctrl+C. Do not add a background flag. The escape is Ctrl+C, and it must
-return to `user >>`.
+return to `>>> `.
 
 ## Segment 4 — REPL
 
@@ -571,24 +571,24 @@ uv run python -m minicode --sandbox sandbox
   `thought_signature`. If it does, the merge dropped `extra_content`. Do
   not parse the signature and do not invent one.
 - Ctrl+C mid-stream prints any partial text without a prefix, then
-  `[interrupted by user]`, the status block, and returns to `user >>`. The
+  `[interrupted by user]`, the status block, and returns to `>>> `. The
   next message is accepted.
 - Ctrl+C during reasoning stops the block, prints
   `[interrupted by user]`, prints the status block, and returns to
-  `user >>`.
+  `>>> `.
 - Ctrl+C while a tool preamble prints still fills every tool id with
-  `Interrupted by user.` and returns to `user >>`.
+  `Interrupted by user.` and returns to `>>> `.
 - Ctrl+C during `python -c "import time; time.sleep(30)"` does the same.
   The sleep does not have to finish.
 - Ctrl+C on the permission prompt denies that call and does not exit.
-- Ctrl+C at `user >>` exits.
+- Ctrl+C at `>>> ` exits.
 - `/plan` still proposes and says `/build`. `/build` still writes. A
   denied plan-mode shell ask still returns the short `/build` sentence.
 - An empty completion prints `[empty response]` once, then the
   status block.
 - A `Model Error:` or max-limit notice prints as a plain notice.
 - `python calculator.py` may open a window and block. Ctrl+C returns to
-  `user >>`. Do not add a background shell to make the window survive.
+  `>>> `. Do not add a background shell to make the window survive.
 
 Ollama, if it is up, uses the same create site. Do not add a second client
 for it.
@@ -617,7 +617,7 @@ for it.
   needs `ENABLE_VIRTUAL_TERMINAL_INPUT`, and PyCharm classic and ConPTY
   often drop `ESC[200~`.
 - Ctrl+C during a stream that is back in Python between chunks returns to
-  `user >>`. Ctrl+C while httpx is blocked in Winsock `recv` does not.
+  `>>> `. Ctrl+C while httpx is blocked in Winsock `recv` does not.
   CPython does not raise `KeyboardInterrupt` until that read returns
   (cpython#85609). `time.sleep` and a console read do check. Ctrl+Break is
   the same once Python has a handler. The client uses the SDK default

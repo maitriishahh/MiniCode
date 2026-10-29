@@ -4,7 +4,7 @@ from threading import Lock, Thread
 
 from minicode import sessions
 from minicode.resolve_path import SANDBOX
-from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM, session_title
+from minicode.agent import agent, TOOLS, last_usage, session_usage, SYSTEM, active, MODELS, mode, effort, args_display, active_names, PLAN_SYSTEM, session_title, _tool_line
 from minicode.permissions import ask as permission_ask, restore_always
 from minicode.tools.shell import output as shell_output
 
@@ -86,17 +86,29 @@ def _elapsed(seconds: float) -> str:
             break
     return " ".join(parts)
 
-def _status(usage: str | None = None) -> None:
+def _usage() -> str | None:
+    if last_turn["Elapsed"] is None:
+        return None
+    window = MODELS.get(active["id"], {}).get("context_window")
+    ctx = f" | {last_usage['prompt_tokens'] / window:.1%} context" if window else ""
+    return (
+        f"{last_usage['prompt_tokens']:,} In | {last_usage['completion_tokens']:,} Out | "
+        f"{session_usage['completion_tokens']:,} Session | Elapsed: {_elapsed(last_turn['Elapsed'])}{ctx}"
+    )
+
+def _status() -> None:
     body = (
         f"\n---\n"
         f"Model: {active['id']} | Mode: {mode['name']} | Tools Loaded: {', '.join(active_names())}\n"
         f"Sandbox: {SANDBOX} | Thinking: {thinking['name']} | Effort: {effort['name']} "
         f"| Args: {args_display['name']} | Output: {shell_output['name']}"
     )
+    usage = _usage()
     if usage is not None:
         body += f"\n{usage}"
     print(f"{body}\n---")
 
+last_turn = {"Elapsed": None}
 _TITLE_LOCK = Lock()
 _title_thread: Thread | None = None
 _title_locked = False
@@ -126,6 +138,11 @@ def _save() -> bool:
             _STATE["messages"],
             _settings(),
             session_usage["completion_tokens"],
+            {
+                "prompt_tokens": last_usage["prompt_tokens"],
+                "completion_tokens": last_usage["completion_tokens"],
+                "Elapsed": last_turn["Elapsed"],
+            },
         )
     except sessions.SessionError as exc:
         print(f"\nSession Error: {exc}\n")
@@ -139,6 +156,7 @@ def _reset_current() -> None:
     session_usage["completion_tokens"] = 0
     last_usage["prompt_tokens"] = 0
     last_usage["completion_tokens"] = 0
+    last_turn["Elapsed"] = None
     restore_always([])
     with _TITLE_LOCK:
         _title_locked = False
@@ -227,12 +245,41 @@ def _apply_session(data: dict) -> None:
     usage = data.get("usage")
     tokens = usage.get("completion_tokens") if isinstance(usage, dict) else 0
     session_usage["completion_tokens"] = max(0, int(tokens)) if isinstance(tokens, int) else 0
-    last_usage["prompt_tokens"] = 0
-    last_usage["completion_tokens"] = 0
+    turn = data.get("last_turn") if isinstance(data.get("last_turn"), dict) else {}
+    last_usage["prompt_tokens"] = max(0, int(turn.get("prompt_tokens") or 0))
+    last_usage["completion_tokens"] = max(0, int(turn.get("completion_tokens") or 0))
+    seconds = turn.get("Elapsed")
+    last_turn["Elapsed"] = float(seconds) if isinstance(seconds, (int, float)) else None
     restore_always(data.get("always", []))
     with _TITLE_LOCK:
         _title_locked = False
         _title_thread = None
+
+_NOTE_PREFIXES = ("Plan mode:", "Permission denied:", "Unknown tool:", "Tool error:", "Model Error:")
+
+def _replay() -> None:
+    results: dict[str, str] = {}
+    for message in _STATE["messages"][1:]:
+        if message.get("role") == "tool" and isinstance(message.get("content"), str):
+            results[message.get("tool_call_id", "")] = message["content"]
+    blocks: list[str] = []
+    for message in _STATE["messages"][1:]:
+        role = message.get("role")
+        if role == "user":
+            blocks.append(f">>> {message.get('content', '')}")
+        elif role == "assistant":
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                blocks.append(content)
+            for call in message.get("tool_calls") or []:
+                if not isinstance(call, dict):
+                    continue
+                if results.get(call.get("id", ""), "").startswith(_NOTE_PREFIXES):
+                    continue
+                function = call.get("function") or {}
+                blocks.append(_tool_line(function.get("name", "?"), function.get("arguments", "")))
+    if blocks:
+        print("\n\n".join(blocks))
 
 def _resume(target: dict) -> None:
     try:
@@ -242,6 +289,7 @@ def _resume(target: dict) -> None:
         return
     _apply_session(data)
     print(f"\nResumed: {data.get('title', 'Untitled')}\n")
+    _replay()
     _status()
 
 def _rename(target: dict, raw: str) -> None:
@@ -291,7 +339,8 @@ def _new() -> None:
     if not _save():
         return
     _reset_current()
-    print("\nNew session\n")
+    print("\nNew session")
+    _status()
 
 def main() -> None:
     print(f"\nType /help for available commands")
@@ -454,6 +503,10 @@ def main() -> None:
             _save()
             continue
 
+        if stripped.startswith("/"):
+            print(f"\nUnknown command: {stripped.split(maxsplit=1)[0]}. Use /help.\n")
+            continue
+
         fresh = _STATE["session"] is None
         if fresh:
             _STATE["session"] = sessions.new_session(_settings())
@@ -505,10 +558,6 @@ def main() -> None:
 
         answer = agent(_STATE["messages"], on_event)
         elapsed = time.perf_counter() - start_time
-        prompt_tokens = last_usage["prompt_tokens"]
-        out_tokens = last_usage["completion_tokens"]
-        session_tokens = session_usage["completion_tokens"]
-        window = MODELS[active["id"]]["context_window"]
         if wrote:
             print()
         if answer is None:
@@ -516,10 +565,8 @@ def main() -> None:
         elif answer:
             print(f"\n{answer}\n")
 
-        ctx = f" | {prompt_tokens / window:.1%} context" if window else ""
-        _status(
-            f"{prompt_tokens:,} In | {out_tokens:,} Out | {session_tokens:,} Session | Elapsed: {_elapsed(elapsed)}{ctx}"
-        )
+        last_turn["Elapsed"] = elapsed
+        _status()
         _save()
 
     _join_title()

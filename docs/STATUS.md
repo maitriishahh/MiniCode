@@ -117,6 +117,10 @@ waits until more models are added.
   with resume, rename, and delete; LLM summary titles in a daemon thread;
   restored settings and `Session`; session-scoped `always`; atomic writes.
   No file at startup. No reasoning in the file.
+- [x] `/new` prints the status block. Resume replays the transcript and
+  prints the same last line as before, rebuilt from `last_turn`
+  (`prompt_tokens`, `completion_tokens`, `Elapsed`). Any unmatched `/...`
+  prints `Unknown command: ... Use /help.` and is not sent to the model.
 
 ## Open gaps
 

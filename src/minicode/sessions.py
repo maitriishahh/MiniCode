@@ -83,6 +83,17 @@ def _check(data, path: Path) -> dict:
         data["updated"] = data["created"]
     if not isinstance(data.get("usage"), dict):
         data["usage"] = {"completion_tokens": 0}
+    turn = data.get("last_turn")
+    if not isinstance(turn, dict):
+        turn = {}
+    prompt = turn.get("prompt_tokens")
+    completion = turn.get("completion_tokens")
+    elapsed = turn.get("Elapsed")
+    data["last_turn"] = {
+        "prompt_tokens": max(0, int(prompt)) if isinstance(prompt, int) else 0,
+        "completion_tokens": max(0, int(completion)) if isinstance(completion, int) else 0,
+        "Elapsed": float(elapsed) if isinstance(elapsed, (int, float)) else None,
+    }
     if not isinstance(data.get("always"), list):
         data["always"] = []
     return data
@@ -134,14 +145,26 @@ def new_session(settings: dict) -> dict:
         "sandbox": str(SANDBOX),
         **settings,
         "usage": {"completion_tokens": 0},
+        "last_turn": {"prompt_tokens": 0, "completion_tokens": 0, "Elapsed": None},
         "always": [],
         "messages": [],
     }
 
 
-def _snapshot(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> dict:
+def _snapshot(
+    session: dict,
+    messages: list[dict],
+    settings: dict,
+    completion_tokens: int,
+    last_turn: dict,
+) -> dict:
     session.update(settings)
     session["usage"] = {"completion_tokens": max(0, int(completion_tokens))}
+    session["last_turn"] = {
+        "prompt_tokens": max(0, int(last_turn.get("prompt_tokens") or 0)),
+        "completion_tokens": max(0, int(last_turn.get("completion_tokens") or 0)),
+        "Elapsed": last_turn.get("Elapsed"),
+    }
     session["always"] = snapshot_always()
     session["messages"] = [
         message for message in messages
@@ -151,8 +174,14 @@ def _snapshot(session: dict, messages: list[dict], settings: dict, completion_to
     return session
 
 
-def save(session: dict, messages: list[dict], settings: dict, completion_tokens: int) -> None:
-    _write(_snapshot(session, messages, settings, completion_tokens))
+def save(
+    session: dict,
+    messages: list[dict],
+    settings: dict,
+    completion_tokens: int,
+    last_turn: dict,
+) -> None:
+    _write(_snapshot(session, messages, settings, completion_tokens, last_turn))
 
 
 def clean_name(raw: str) -> str:

@@ -76,7 +76,7 @@ helper call it through `_create`.
 The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `schema_generator.py`. Sandbox stays in `resolve_path.py`. A new tool is
 `tools/<name>.py` plus one registry line in `agent.py`. Snippets use
-`user >>`, `|Tool Used: \`name\` ({args})|` (a newline in an argument is a
+`>>> `, `|Tool Used: \`name\` ({args})|` (a newline in an argument is a
 left `|` rail, not that one-liner), and
 `{In} | {Out} | {Session} | Elapsed: {_elapsed}`.
 No Tok/s. Future guides must not say `from litellm import completion`,
@@ -205,8 +205,16 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   after active rename, and on exit. Schema version `1`; `messages` excludes
   the system prompt; no reasoning field. Atomic writes; corrupt files are
   skipped in lists and reported on direct load. Resume rebuilds
-  `messages[0]` from the current mode and restores settings, `Session`, and
-  exact `always` pairs. `/new` inherits settings, clears `always`, resets
+  `messages[0]` from the current mode, restores settings, `Session`, exact
+  `always` pairs, and `last_turn`, prints the transcript, then prints the
+  status block. `last_turn` is `{prompt_tokens, completion_tokens, Elapsed}`
+  and rebuilds the same last status line the session showed before it was
+  left. A file without it loads with `Elapsed: null` and no last line.
+  Transcript replay prints `>>> {text}`, assistant text, and one
+  `|Tool Used: \`name\`` per successful call. It never prints `role: "tool"`
+  bodies and skips a call whose result starts with `Plan mode:`,
+  `Permission denied:`, `Unknown tool:`, `Tool error:`, or `Model Error:`.
+  `/new` inherits settings, clears `always`, resets
   `Session`, and creates no file until the next message. Deleting the active
   session does the same after unlinking. `/sessions` is sorted by `created`
   descending; resume and rename do not reorder. `/sessions N` or a full id
@@ -281,9 +289,11 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   secret into the record. Do not replace `os.getenv`. A key-only command is
   not its own phase. Do not add the tag in the permissions guide. Ollama local
   stays a base URL plus an empty key, not a login.
-- REPL prompt is `user >> `. `/thinking` lists `1 off` and `2 on` with a
-  blank line above and below. `/thinking N` or `/thinking on|off` changes it
-  for the session. Default is `off`. `/thinking off` prints only `Thinking:`.
+- REPL prompt is `>>> `. Startup prints `Type /help for available commands`,
+  then the status block with no usage line. `/thinking` lists `1 off` and
+  `2 on` with a blank line above and below. `/thinking N` or
+  `/thinking on|off` changes it for the session. Default is `off`.
+  `/thinking off` prints only `Thinking:`.
   `/thinking on` shows the body. `/effort` lists `1 low`, `2 medium`, and
   `3 high` the same way. `/effort N` or `/effort low|medium|high` changes it.
   Default is `low`. `/args` lists `1 off` and `2 on`. Default is `off`,
@@ -320,6 +330,10 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   after the answer, wrapped in `---`:
   Model / Mode / Tools Loaded, `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name} | Args: {name} | Output: {name}`, then
   `{prompt:,} In | {out:,} Out | {session:,} Session | Elapsed: {_elapsed(elapsed)}`.
+  One `_status()` prints that fence. Startup and `/new` call it with no usage
+  line; a turn and a resume include it. A resume rebuilds the same line from
+  `last_turn`, so the block matches the one the session showed before it was
+  left.
   `_elapsed` lives in `__main__.py`. Under 60s it keeps one decimal (`45.2s`,
   and `60.0` rolls to `1m`). After that it shows the two largest units from
   `s`, `m`, `h`, `d`, `w`, `y`, and drops a zero remainder. A week is 7 days.
@@ -341,7 +355,9 @@ No Tok/s. Future guides must not say `from litellm import completion`,
   one row in `COMMANDS`, and a README commands-table row. `/help` prints
   `COMMANDS` only. Do not write a second help string. Do not generate the
   handlers from the tuple. Add an `AGENTS.md` sentence when the command is
-  a new rule.
+  a new rule. Any input that starts with `/` and reaches the end of the
+  handler chain prints `Unknown command: {first word}. Use /help.` and is
+  not sent to the model. Slash input is never a prompt.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
   `uv.lock` is committed (pins exact versions).
 - Streaming, abort, the conditional reasoning labels, and the
