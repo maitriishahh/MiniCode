@@ -10,30 +10,18 @@ reached. Everything else in the package exists to serve that loop.
 
 ## Contract
 
-The turn, exactly:
-
-```text
-REPL        append {"role": "user"} once
-agent       for step in range(16):
-              stream one create
-              append the assistant message once
-              if no tool_calls: return
-              for each call:
-                check plan deny, then permission
-                run the tool            # never raises out of the loop
-                append one {"role": "tool"} per call, same tool_call_id
-            reach 16: return "Max limit reached: 16. Try smaller request."
-```
+The loop itself — the message flow, the 16-step ceiling, and what `agent`
+returns — is owned by `docs/loop.md`. This doc covers only where the code
+lives and what crosses between modules.
 
 | Rule | Where |
 |---|---|
 | One `chat.completions.create` site in the package | `agent._create` |
 | The agent and the title worker both call it | `agent.agent`, `agent.session_title` |
-| The REPL appends the user message, once | `__main__.main` |
-| The loop never appends the user message | `agent.agent` |
 | The history holds plain dicts, never SDK objects | `agent._assistant` |
 | Tool code never raises out of the loop | `schema_generator.tool_from_fn` → `run` |
-| `max_steps` returns a string | `agent.agent` |
+| No tool imports the model client | `tools/` |
+| No module imports the REPL | all |
 
 `MAX_STEPS` is 16.
 
@@ -94,22 +82,21 @@ disabled later.
 `shell.__name__` is already the loaded shell's name by then, so the registry
 key is `bash`, `sh`, or `powershell`, never `shell`.
 
-## A turn, in order
+## A turn across modules
 
-1. REPL reads a line. `exit`, `quit`, `bye` leave before any model call.
-2. A line starting with `/` is handled by a command branch and never sent.
-3. Otherwise the first message of a session creates the file and starts the
-   title worker; the user message is appended.
-4. `agent` resets `last_usage`, picks the active model record, and builds a
-   client for it.
-5. Each step streams one completion into `_consume`, which separates
-   reasoning, text, and tool-call deltas.
-6. The assistant message is appended once, as a plain dict.
-7. No tool calls means the turn is over. The REPL prints the status block and
-   saves.
-8. Tool calls are checked against the plan deny list, then permissions, then
-   run. Each result is appended as `role: "tool"` with the same id.
-9. The step counter increments. At 16 the loop returns the limit message.
+The ordering rules are in `docs/loop.md`. This is the same turn seen by module.
+
+1. `__main__.main` reads the line and handles any slash command. Nothing
+   starting with `/` reaches `agent`.
+2. `__main__` creates the session file on the first message and starts the
+   title worker.
+3. `agent.agent` resets usage, resolves the model record, and builds a client.
+4. `agent._create` streams one completion. `_consume` separates reasoning,
+   text, and tool-call deltas.
+5. `agent._permit` answers allow or deny for each call, then the wrapped tool
+   runs and returns a string.
+6. Back in `__main__`, the status block prints from `last_usage` and
+   `session_usage`, and `sessions.save` writes the file.
 
 ## Verification
 
