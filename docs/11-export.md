@@ -6,7 +6,7 @@ add a model call, a session schema change, reasoning capture, a diff viewer,
 or compaction.
 
 The command, the formatter, and the file write live in `__main__.py`.
-`sessions.py` is untouched. No new module, no new dependency.
+Export itself does not change `sessions.py`. No new module, no new dependency.
 
 ## What it is
 
@@ -25,27 +25,30 @@ message, never saves the session, and never changes `last_usage` or
 
 | Command | Effect |
 |---|---|
-| `/export` | Write `minicode-YYYY-MM-DD-HH-MM-SS-<4hex>.txt` in the workspace root. |
+| `/export` | Write `<title>.txt` in the workspace root. |
 | `/export <path>` | Write to that path, absolute or workspace-relative. Outside asks. |
 | `/export .env` | Refused. No write. |
 
-Default name, for the session id `20261029-145001-a1b2`:
+The default filename comes from the session title. A trailing date stamp such
+as ` - 2026-10-29 21:36` is removed, then characters that are invalid in a
+filename (`\ / * ? : " < > |`) are removed. An empty result becomes
+`New Session.txt`. For a title `The Evolution of Artificial Intelligence`:
 
 ```
-minicode-2026-10-29-14-50-01-a1b2.txt
+The Evolution of Artificial Intelligence.txt
 ```
 
-Readable date and time, and still unique and stable. The id does not change
-when the title lands, when the session is renamed, or when the same session
-is exported twice. A title-based name would move under all three.
+The fallback title `New session - YYYY-MM-DD HH:MM` loses its stamp and exports
+as `New session.txt`. A title change, including a rename or the background
+title landing, changes the default filename; the old file stays where it was.
 
 `~` is not expanded. Use an absolute path or a workspace-relative one.
 
 ## File shape
 
 ```text
-The Evolution of Artificial Intelligence - 2026-10-29 14:50
-Exported: 2026-10-29 15:02
+The Evolution of Artificial Intelligence - 29-10-2026 14:50
+Exported: 29-10-2026 15:02
 
 >>> write an essay on ai evolution
 
@@ -55,8 +58,7 @@ The Evolution of Artificial Intelligence: ...
 ```
 
 - Line one is the title and the local `created` stamp. Line two is the local
-  export time. Both use `_stamp` and the same `%Y-%m-%d %H:%M` shape as
-  `/sessions`.
+  export time. Both use the same `%d-%m-%Y %H:%M` shape as `/sessions`.
 - A blank line follows the header.
 - The body is `_transcript()` joined with one blank line between blocks, and
   one trailing newline.
@@ -121,22 +123,19 @@ def _replay() -> None:
 ## Add `_export_name`
 
 ```python
-def _export_name(session_id: str) -> str:
-    parts = session_id.split("-")
-    if (
-        len(parts) == 3
-        and len(parts[0]) == 8
-        and len(parts[1]) == 6
-        and len(parts[2]) == 4
-    ):
-        day, clock, tail = parts
-        stamp = f"{day[:4]}-{day[4:6]}-{day[6:8]}-{clock[:2]}-{clock[2:4]}-{clock[4:6]}"
-        return f"minicode-{stamp}-{tail}.txt"
-    return f"minicode-{session_id}.txt"
+_INVALID_CHARS = re.compile(r'[\\/*?:"<>|]')
+_TRAILING_STAMP_RE = re.compile(r"\s*-\s*\d{2,4}[-/]\d{2}[-/]\d{2,4}\s+\d{2}:\d{2}$")
+
+
+def _export_name(title: str) -> str:
+    clean = _TRAILING_STAMP_RE.sub("", title).strip()
+    safe = _INVALID_CHARS.sub("", clean).strip()
+    return f"{safe or 'New Session'}.txt"
 ```
 
-The id is `YYYYMMDD-HHMMSS-4hex`, so the slices are fixed. The `len` checks
-keep a hand-edited or future id from raising.
+The trailing-stamp pattern removes both the fallback's `YYYY-MM-DD HH:MM`
+suffix and a `DD-MM-YYYY HH:MM` suffix. The invalid-character pattern covers
+Windows' reserved filename characters.
 
 ## Add `_export`
 
@@ -149,7 +148,7 @@ def _export(raw: str) -> None:
     blocks = _transcript()
     text = (
         f"{session.get('title', 'Untitled')} - {_stamp(session.get('created', ''))}\n"
-        f"Exported: {datetime.now():%Y-%m-%d %H:%M}\n"
+        f"Exported: {datetime.now():%d-%m-%Y %H:%M}\n"
     )
     if blocks:
         text += "\n" + "\n\n".join(blocks) + "\n"
@@ -167,7 +166,7 @@ def _export(raw: str) -> None:
                 print(f"\nPermission denied: external_directory {shown}\n")
                 return
     if target is None:
-        target = SANDBOX / _export_name(session["id"])
+        target = SANDBOX / _export_name(session.get("title", "New Session"))
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("w", encoding="utf-8", newline="\n") as handle:
@@ -179,7 +178,7 @@ def _export(raw: str) -> None:
         shown = target.relative_to(SANDBOX).as_posix()
     else:
         shown = target.as_posix()
-    print(f"\nExported {len(text.encode('utf-8'))} bytes to {shown}\n")
+    print(f"\nExported as {shown}\n")
 ```
 
 Notes:
@@ -197,10 +196,14 @@ Notes:
   and no traceback.
 - `kind == "inside"` covers the default name too. `relative_to` is safe
   because `classify` proved the target is under `SANDBOX`.
+- The default target is `SANDBOX / _export_name(session["title"])`. It moves
+  when the title changes; it is not tied to the session id.
 
 ## Add imports
 
 ```python
+import re
+
 from minicode.permissions import ask as permission_ask, restore_always, decide
 from minicode.resolve_path import SANDBOX, classify
 ```
@@ -233,14 +236,14 @@ After the `/sessions` row:
 - `README.md` commands table, after the `/sessions` rows:
 
   ```
-  | `/export` | Write the current session transcript to `minicode-YYYY-MM-DD-HH-MM-SS-<4hex>.txt` in the workspace. |
+  | `/export` | Write the current session transcript to a `.txt` named from the session title in the workspace. |
   | `/export <path>` | Write it to that path. A path outside the workspace asks. `.env` is refused. |
   ```
 
 - `README.md` sessions section: one sentence. Export is the replay shape, no
   tool bodies, no reasoning, and an explicit path follows the permission rules.
 - `AGENTS.md`, sessions bullet: one sentence. `/export` writes `_transcript()`
-  with a title/created/exported header, defaults to the id-derived name, uses
+  with a title/created/exported header, defaults to the title-derived name, uses
   `external_directory` for an outside path, refuses `.env`, works in plan, and
   is not a tool call.
 - `docs/STATUS.md`: tick this layer, and name `docs/12-cache.md` next.
@@ -250,13 +253,15 @@ After the `/sessions` row:
 - No session: `Nothing to export yet`. No file. `/new` then `/export` does
   this too.
 - A session with no blocks: only the two header lines. Harmless.
-- Two sessions with the same title: different files, because the name is
-  id-based.
-- Export during the first seconds, before the title thread lands: the header
-  says `New session - ...`, the filename does not move. A later export
-  overwrites the same file with the new title.
-- Rename after export: the next `/export` overwrites the same file with the
-  new title. No second file.
+- Two sessions with the same title: the same default filename, so the second
+  export overwrites the first.
+- Export during the first seconds, before the title thread lands: the filename
+  is `New session.txt`. A later export after the title lands writes a new file
+  named from the title; the fallback file stays.
+- A fallback title's own ` - YYYY-MM-DD HH:MM` suffix stays in the header.
+  Only the filename strips it.
+- Rename after export: the next `/export` writes a new file named from the new
+  title. The old file stays.
 - `/export` with a trailing space: `raw.strip()` is empty, so it takes the
   default.
 - `/export my notes.txt`: the whole remainder is the path, spaces included.
@@ -283,7 +288,9 @@ After the `/sessions` row:
 - `/export .env` prints `Export Error:` and writes nothing.
 - `/export` before the first message prints `Nothing to export yet`.
 - Export twice. One file, second content wins.
-- Two sessions with the same prompt. Two files.
+- Two sessions with the same prompt. The same default filename; the later
+  export overwrites it.
+- Rename, then export. A second file appears; the old one stays.
 - `/help` lists `/export`.
 - `/build`, change a file, `/export`. The tool line appears; the diff and the
   shell block do not.

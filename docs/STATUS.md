@@ -1,12 +1,15 @@
 # STATUS.md — MiniCode
 
-Current code: layers 0–9 are committed. Layer 9 adds persistent sessions,
+Current code: layers 0-10 are committed, including `/export` and the session,
+title, and date refinements. Layer 9 adds persistent sessions,
 live resume, rename, delete, `/new`, background LLM titles, and session-scoped
-`always` grants. Startup default is `plan`; `/new` keeps the current settings.
-Plan drops `write` / `edit` only. `bash` / `powershell` stay in the list.
-Shell asks for `.env` text, and in plan for content-read, create, and delete
-verbs. Status line is `In | Out | Session | Elapsed: {_elapsed}`. Cost display
-waits until more models are added.
+`always` grants. Startup default is `plan`; `/new` and deleting the active
+session reset the model, mode, thinking, effort, args, and output to their
+startup defaults. Session stamps are local `DD-MM-YYYY HH:MM`; the list sorts
+by id descending. Plan drops `write` / `edit` only. `bash` / `powershell` stay
+in the list. Shell asks for `.env` text, and in plan for content-read, create,
+and delete verbs. Status line is `In | Out | Session | Elapsed: {_elapsed}`.
+Cost display waits until more models are added.
 
 ## Done
 
@@ -121,11 +124,18 @@ waits until more models are added.
   prints the same last line as before, rebuilt from `last_turn`
   (`prompt_tokens`, `completion_tokens`, `Elapsed`). Any unmatched `/...`
   prints `Unknown command: ... Use /help.` and is not sent to the model.
-- [x] `docs/11-export.md` written. `/export` is not implemented yet. The
-  guide specifies the id-derived default
-  `minicode-YYYY-MM-DD-HH-MM-SS-<4hex>.txt`, an explicit path, an
-  `external_directory` ask, a `.env` refusal, and a header plus the replay
-  blocks. No model call.
+- [x] Layer 10 (`docs/11-export.md`): `/export` writes `_transcript()` with a
+  title/created/exported header. The default name comes from the session
+  title, with a trailing date stamp and invalid filename characters removed
+  (fallback `New Session.txt`). An explicit path follows `classify`; an
+  outside path asks `external_directory`; `.env` is refused. Prints
+  `Exported as {path}`. Works in plan. No model call and no save.
+- [x] Session refinements: `created` / `updated` are local
+  `DD-MM-YYYY HH:MM` (legacy ISO strings are rewritten on load); `/sessions`
+  sorts by id descending; delete asks `[Y/N]`; `/new` and active delete reset
+  the model to `default_id`, mode to `plan`, thinking to `off`, effort to
+  `low`, and args/output to `off`. Titles are 2-5 capitalized words with
+  `max_tokens=64`, a 30s timeout, and one SDK retry.
 
 ## Open gaps
 
@@ -143,6 +153,9 @@ Known and accepted. These are not the next layer.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
+- `SYSTEM` hardcodes the sessions directory as
+  `C:/Users/hp/.local/share/minicode/sessions`, with no space before the
+  sentence. It is user-specific and Windows-only. The fix plan is below.
 - Answer tokens stream as they arrive. There is no `minicode >>` prefix.
   Gemini asks for a low thought summary. No `reasoning_effort`. A provider
   that sends no summary shows no thinking block.
@@ -151,9 +164,28 @@ Known and accepted. These are not the next layer.
   blocked in Winsock `recv`. Both are deferred. The shape is an amendment
   to `docs/09-streaming.md`. Not next.
 
+## Follow-up fix plan: SYSTEM sessions path
+
+Not implemented yet. One small fix, no new layer.
+
+1. In `sessions.py`, expose the data root as a public function (for example
+   `data_root()`) that returns `_data_root()`.
+2. In `agent.py`, import `minicode.sessions` and build the sentence from
+   `sessions.data_root().as_posix()` instead of the literal
+   `C:/Users/hp/...`. Keep a space after the previous sentence and after this
+   one.
+3. Do not add a config file, a shell scanner, or a second sessions path.
+   `SYSTEM` still names only the loaded shell and the workspace.
+4. Verify: print `SYSTEM` and confirm the path is derived from
+   `XDG_DATA_HOME` on Unix and `%USERPROFILE%` on Windows; run
+   `uv run python -m compileall src`; start the REPL and check the prompt still
+   lists the tools.
+5. Same pass: remove this gap from STATUS and update the `SYSTEM` sentence in
+   AGENTS.md.
+
 ## Next
 
-1. Implement `docs/11-export.md`. No code from it has landed yet.
+1. Apply the SYSTEM sessions-path fix above.
 2. `docs/12-cache.md`.
 
 ## Deferred (do not start)

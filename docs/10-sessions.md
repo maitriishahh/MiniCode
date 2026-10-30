@@ -14,8 +14,9 @@ stays in `tools/`. Do not split a new package.
 
 One JSON file per session. `/sessions` lists the saved files for the current
 workspace, newest first. `/sessions N` resumes one. `/new` starts a clean
-session but keeps the current model, mode, thinking, effort, args, and output.
-The `Session` counter is conversation lifetime, not process lifetime.
+session and resets the model to `default_id`, mode to `plan`, thinking to
+`off`, effort to `low`, and args/output to `off`. The `Session` counter is
+conversation lifetime, not process lifetime.
 
 Sessions are written only when there is something to save. Startup shows no
 session and creates no file. The first user message creates the id, fallback
@@ -35,18 +36,19 @@ database. Do not commit session files.
 
 ## File shape
 
-Version `1`. `created` and `updated` are UTC ISO 8601 strings. Display is
-local. `messages` excludes the system prompt; the current `SYSTEM` is
-rebuilt on resume. The raw assistant dicts, including `extra_content`, stay
-as they were written by `agent.py`.
+Version `1`. `created` and `updated` are local `DD-MM-YYYY HH:MM` strings.
+Legacy ISO strings are rewritten to that shape on load. `messages` excludes
+the system prompt; the current `SYSTEM` is rebuilt on resume. The raw
+assistant dicts, including `extra_content`, stay as they were written by
+`agent.py`.
 
 ```json
 {
   "version": 1,
   "id": "20261029-142501-a1b2",
   "title": "Fix login redirect",
-  "created": "2026-10-29T14:25:01+00:00",
-  "updated": "2026-10-29T14:27:10+00:00",
+  "created": "29-10-2026 14:25",
+  "updated": "29-10-2026 14:27",
   "cwd": "/home/me/project",
   "sandbox": "/home/me/project",
   "model": "gemini-3-flash",
@@ -65,7 +67,8 @@ as they were written by `agent.py`.
 `usage.completion_tokens` is the `Session` value at the last save. Restore
 it; do not add prompt tokens. `last_turn` holds the last finished turn's `In`,
 `Out`, and wall-clock `Elapsed` so a resume prints the same last status line.
-A file without `last_turn` loads with zeros and `Elapsed: null`. `/new` and
+A file without `last_turn` loads with zeros. A session with history or tokens
+and no `Elapsed` uses `0.0`, so the usage line still prints. `/new` and
 deleting the active session reset both. `always` is a sorted list of exact
 `[key, value]` pairs already normalized by `permissions.py`. Resume restores
 it. `/new` and deleting the active session clear it.
@@ -98,12 +101,15 @@ CLI resume flag.
 List rows:
 
 ```
-1 Fix login redirect - 2026-10-29 14:25 (active)
-2 New session - 2026-10-29 12:04
+1 Fix login redirect - 29-10-2026 14:25 (active)
+2 New session - 29-10-2026 12:04
 ```
 
-Newest `created` first. Resume and rename do not reorder. A delete shifts
-later numbers down. Empty list prints `(no saved sessions)`.
+Newest id first. The id embeds the local creation time, so id order is newest
+first. Resume and rename do not reorder. A delete shifts later numbers down.
+A fallback title's ` - YYYY-MM-DD HH:MM` suffix is hidden in the row; the row
+then shows `New session - DD-MM-YYYY HH:MM`. Empty list prints
+`(no saved sessions)`.
 
 Errors:
 
@@ -113,7 +119,7 @@ Unknown Session action: foo
 Session Error: <detail>
 ```
 
-Delete asks `Delete session "title"? [y/N]`. Only `y` or `yes` confirms.
+Delete asks `Delete session "title"? [Y/N]`. Only `y` or `yes` confirms.
 Rename without a name asks `New name: `. Blank, EOF, Ctrl+C, or a non-yes
 delete answer prints `Cancelled` and does nothing.
 
@@ -122,9 +128,10 @@ whitespace, strip, reject empty, cap at 200 characters. Duplicate names are
 allowed. A rename is permanent; an active rename sets `title_locked` so a
 pending title thread cannot overwrite it.
 
-Active delete: confirm, unlink, then `/new` semantics. Settings stay, mode
-stays, `always` clears, `Session` resets, history returns to the system
-message only, and no file exists until the next user message.
+Active delete: confirm, unlink, then `/new` semantics. Model, mode, thinking,
+effort, args, and output reset to startup defaults; `always` clears;
+`Session` resets; history returns to the system message only; and no file
+exists until the next user message.
 
 Non-active delete: current session is saved first, target file is removed,
 current session is unchanged.
@@ -139,11 +146,14 @@ The title is an LLM summary of the first user prompt, not its first line.
 Use the model active when the first message is sent. Launch one daemon
 thread after the first message is saved. It runs alongside the agent turn.
 
-- Prompt: 3-6 words, same language as the request, at most 60 characters,
-  title only, no Markdown or quotes.
+- Prompt: extract a concise 2-5 word title, capitalize major words, and keep
+  minor words such as `in`, `of`, `the`, and `and` lowercase. At most 60
+  characters. Output only the title.
 - Input cap: first 2000 characters.
-- `max_tokens`: 32. `stream`: false. `timeout`: 10 seconds.
-- No tools, no reasoning display, no retries, no second attempt.
+- `max_tokens`: 64. `stream`: false. `timeout`: 30 seconds.
+- One SDK retry (`max_retries=1`). No tools and no reasoning display.
+- Thought tags (`<thought>`, `</thought>`, `<think>`, `</think>`) are removed
+  before the title is used.
 - Fallback at creation: `New session - YYYY-MM-DD HH:MM` in local time.
 - The worker only calls the model, cleans the answer, and assigns
   `session["title"]` under `_TITLE_LOCK`.
@@ -186,7 +196,7 @@ class SessionError(Exception):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now().astimezone().strftime("%d-%m-%Y %H:%M")
 
 
 def _data_root() -> Path:
@@ -243,10 +253,24 @@ def _check(data, path: Path) -> dict:
         raise SessionError(f"{path.name}: invalid messages")
     if not isinstance(data.get("title"), str) or not data["title"].strip():
         data["title"] = fallback_title(data.get("created"))
-    if not isinstance(data.get("created"), str):
+    created_val = data.get("created")
+    if not isinstance(created_val, str):
         data["created"] = _now()
-    if not isinstance(data.get("updated"), str):
+    elif "T" in created_val or "+" in created_val or "Z" in created_val:
+        try:
+            dt = datetime.fromisoformat(created_val)
+            data["created"] = dt.astimezone().strftime("%d-%m-%Y %H:%M")
+        except (ValueError, TypeError):
+            pass
+    updated_val = data.get("updated")
+    if not isinstance(updated_val, str):
         data["updated"] = data["created"]
+    elif "T" in updated_val or "+" in updated_val or "Z" in updated_val:
+        try:
+            dt = datetime.fromisoformat(updated_val)
+            data["updated"] = dt.astimezone().strftime("%d-%m-%Y %H:%M")
+        except (ValueError, TypeError):
+            pass
     if not isinstance(data.get("usage"), dict):
         data["usage"] = {"completion_tokens": 0}
     turn = data.get("last_turn")
@@ -254,7 +278,7 @@ def _check(data, path: Path) -> dict:
         turn = {}
     prompt = turn.get("prompt_tokens")
     completion = turn.get("completion_tokens")
-    elapsed = turn.get("Elapsed")
+    elapsed = turn.get("Elapsed") if turn.get("Elapsed") is not None else turn.get("elapsed")
     data["last_turn"] = {
         "prompt_tokens": max(0, int(prompt)) if isinstance(prompt, int) else 0,
         "completion_tokens": max(0, int(completion)) if isinstance(completion, int) else 0,
@@ -329,7 +353,7 @@ def _snapshot(
     session["last_turn"] = {
         "prompt_tokens": max(0, int(last_turn.get("prompt_tokens") or 0)),
         "completion_tokens": max(0, int(last_turn.get("completion_tokens") or 0)),
-        "Elapsed": last_turn.get("Elapsed"),
+        "Elapsed": last_turn.get("Elapsed") if last_turn.get("Elapsed") is not None else last_turn.get("elapsed"),
     }
     session["always"] = snapshot_always()
     session["messages"] = [
@@ -397,7 +421,7 @@ def list_sessions() -> tuple[list[dict], list[str]]:
         except SessionError as exc:
             errors.append(str(exc))
     found.sort(
-        key=lambda item: (item.get("created", ""), item.get("id", "")),
+        key=lambda item: item.get("id", ""),
         reverse=True,
     )
     return found, errors
@@ -430,9 +454,10 @@ Update `always` docs: it lives for the session, not only the process.
 
 ```python
 TITLE_SYSTEM = (
-    "Write a 3-6 word title for this coding session. "
-    "Use the same language as the user's request. "
-    "Use at most 60 characters. Return only the title, no quotes or Markdown."
+    "Extract a concise 2 to 5 word title from the user prompt. "
+    "Capitalize major words and keep minor words like 'in', 'of', 'the', 'and' in lowercase "
+    "(example: 'The Evolution of Artificial Intelligence'). "
+    "Output only the title."
 )
 
 
@@ -452,13 +477,14 @@ def _client_for(record: dict, max_retries: int | None = None) -> OpenAI:
 
 
 def _clean_title(text: str) -> str | None:
-    text = " ".join(text.split()).strip("\"'`* ")
+    if not isinstance(text, str):
+        return None
+    for tag in ("<thought>", "</thought>", "<think>", "</think>"):
+        text = text.replace(tag, "")
+    text = text.strip("\"'`*#: \n")
     if text.lower().startswith("title:"):
         text = text[6:].strip()
-    text = text.strip("\"'`* ")
-    if not text:
-        return None
-    return text[:60].rstrip()
+    return text[:60].strip() or None
 
 
 def session_title(first_prompt: str, model_id: str) -> str | None:
@@ -466,7 +492,7 @@ def session_title(first_prompt: str, model_id: str) -> str | None:
     if record is None:
         return None
     try:
-        client = _client_for(record, max_retries=0)
+        client = _client_for(record, max_retries=1)
         response = _create(
             client,
             model=record["id"],
@@ -474,16 +500,13 @@ def session_title(first_prompt: str, model_id: str) -> str | None:
                 {"role": "system", "content": TITLE_SYSTEM},
                 {"role": "user", "content": first_prompt[:2000]},
             ],
-            max_tokens=32,
+            max_tokens=64,
             stream=False,
-            timeout=10.0,
+            timeout=30.0,
         )
-        content = response.choices[0].message.content
+        return _clean_title(response.choices[0].message.content)
     except Exception:
         return None
-    if not isinstance(content, str):
-        return None
-    return _clean_title(content)
 ```
 
 **Replace** the client setup in `agent()`:
@@ -556,6 +579,15 @@ def _save() -> bool:
 def _reset_current() -> None:
     global _title_locked, _title_thread
     _STATE["session"] = None
+    if default_id in MODELS:
+        active["id"] = default_id
+    elif MODELS:
+        active["id"] = next(iter(MODELS))
+    mode["name"] = "plan"
+    thinking["name"] = "off"
+    effort["name"] = "low"
+    args_display["name"] = "off"
+    shell_output["name"] = "off"
     _STATE["messages"] = [_system()]
     session_usage["completion_tokens"] = 0
     last_usage["prompt_tokens"] = 0
@@ -594,10 +626,12 @@ def _start_title(target: dict, prompt: str, model_id: str) -> None:
 
 
 def _stamp(value: str) -> str:
+    if not value:
+        return ""
     try:
-        return datetime.fromisoformat(value).astimezone().strftime("%Y-%m-%d %H:%M")
+        return datetime.fromisoformat(value).astimezone().strftime("%d-%m-%Y %H:%M")
     except (TypeError, ValueError):
-        return str(value)[:16].replace("T", " ")
+        return str(value)
 
 
 def _target(items: list[dict], token: str) -> dict | None:
@@ -626,7 +660,9 @@ def _show_sessions(show: bool = True) -> list[dict]:
     print()
     for number, item in enumerate(items, 1):
         mark = " (active)" if current is not None and item.get("id") == current.get("id") else ""
-        print(f"{number} {item.get('title', 'Untitled')} - {_stamp(item.get('created', ''))}{mark}")
+        title = item.get("title", "New Session").split(" - 20")[0].strip()
+        stamp = _stamp(item.get("created", ""))
+        print(f"{number} {title} - {stamp}{mark}")
     print()
     return items
 
@@ -658,7 +694,9 @@ def _apply_session(data: dict) -> None:
     turn = data.get("last_turn") if isinstance(data.get("last_turn"), dict) else {}
     last_usage["prompt_tokens"] = max(0, int(turn.get("prompt_tokens") or 0))
     last_usage["completion_tokens"] = max(0, int(turn.get("completion_tokens") or 0))
-    seconds = turn.get("Elapsed")
+    seconds = turn.get("Elapsed") if turn.get("Elapsed") is not None else turn.get("elapsed")
+    if seconds is None and (history or session_usage["completion_tokens"] or last_usage["prompt_tokens"]):
+        seconds = 0.0
     last_turn["Elapsed"] = float(seconds) if isinstance(seconds, (int, float)) else None
     restore_always(data.get("always", []))
     with _TITLE_LOCK:
@@ -692,8 +730,12 @@ def _replay() -> None:
                 blocks.append(_tool_line(function.get("name", "?"), function.get("arguments", "")))
     if blocks:
         print("\n\n".join(blocks))
+```
 
+`docs/11-export.md` splits this block builder into `_transcript()` so `/export`
+and replay share it. That split is the current code.
 
+```python
 def _resume(target: dict) -> None:
     try:
         data = sessions.load(target["id"])
@@ -734,7 +776,7 @@ def _delete(target: dict) -> None:
     active = current is not None and target.get("id") == current.get("id")
     title = target.get("title", "Untitled")
     try:
-        answer = input(f'Delete session "{title}"? [y/N] ').strip().lower()
+        answer = input(f'Delete session "{title}"? [Y/N] ').strip().lower()
     except (EOFError, KeyboardInterrupt):
         print("\nCancelled\n")
         return
@@ -808,6 +850,8 @@ from threading import Lock, Thread
 from minicode import sessions
 from minicode.permissions import ask as permission_ask, restore_always
 ```
+
+`default_id` is imported from `minicode.agent` alongside the existing names.
 
 **Replace** the startup message list:
 
@@ -917,13 +961,16 @@ message has no session, so `_save()` is a no-op.
 - History from disk may include an interrupted assistant marker or a tool
   error string. Restore it as plain dicts.
 - No system prompt from disk. Rebuild from current `SYSTEM` / `PLAN_SYSTEM`.
-- A title call failure is silent. The fallback stays. Do not retry.
+- A title call failure is silent. The fallback stays after the one SDK retry.
 - A title call never changes `last_usage` or `session_usage`.
 - A corrupt session is not repaired in place by the list.
 - `exit`, `quit`, and `bye` join the title worker briefly, save, then leave.
 - No file at startup. No file after `/new` until the next message.
-- An older file without `last_turn` loads with zeros and `Elapsed: null`, so
-  its resume block has no last line until its next turn.
+- An older file without `last_turn` loads with zeros. If it has history or
+  tokens, `Elapsed` becomes `0.0` so the resume block still prints a usage
+  line. A truly empty file has no last line until its next turn.
+- A legacy ISO `created` / `updated` is rewritten to local
+  `DD-MM-YYYY HH:MM` on load.
 - Replay skips every `role: "tool"` body, so file contents and command output
   never reappear. A call whose result is a plan denial, a permission denial,
   an unknown tool, a tool error, or a model error prints no tool line.
@@ -950,16 +997,16 @@ message has no session, so `_save()` is a no-op.
 - `/sessions 1` restores messages, model, mode, thinking, effort, args,
   output, `always`, `Session`, and the last `In`, `Out`, and `Elapsed`, then
   replays the transcript and prints the same last line as before.
-- `/new` prints the block with no last line and resets `Session` to 0.
-- `/export` prints `Unknown command: /export. Use /help.` and does not call
-  the model.
+- `/new` prints the block with no last line, resets `Session` to 0, and resets
+  the model, mode, thinking, effort, args, and output to their defaults.
+- `/export` writes the transcript and does not call the model.
 - Rename with spaces, rename with no name, blank name, 201 chars, control
   characters, duplicate name, full-id target.
 - Delete active and non-active. Check cancel, `n`, EOF, and Ctrl+C.
 - Clear `always` on `/new` and active delete; preserve it on resume.
 - Check that a resumed session starts a new turn with the current system
   prompt and that no system message is duplicated.
-- Check that `/new` keeps settings and resets `Session` to 0.
+- Check that `/new` resets settings and `Session` to their defaults.
 - Corrupt one JSON file. The list skips it and prints `Session Error`;
   `sessions.load(id)` raises the same error on direct load.
 - Run with `--sandbox sandbox`; confirm the list is separate from the
@@ -971,7 +1018,7 @@ message has no session, so `_save()` is a no-op.
 
 ## Next
 
-`docs/11-export.md`: transcript export only. No reasoning capture in the
-session file. Export reads `messages` and writes a `.txt`; it does not change
-the session schema or add a model call. Cost display, cache control,
-compaction, and `AGENTS.md` injection remain deferred.
+`docs/12-cache.md`: display cache-read and cache-write tokens when `usage`
+reports them. Export is implemented in `docs/11-export.md`. No reasoning
+capture in the session file. Cost display, compaction, and `AGENTS.md`
+injection remain deferred.

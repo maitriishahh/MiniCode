@@ -340,7 +340,7 @@ network wait, and summed `total_tokens` counts the prompt once per step.
 |---|---|---|
 | Active model id | Context % (last `prompt_tokens` ÷ `context_window`) | Cost — deferred until more models are added |
 | Mode | Prompt-cache hits when `usage` reports cache tokens | Diff **viewer** UI |
-| Enabled tool names | Transcript export | Cache control |
+| Enabled tool names, session export | | Cache control |
 | `In` / `Out` / elapsed | | |
 
 The response `usage` object is enough for token counts —
@@ -431,17 +431,19 @@ shell. `Session` still excludes prompt tokens.
 
 **Layer 9 — sessions.** Done. `docs/10-sessions.md` is the guide.
 `sessions.py` persists one JSON file per conversation under the user data
-directory, keyed by workspace. `/sessions` lists newest first, resumes by
-number or full id, renames, and deletes. `/new` starts a clean conversation
-with inherited settings. Resume restores messages, settings, usage, and exact
+directory, keyed by workspace. `/sessions` lists newest first by id, resumes by
+number or full id, renames, and deletes. `/new` starts a clean conversation and
+resets the model, mode, thinking, effort, args, and output to their startup
+defaults. Resume restores messages, settings, usage, and exact
 session-scoped `always` grants, replays the transcript, and restores
 `last_turn` so the status line matches the one from before the session was
 left. `/new` prints the status block with no usage line. Any unmatched
 `/...` input prints `Unknown command: ... Use /help.` and is never sent.
 A daemon title worker uses the active model
 after the first save; the fallback is local. Session files exclude the system
-prompt and reasoning. No export yet (Layer 10), no reasoning capture, no
-compaction, and no database.
+prompt and reasoning. Session stamps are local `DD-MM-YYYY HH:MM`.
+Layer 10 export is implemented in `docs/11-export.md`. No reasoning capture,
+no compaction, and no database.
 
 **Known gaps by phase.** These are open, not new layers.
 
@@ -450,18 +452,19 @@ compaction, and no database.
 | Layer 0 | `tool_from_fn`, the tools, and sessions have no automated tests | Ad-hoc checks only; still open |
 | Layer 0 | History is unbounded; no compaction | Deferred until the context gap hurts (§10) |
 | Layer 2 | `context_window` is `None`, so context `%` stays off | Set only a verified number |
-| Layer 2 | Cache tokens in `usage` are not displayed | Cache control, after export |
+| Layer 2 | Cache tokens in `usage` are not displayed | Cache control, next |
 | Layer 3 | Sandbox is a path boundary, not a container; shell can leave it | Containerization is separate |
 | Layer 5 | Plan hides `write`/`edit` only; shell stays and asks | Tool-list restriction, not a shell deny |
 | Layer 7 | No permissions config file; `always` is exact and session-scoped | Saved in the session file; deferred config |
 | Layer 7 | No env scrubbing; shell inherits the process environment | Not planned |
 | Layer 8 | Answer tokens stream; no `minicode >>` prefix | Done |
-| Layer 9 | No transcript export; no reasoning in the session file | `docs/11-export.md` next |
-| After Layer 9 | Export, cache control, diff viewer, `AGENTS.md` injection | In that order |
+| Layer 9 | No reasoning in the session file | Keep excluded |
+| Layer 10 | Export defaults to a title-derived filename; same title overwrites | Accepted |
+| After Layer 10 | Cache control, diff viewer, `AGENTS.md` injection | In that order |
 | — | Cost display | Deferred until more models are added |
 
-**Next:** transcript export (`docs/11-export.md`) → cache control → diff
-viewer → `AGENTS.md` injection into the system prompt.
+**Next:** cache control (`docs/12-cache.md`) → diff viewer → `AGENTS.md`
+injection into the system prompt.
 Cost is not in this chain. It is deferred until more models are added;
 when it lands it needs pricing on the Model record.
 A shell command can still `cd` out. Permissions asks before the command

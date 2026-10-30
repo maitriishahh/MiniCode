@@ -627,8 +627,9 @@ for it.
 
 ## Don't add yet
 
-Sessions/resume are implemented in `docs/10-sessions.md`. Later, in order:
-transcript export, cache control, diff viewer, `AGENTS.md` injection. Cost
+Sessions/resume are implemented in `docs/10-sessions.md`. Export is
+implemented in `docs/11-export.md`. Later, in order: cache control, diff
+viewer, `AGENTS.md` injection. Cost
 display waits until more models
 are added. Compaction waits until the context gap hurts. Windows paste and
 a stuck model read wait too. That one is an amendment to this guide, not a

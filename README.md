@@ -83,7 +83,7 @@ One Python loop over an OpenAI-compatible chat API.
 
 ## Features
 
-- Persistent sessions with live resume, rename, delete, and `/new`
+- Persistent sessions with live resume, rename, delete, `/new`, and `/export`
 - Background LLM session titles with a local fallback
 - Plan and build modes in one session
 - `read`, `write`, `edit`, `glob`, `grep`, and shell tools
@@ -183,12 +183,14 @@ you see after a turn, with no usage line. The default mode is `plan`.
 | `/models N` | Switch to model number `N` from that list. |
 | `/models <id>` | Switch to another loaded model by id for this session. |
 | `/model` | Not a command. Prints `Unknown command: /model. Use /models.` |
-| `/new` | Start a new session. Keep the current model, mode, thinking, effort, args, and output. |
+| `/new` | Start a new session. Reset the model, mode, thinking, effort, args, and output to their startup defaults. |
 | `/sessions` | List saved sessions for this workspace, newest first. |
 | `/sessions N` | Resume session number `N`, or a full session id. |
 | `/sessions N rename` | Rename a session. Prompts when no name follows. |
 | `/sessions N rename New name` | Rename a session to `New name`. |
-| `/sessions N delete` | Delete a session after a `[y/N]` confirmation. |
+| `/sessions N delete` | Delete a session after a `[Y/N]` confirmation. |
+| `/export` | Write the current session transcript to a `.txt` named from the session title in the workspace. |
+| `/export <path>` | Write the transcript to that path. A path outside the workspace asks. `.env` is refused. |
 | `/thinking` | List `1 off` and `2 on`, with a blank line above and below. Marks `(active)`. |
 | `/thinking N` | Switch thinking to that number. |
 | `/thinking on` / `off` | Switch thinking by name. `on` shows the bars and the reasoning. `off` shows only `Thinking:`. |
@@ -205,8 +207,8 @@ you see after a turn, with no usage line. The default mode is `plan`.
 | `exit` / `quit` / `bye` | Leave MiniCode. |
 
 Switching modes keeps the same conversation and history. `/new` resets the
-conversation but keeps the current settings, then prints the status block.
-None of these commands is sent to the model. Any input that starts with `/`
+conversation and every setting to its startup default, then prints the status
+block. None of these commands is sent to the model. Any input that starts with `/`
 and matches no command prints `Unknown command: ... Use /help.` and is not
 sent either.
 
@@ -225,8 +227,8 @@ the model as a file path.
 
 ```text
 /sessions
-1 Fix login redirect - 2026-10-29 14:25 (active)
-2 New session - 2026-10-29 12:04
+1 Fix login redirect - 29-10-2026 14:25 (active)
+2 New session - 29-10-2026 12:04
 
 /sessions 2
 /sessions 1 rename Fix the redirect
@@ -234,7 +236,8 @@ the model as a file path.
 ```
 
 `del` and `ren` are aliases. A number or a full session id works as the target;
-actions are case-insensitive.
+actions are case-insensitive. Each row's date is its local `DD-MM-YYYY HH:MM`
+creation stamp.
 
 A resumed session restores its messages, model, mode, thinking, effort, args,
 output, `Session` count, exact `always` grants, and the last turn's `In`,
@@ -257,13 +260,23 @@ The Evolution of Artificial Intelligence: ...
 
 Replay prints your prompts, the answers, and one tool line per successful
 call. File contents and command output are not reprinted. `/new` and deleting
-the active session clear `always` and reset `Session` to 0. Rename keeps the
-current ordering; newest sessions stay first. A rename is permanent.
+the active session reset every setting to its startup default, clear `always`,
+and reset `Session` to 0. Rename keeps the current ordering; newest sessions
+stay first. A rename is permanent.
 
 The title starts as `New session - YYYY-MM-DD HH:MM`. After the first message,
-MiniCode asks the active model in a background thread for a 3-6 word title. A
-failed or slow title call leaves the fallback. Title tokens never enter the
-status line or the conversation. No reasoning text is stored in the session.
+MiniCode asks the active model in a background thread for a 2-5 word title with
+the major words capitalized. A failed or slow title call leaves the fallback.
+Title tokens never enter the status line or the conversation. No reasoning
+text is stored in the session.
+
+`/export` writes the same replay text to a `.txt`. With no path, the filename
+comes from the session title, with any trailing date stamp and invalid filename
+characters removed. An explicit path may be absolute or workspace-relative; a
+path outside the workspace asks, and `.env` is refused. The export has a
+title and date header, your prompts, the answers, and the tool lines. It has no
+tool bodies, shell output, or reasoning. Re-exporting the same title overwrites
+the same file.
 
 Session files may contain prompts, file contents, tool output, and command
 output. They stay on your machine and are not part of the repository.
@@ -403,7 +416,7 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 
 ## Not included yet
 
-Transcript export, cache control, cost display, compaction, a diff viewer,
+Cache control, cost display, compaction, a diff viewer,
 `AGENTS.md` injection, MCP, subagents, and a graphical interface. Session files
 do not store reasoning text. Context percentage stays off until a verified
 `context_window` is set. Cost display waits until more models are added. Ctrl+C during a model call or a tool call
