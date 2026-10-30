@@ -142,7 +142,9 @@ repeating them is how the archived guides went stale.
 - Search is capped: `glob` lists at most 50 paths, `grep` at most 50
   matches, both append `... and N more — refine pattern` past the cap and
   say `(no matches)` on empty. Both skip dot-dirs, `__pycache__`, and
-  `.venv`, and omit `.env` and `.env.*` from results. A missing or
+  `.venv`; `grep` also skips `.env` and `.env.*` contents. `glob` lists a
+  `.env` name when the pattern matches it — the name is not the secret, the
+  contents are. A missing or
   non-directory root is a tool error. Routing (`glob`, then `grep` with
   `include`, then `read`) lives in `SYSTEM`. A root inside the workspace
   returns workspace-relative paths; a root outside returns absolute
