@@ -246,9 +246,8 @@ No Tok/s. Future guides must not say `from litellm import completion`,
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the
-  loaded shell. It says a new file is `write`, not the shell. It currently
-  also names a hardcoded sessions directory; that is an open gap. Fix it from
-  `sessions.data_root()` (see `docs/STATUS.md`); do not copy the literal path.
+  loaded shell. It says a new file is `write`, not the shell. It names the
+  sessions root from `sessions.data_root()`; do not copy a literal user path.
   `PLAN_SYSTEM` appends: if the user named a file, read that path; do not
   glob first. It also says not to create or delete files with the shell,
   not to paste file contents, and, if the user asked for a file, to end by

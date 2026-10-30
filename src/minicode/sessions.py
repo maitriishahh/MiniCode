@@ -20,10 +20,10 @@ class SessionError(Exception):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now().astimezone().strftime("%d-%m-%Y %H:%M")
 
 
-def _data_root() -> Path:
+def data_root() -> Path:
     if sys.platform == "win32":
         base = Path.home() / ".local" / "share"
     else:
@@ -41,7 +41,7 @@ def _project_key(sandbox: Path) -> str:
 
 
 def _project_dir() -> Path:
-    return _data_root() / _project_key(SANDBOX)
+    return data_root() / _project_key(SANDBOX)
 
 
 def _session_path(session_id: str) -> Path:
@@ -64,8 +64,6 @@ def fallback_title(when: str | None = None) -> str:
         moment = moment.replace(tzinfo=timezone.utc)
     return f"New session - {moment.astimezone():%Y-%m-%d %H:%M}"
 
-def _now() -> str:
-    return datetime.now().astimezone().strftime("%d-%m-%Y %H:%M")
 
 def _check(data, path: Path) -> dict:
     if not isinstance(data, dict):

@@ -222,8 +222,8 @@ MiniCode writes one JSON file per conversation:
 
 On Windows the root is `%USERPROFILE%\.local\share\minicode\sessions`. The
 project key is derived from the workspace path, so a different workspace has a
-different list. Session files are outside the sandbox and are never offered to
-the model as a file path.
+different list. Session files are outside the sandbox. The system prompt names
+only the sessions root; individual session files are not offered as tool paths.
 
 ```text
 /sessions

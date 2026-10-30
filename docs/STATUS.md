@@ -136,6 +136,9 @@ Cost display waits until more models are added.
   the model to `default_id`, mode to `plan`, thinking to `off`, effort to
   `low`, and args/output to `off`. Titles are 2-5 capitalized words with
   `max_tokens=64`, a 30s timeout, and one SDK retry.
+- [x] `SYSTEM` derives the sessions root from `sessions.data_root()` instead
+  of a hardcoded user path. `sessions.py` exposes `data_root()`; the old
+  duplicate `_now()` is gone.
 
 ## Open gaps
 
@@ -153,9 +156,6 @@ Known and accepted. These are not the next layer.
 - No diff viewer.
 - `AGENTS.md` is not injected into the system prompt.
 - Cost display is deferred until more models are added.
-- `SYSTEM` hardcodes the sessions directory as
-  `C:/Users/hp/.local/share/minicode/sessions`, with no space before the
-  sentence. It is user-specific and Windows-only. The fix plan is below.
 - Answer tokens stream as they arrive. There is no `minicode >>` prefix.
   Gemini asks for a low thought summary. No `reasoning_effort`. A provider
   that sends no summary shows no thinking block.
@@ -164,29 +164,9 @@ Known and accepted. These are not the next layer.
   blocked in Winsock `recv`. Both are deferred. The shape is an amendment
   to `docs/09-streaming.md`. Not next.
 
-## Follow-up fix plan: SYSTEM sessions path
-
-Not implemented yet. One small fix, no new layer.
-
-1. In `sessions.py`, expose the data root as a public function (for example
-   `data_root()`) that returns `_data_root()`.
-2. In `agent.py`, import `minicode.sessions` and build the sentence from
-   `sessions.data_root().as_posix()` instead of the literal
-   `C:/Users/hp/...`. Keep a space after the previous sentence and after this
-   one.
-3. Do not add a config file, a shell scanner, or a second sessions path.
-   `SYSTEM` still names only the loaded shell and the workspace.
-4. Verify: print `SYSTEM` and confirm the path is derived from
-   `XDG_DATA_HOME` on Unix and `%USERPROFILE%` on Windows; run
-   `uv run python -m compileall src`; start the REPL and check the prompt still
-   lists the tools.
-5. Same pass: remove this gap from STATUS and update the `SYSTEM` sentence in
-   AGENTS.md.
-
 ## Next
 
-1. Apply the SYSTEM sessions-path fix above.
-2. `docs/12-cache.md`.
+1. `docs/12-cache.md`.
 
 ## Deferred (do not start)
 

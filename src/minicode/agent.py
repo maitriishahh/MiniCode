@@ -16,6 +16,7 @@ from minicode.tools.grep import grep
 from minicode.tools.shell import shell
 from minicode.permissions import decide, force_ask, plan_touches
 from minicode.resolve_path import SANDBOX, classify, approve, clear_approved
+from minicode import sessions
 
 MAX_STEPS = 16
 
@@ -58,8 +59,8 @@ SYSTEM = (
     f"Workspace is {SANDBOX}. A path may be absolute. Outside it asks permission. "
     "A path the user already named is read with `read`, not `glob` and not the shell. "
     "Locate an unknown file with `glob`, then `grep`, then `read`. "
-    f"Run tests and git with `{shell.__name__}`. Do not use it to read or search files."
-    "You can find all the sessions created in minicode at 'C:/Users/hp/.local/share/minicode/sessions' "
+    f"Run tests and git with `{shell.__name__}`. Do not use it to read or search files. "
+    f"Session files are under '{sessions.data_root().as_posix()}'. "
 )
 
 

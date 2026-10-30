@@ -30,6 +30,8 @@ On Windows that is `%USERPROFILE%\.local\share\minicode\sessions`. On Unix,
 honor `XDG_DATA_HOME`. The project key is the sanitized workspace directory
 name plus a short SHA-1 of the resolved workspace path. On Windows the name
 and hash input are case-folded. A different workspace gets a different list.
+`SYSTEM` names this root from `sessions.data_root()`; individual session files
+are not offered as tool paths.
 
 Do not put sessions in the project, `.env`, or the sandbox. Do not add a
 database. Do not commit session files.
@@ -199,7 +201,7 @@ def _now() -> str:
     return datetime.now().astimezone().strftime("%d-%m-%Y %H:%M")
 
 
-def _data_root() -> Path:
+def data_root() -> Path:
     if sys.platform == "win32":
         base = Path.home() / ".local" / "share"
     else:
@@ -217,7 +219,7 @@ def _project_key(sandbox: Path) -> str:
 
 
 def _project_dir() -> Path:
-    return _data_root() / _project_key(SANDBOX)
+    return data_root() / _project_key(SANDBOX)
 
 
 def _session_path(session_id: str) -> Path:
@@ -950,8 +952,8 @@ message has no session, so `_save()` is a no-op.
 
 ## Edge cases
 
-- A path outside the workspace still asks. Session storage is outside the
-  sandbox and is never exposed to the model as a tool path.
+- A path outside the workspace still asks. `SYSTEM` names the sessions root;
+  no individual session file is offered as a tool path.
 - `list_sessions()` catches bad files; a bad target prints
   `Session Error: ...`.
 - `always` pairs are exact. `git status` still does not cover
