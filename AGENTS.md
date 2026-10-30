@@ -1,22 +1,27 @@
 # AGENTS.md — MiniCode
 
-A small Python coding harness. Docs first, then the `.py` from the doc.
+A small Python coding harness. Decisions first, then the `.py`, then the doc
+that describes what shipped.
 
 ## Read order (every new session)
 
 1. This file (`AGENTS.md`)
-2. `docs/STATUS.md` — what is done, what to write next
+2. `docs/STATUS.md` — what is shipped, what is next
 3. `HARNESS_RESEARCH_AND_PLAN.md` — decisions (loop, providers, sandbox,
    plan/build, observability)
-4. The next build guide or amendment listed in STATUS
+4. `docs/STYLE.md` — the documentation convention
+5. `docs/index.md` — the doc map; then the feature doc for the area you touch
 
 When a session locks a new convention, write it into `AGENTS.md` in the same
 pass. A new session must not need prior chat history.
 
-The next guide is the file named in `docs/STATUS.md`. Write that guide
-before any code unless STATUS names an amendment to an existing guide. Do
-not implement the next layer in the same pass as writing it unless the user
-says implement.
+## Work order
+
+Record the decision and name the next item in `docs/STATUS.md` before writing
+code. Write the feature doc when the behaviour ships, in the same commit as
+the code. Do not write a doc for behaviour that is not in `src/`; planned work
+is a `docs/STATUS.md` entry, not a guide. Do not implement the next layer in
+the same pass that only records it unless the user says implement.
 
 ## When the user questions a shipped choice
 
@@ -65,11 +70,11 @@ docs/                    # STATUS + setup + one build guide per layer
 Do not invent empty package dirs (`llm/`, `core/`, `session/`, `ui/` …).
 Imports are `minicode.*`. Do not split further without a reason.
 
-A guide names the file and pastes the functions that belong there. "Not
-implemented" means those functions are not in `src/` yet. Do not say "grow
-`__main__.py`" instead of pasting the REPL functions. The loop stays in
-`agent.py`. A segment that only describes a function is not done. REPL, slash
-commands, sessions, the title thread, and the status print live in
+Documentation follows `docs/STYLE.md`. One feature doc per subsystem, linked
+from `docs/index.md`, describing what exists in `src/` today. The layout facts
+below hold regardless of how a doc is worded.
+
+REPL, slash commands, sessions, the title thread, and the status print live in
 `__main__.py`. The loop, `SYSTEM`, the registry, and the one
 `chat.completions.create` site live in `agent.py`; both the agent and the title
 helper call it through `_create`.
@@ -79,16 +84,18 @@ The function is `agent`, not `run_agent`. `tool_from_fn` stays in
 `>>> `, `|Tool Used: \`name\` ({args})|` (a newline in an argument is a
 left `|` rail, not that one-liner), and
 `{In} | {Out} | {Session} | Elapsed: {_elapsed}`.
-No Tok/s. Future guides must not say `from litellm import completion`,
-`ollama_chat/`, a `gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`,
-`api_key_env` as the record key, or that the code still imports LiteLLM.
+No Tok/s. No doc may say `from litellm import completion`, `ollama_chat/`, a
+`gemini/` prefix, `OLLAMA_ID = "qwen3-coder"`, `api_key_env` as the record key,
+or that the code still imports LiteLLM. Those were all real and are all gone;
+repeating them is how the archived guides went stale.
 
 ## Conventions (do not break)
 
 - User-facing behavior changes update `README.md` in the same pass. An
   architecture edge names an import or call site; label runtime, import-time,
   and callback edges. A policy gate is not a parent of the tools it governs.
-- Growing file: each guide says keep / add / replace. The loop shape in
+- Growing subsystem: a doc that describes a change states what is kept, added,
+  and replaced. The loop shape in
   `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
   History stores plain dicts only. The assistant message appended is the raw
