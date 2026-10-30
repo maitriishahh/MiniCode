@@ -121,3 +121,5 @@ through 10.
 - Any unmatched `/...` input prints `Unknown command: ... Use /help.` instead of
   being sent to the model.
 - The plan prompt is loaded at startup, not only after a `/plan` transition.
+- The `/help` summary for `/new` said current settings are kept. The handler
+  has always reset every setting to its startup default; the text now says so.

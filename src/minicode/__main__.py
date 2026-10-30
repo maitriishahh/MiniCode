@@ -13,7 +13,7 @@ COMMANDS = (
     ("/plan", "Switch to plan mode. write and edit are disabled.", ""),
     ("/build", "Switch to build mode. All tools are available.", ""),
     ("/models", "List loaded models. A number or an id switches for this session.", "/models 2"),
-    ("/new", "Start a new session. Current settings are kept.", ""),
+    ("/new", "Start a new session. Mode, model, thinking, effort, args, and output reset to their defaults.", ""),
     ("/sessions", "List saved sessions. A number resumes. delete and rename are actions.", "/sessions 2, /sessions 2 rename Fix login, /sessions 2 delete"),
     ("/export", "Write this session's transcript to a .txt in the workspace.", "/export notes/session.txt"),
     ("/thinking", "Show or hide reasoning. 1 off, 2 on. Default off.", "/thinking 2"),
