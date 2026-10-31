@@ -1,188 +1,45 @@
-# STATUS.md — MiniCode
+# Status
 
-Current code: layers 0-10 are committed, including `/export` and the session,
-title, and date refinements. Layer 9 adds persistent sessions,
-live resume, rename, delete, `/new`, background LLM titles, and session-scoped
-`always` grants. Startup default is `plan`; `/new` and deleting the active
-session reset the model, mode, thinking, effort, args, and output to their
-startup defaults. Session stamps are local `DD-MM-YYYY HH:MM`; the list sorts
-by id descending. Plan drops `write` / `edit` only. `bash` / `powershell` stay
-in the list. Shell asks for `.env` text, and in plan for content-read, create,
-and delete verbs. Status line is `In | Out | Session | Elapsed: {_elapsed}`.
-Cost display waits until more models are added.
+Layers 0–10 are shipped. Each contract is its feature doc under `docs/`.
+Why a choice was made is `DESIGN.md`. What changed by release is
+`CHANGELOG.md`.
 
-## Done
-
-- [x] Research pass: Pi design posts, Pi session/compaction docs, OpenCode
-  providers/Zen/config/models/agents/permissions docs, LiteLLM function
-  calling + Ollama + OpenAI-compatible docs, Ronacher agent notes,
-  AgenticRoadmap guide structure.
-- [x] Final plan: `DESIGN.md` (was `HARNESS_RESEARCH_AND_PLAN.md`) records the
-  loop, model registry, sandbox, plan/build, and observability decisions.
-- [x] Session files: `AGENTS.md`, this STATUS, `docs/setup.md`,
-  `docs/loop.md`, `.env.example`, `.gitignore`.
-- [x] `docs/setup.md` — venv, `.env`, Gemini reachable. Guide now
-  targets the OpenAI client.
-- [x] `docs/loop.md` / Layer 0: loop in `agent.py`, REPL in
-  `__main__.py`. Live status is `In | Out | Session | Elapsed: {_elapsed}`. No Tok/s.
-- [x] `docs/file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
-  Registry in `agent.py`.
-- [x] History is the raw assistant message dict from the response JSON.
-  Not `model_dump`. Tool line is `|Tool Used: \`name\``. `SYSTEM`
-  routes whole-file `write` vs one-span `edit`.
-- [x] Observability: startup prints the status block with no usage line.
-  The flag line is `Sandbox: {SANDBOX} | Thinking: {name} | Effort: {name} | Args: {name} | Output: {name}`.
-- [x] `uv.lock` staged for commit (pins exact versions).
-- [x] Dedicated `sandbox/` dir at the project root is the dev override:
-  `uv run python -m minicode --sandbox sandbox` (`sandbox/` is gitignored).
-  REPL startup + status block show the path.
-- [x] Diff separators fixed: `end="---\n" if diff.endswith("\n") else
-  "\n---\n"` — closing `---` always lands on its own line.
-
-- [x] Layer 2: OpenAI client, `_SERVERS` registry, `/models`, raw message
-  dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
-  Status elapsed is `_elapsed`, not raw seconds. No Tok/s. No LiteLLM.
-- [x] Layer 3 (`docs/workspace.md`): default workspace is the launch cwd
-  (`Path.cwd().resolve()` in `resolve_path.py`). `--sandbox path`
-  overrides. Dev fence is `uv run python -m minicode --sandbox sandbox`.
-- [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
-  `agent.py`, `schema_generator.py`, `resolve_path.py`, `tools/`.
-  Status is last prompt (`In`) + summed output tokens (`Out`) + `Session`
-  + `_elapsed`. No Tok/s. Tool line is `|Tool Used: \`name\``.
-- [x] `edit` returns a numbered window to the model (changed span, up to 5
-  lines before and after). Diff stays stdout-only.
-- [x] Layer 4 (`docs/search.md`): `glob` and `grep` in `tools/`. Capped
-  at 50, `.env*` omitted, non-directory root is a tool error. Registry is
-  wired. `SYSTEM` has the locate sentence as its own sentence. Shell is
-  layer 6.
-- [x] Layer 5 (`docs/modes.md`): `/plan` and `/build` on one
-  session. Startup default is `plan`. Plan drops `write`/`edit` from
-  `tools=` and denies them at dispatch. `TOOLS` stays full. History is
-  not rewritten. `MAX_STEPS` is `16`. Shell is layer 6.
-- [x] Layer 6 (`docs/shell.md`): `shell` in `tools/shell.py`. Windows:
-  Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
-  `bash` or `powershell`. This layer denied both in plan. Layer 7 puts
-  them back and adds permissions. `cwd` is `SANDBOX`.
-- [x] Layer 7 (`docs/permissions.md`): `permissions.py`, dispatch gate,
-  and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
-  gates `write` and `edit`); `shell` allows except `.env` text and plan
-  verbs; `external_directory` asks.
-  `always` is exact and session-scoped. Plan keeps `write` / `edit` out of
-  the schema; `bash` / `powershell` stay in and ask.
-- [x] Absolute-path fix: `read` / `write` / `edit` / `glob` / `grep` path
-  docs say absolute or workspace-relative; outside asks permission. `glob`
-  and `grep` return absolute forward-slash paths for an outside root, and
-  keep workspace-relative paths for an inside root. No more
-  `relative_to(SANDBOX)` crash on an outside hit.
-- [x] `SYSTEM` names the workspace, allows absolute paths, says a
-  user-named file is read with `read`, gives the locate order, and names
-  only the loaded shell. A new file is `write`, not the shell.
-  `PLAN_SYSTEM` adds: if the user named a file, read that path; do not glob
-  first. It also says not to create or delete files with the shell, and to
-  tell the user to run `/build`.
-- [x] Status line adds `Session`: conversation sum of `completion_tokens`.
-  `In` and `Out` are unchanged. Prompt tokens are not added.
-- [x] Elapsed rolls units via `_elapsed` in `__main__.py`. Under 60s, one
-  decimal. Then two largest of `s m h d w y`. Week is 7 days. Year is 365
-  days. No months.
-- [x] On Windows, `classify` rewrites Git Bash `/d/...` to `D:/...` before
-  the sandbox check. `/tmp` and `/home` stay as written. No rewrite on Unix.
-- [x] Shell defaults to allow. Ask for `.env` reads, `.env` in a command,
-  `external_directory`, and plan-mode content-read / create / delete verbs.
-  `.env.example` stays allow. `glob` may list `.env` names. `grep` still
-  skips their contents.
-- [x] `README.md` — user install, configure, run, commands, tools,
-  permissions, status line, troubleshooting, and limitations.
-- [x] Plan prompt is loaded at startup, not only on a `/plan` transition.
-  `/plan` and `/build` always assign `messages[0]`. `PLAN_SYSTEM` forbids
-  pasting file contents and ends a create-or-change request with `/build`.
-  A plan denial, a permission denial, and an unknown tool print that tool
-  string. Still no `|Tool Used|` line for those.
-- [x] A denied plan-mode shell ask returns a short `/build` sentence. The
-  command stays in the prompt and is not copied into the tool string.
-  The ask remains. Shell is not force-denied.
-- [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
-  heredoc still asks. A denied ask still returns the short `/build` sentence.
-- [x] `docs/streaming.md` / Layer 8: streaming and Ctrl+C abort are
-  implemented. Reasoning, when the provider sends it, prints inside a
-  `Thinking:` / `---` / text / `---` block when `/thinking` is `on`. Default
-  is `off`, which prints only `Thinking:`. Answer tokens stream as they
-  arrive. There is no `minicode >>` prefix. `/effort` is `low`, `medium`, or
-  `high`, default `low`. Gemini sends that as `thinking_level`. Ollama sends
-  it as `reasoning_effort`. `<thought>` / `<think>` are
-  display-only and are stripped before history.
-- [x] `/args` and `/output` default to `off`. `/args off` prints only
-  `|Tool Used: `{name}``. `/output off` hides the shell block. The model
-  still gets that output. `/help` prints the `COMMANDS` tuple in
-  `__main__.py`. A new slash command adds a handler and a row there.
-- [x] Layer 9 (`docs/sessions.md`): `sessions.py`; session JSON under
-  `~/.local/share/minicode/sessions/<project-key>/`; `/new`; live `/sessions`
-  with resume, rename, and delete; LLM summary titles in a daemon thread;
-  restored settings and `Session`; session-scoped `always`; atomic writes.
-  No file at startup. No reasoning in the file.
-- [x] `/new` prints the status block. Resume replays the transcript and
-  prints the same last line as before, rebuilt from `last_turn`
-  (`prompt_tokens`, `completion_tokens`, `Elapsed`). Any unmatched `/...`
-  prints `Unknown command: ... Use /help.` and is not sent to the model.
-- [x] Layer 10 (`docs/export.md`): `/export` writes `_transcript()` with a
-  title/created/exported header. The default name comes from the session
-  title, with a trailing date stamp and invalid filename characters removed
-  (fallback `New Session.txt`). An explicit path follows `classify`; an
-  outside path asks `external_directory`; `.env` is refused. Prints
-  `Exported as {path}`. Works in plan. No model call and no save.
-- [x] Session refinements: `created` / `updated` are local
-  `DD-MM-YYYY HH:MM` (legacy ISO strings are rewritten on load); `/sessions`
-  sorts by id descending; delete asks `[Y/N]`; `/new` and active delete reset
-  the model to `default_id`, mode to `plan`, thinking to `off`, effort to
-  `low`, and args/output to `off`. Titles are 2-5 capitalized words with
-  `max_tokens=64`, a 30s timeout, and one SDK retry.
-- [x] `SYSTEM` derives the sessions root from `sessions.data_root()` instead
-  of a hardcoded user path. `sessions.py` exposes `data_root()`; the old
-  duplicate `_now()` is gone.
-
-## Open gaps
-
-Known and accepted. These are not the next layer.
-
-- No automated tests for `tool_from_fn`, the tools, or sessions; ad-hoc checks
-  only.
-- History is unbounded; compaction is deferred until the context gap hurts.
-- `context_window` is `None`, so context `%` is off.
-- Cache tokens in `usage` are not displayed.
-- Sandbox is a path boundary, not a container; shell can `cd` out and
-  inherits the process environment.
-- Plan hides `write` / `edit` only. Shell stays in the list. Plan asks for
-  content-read, create, and delete verbs, not for `ls` or `git`.
-- No diff viewer.
-- `AGENTS.md` is not injected into the system prompt.
-- Cost display is deferred until more models are added.
-- Answer tokens stream as they arrive. There is no `minicode >>` prefix.
-  Gemini asks for a low thought summary. No `reasoning_effort`. A provider
-  that sends no summary shows no thinking block.
-- A click or middle-click paste into `input()` submits every newline as a
-  request. On Windows, Ctrl+C does not abort a model call while httpx is
-  blocked in Winsock `recv`. Both are deferred. The shape is an amendment
-  to `docs/streaming.md`. Not next.
+Startup is plan. `/build` enables `write` and `edit`. The shell stays in both
+modes and asks for `.env` text, and in plan for a command that reads, creates,
+or deletes. Sessions, titles, `/export`, streaming, and abort are in. No
+reasoning is stored. No Tok/s. No cost.
 
 ## Next
 
-1. `docs/12-cache.md`.
+1. `docs/cache.md` — cache control. Display cache-read tokens when `usage`
+   reports them. Do not rewrite history; the prompt prefix stays
+   byte-identical (`DESIGN.md` D16). Not a second provider's cache code until
+   one is actually needed.
 
-## Deferred (do not start)
+## Deferred
 
-A JSON permissions file (OpenCode-shaped rules, loaded at startup; a
-configured `deny` beats `always`), cache
-control, diff viewer, `AGENTS.md` injection, compaction (context gap
-on a real codebase; do not start it), cost (until more models are added;
-then pricing on the Model record), tests (still not written),
-models.dev import, `/connect` (with that catalog; transport tag on the
-tuple, not a client per brand; API key or OAuth; user `0600` auth file,
-not project `.env`; not a key-only phase), variants (reasoning effort;
-fetched with the catalog, not a create flag), `reasoning_effort` (Gemini
-summaries use `include_thoughts` and `thinking_level: low`, not this flag),
-Windows paste and a stuck Ctrl+C (amendment to `docs/streaming.md`, not
-a new guide and not next: after `input()` returns, if the console already
-has more lines, do not send them; on interrupt, `FlushConsoleInputBuffer`;
-run the stream on a worker and `time.sleep` on the main thread so Ctrl+C
-can close the httpx stream; a second Ctrl+C calls `os._exit`. No TUI, no
-asyncio, no short read timeout, no `prompt_toolkit`).
+Do not start these. The trigger for each is in `DESIGN.md` ## Deferred. The
+order after cache control, for the three that have one, is a diff viewer, then
+`AGENTS.md` injection. Cost is not in that chain. Compaction is not next.
+`/connect` is not in that chain.
+
+- Diff viewer. `AGENTS.md` injection.
+- Compaction, when the context gap hurts on a real codebase.
+- Cost display, when more models exist and the record can carry pricing.
+- Tests. Still not written. Ad-hoc checks only.
+- A JSON permissions file, where a configured `deny` beats `always`. Not next.
+- models.dev import, `/connect`, the transport tag, and variants. One phase.
+  Not a key-only command, and not an SDK per brand.
+- Windows paste and a stuck Ctrl+C. An amendment to `docs/streaming.md`, not a
+  new doc and not next. No `prompt_toolkit`, no asyncio, no short read timeout.
+- MCP, subagents, skills, LSP, background bash, Rich, a web UI, a JSONL session
+  tree, containerization, env scrubbing, LangGraph, LlamaIndex.
+- Groq, only when asked: one `_SERVERS` tuple and two env lines. No OpenCode
+  Console free model.
+
+## Accepted limits
+
+- `context_window` is unset, so context `%` stays off. Do not invent the number.
+- The workspace is a path boundary. A shell command can `cd` out and inherits
+  the environment.
+- Plan hides `write` and `edit` only. `python -c` can still write.

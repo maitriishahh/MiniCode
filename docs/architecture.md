@@ -8,6 +8,61 @@ appended once, the loop calls the model, runs whatever tools it asks for, and
 repeats until the model answers without a tool call or the step limit is
 reached. Everything else in the package exists to serve that loop.
 
+## Flow
+
+The turn as the REPL sees it. Which edges are import-time is in the tables
+below. The permission rules are `docs/permissions.md`.
+
+```text
+  [ User / Terminal ]
+         │
+         ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/models`)
+  [ __main__.py ] (REPL loop, sessions, title thread, usage tracking)
+         │
+         ├─► Command handled locally? (any slash command, or exit/quit/bye)
+         │
+         ▼  (otherwise appends user message to history, calls agent)
+  [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
+         │
+         ├─► _create(...) (one chat.completions.create site)
+         │        │
+         │        ├─► Model API (Gemini / Ollama)
+         │        │        │
+         │        │        ▼ (Streaming response chunks)
+         │        ├─► _consume(stream, on_event, state)
+         │        │        ├─► Emits reasoning/thinking (if present)
+         │        │        ├─► Accumulates text content & tool calls (handles missing indices/Gemini extra_content)
+         │        │        └─► Captures token usage metadata
+         │        │
+         │        ├─► KeyboardInterrupt / Exception handling during stream
+         │        │        └─► Appends interrupted/error assistant message, returns None / error
+         │        │
+         │        ▼ (No tool calls)
+         ├─► Answer tokens stream as they arrive. No `minicode >>` prefix
+         │
+         └─► Tool Calls Present?
+                  │
+                  ▼
+         [ Permission & Boundary Check ] (`_permit` in agent.py → permissions.py & resolve_path.py)
+                  │
+                  ├─► Plan mode active & tool in PLAN_DENIED (write, edit) or shell mutating sandbox?
+                  │        └─► Denied / prompts user via terminal callback (`_permission` in `__main__.py`)
+                  ├─► Target path in `.env` or external directory?
+                  │        └─► Prompts user: `[o]nce / [a]lways / [d]eny`
+                  │
+                  ▼ (Allowed)
+         [ Tool Dispatch ] (`TOOLS[name]` in `tools/`)
+                  │
+                  ├─► read.py, write.py, edit.py, glob.py, grep.py, shell.py
+                  │        └─► Validated against SANDBOX boundary (`resolve_path.py`)
+                  │        └─► Executes operation (e.g. diff for edit, subprocess for shell)
+                  │
+                  ▼
+         [ Append Tool Result ] (`role: "tool"`, `tool_call_id`)
+                  │
+                  └─► Loop continues to next step in `agent()`
+```
+
 ## Contract
 
 The loop itself — the message flow, the 16-step ceiling, and what `agent`
@@ -65,7 +120,9 @@ Every cross-module edge in the package, labelled by when it happens.
 `permissions` is a policy gate, not a parent of the tools it governs. It
 decides and remembers; `agent._permit` applies the decision; the tool never
 sees a permission call. `schema_generator` is not in the turn: it wraps each
-tool once at import.
+tool once at import. `agent.py`, `tools/edit.py`, and `tools/shell.py` print
+to stdout. The title worker does no file I/O and no printing; the main thread
+saves.
 
 ## Import order
 

@@ -23,6 +23,9 @@ the order the work landed.
   `docs/archive/build-guides/`.
 - `HARNESS_RESEARCH_AND_PLAN.md` renamed to `DESIGN.md`. Decisions are numbered.
   The reliability rules and the source list are unchanged.
+- `README.md` is the install and command guide. The turn diagram moved to
+  `docs/architecture.md`. `docs/STATUS.md` names the next piece of work.
+  `CONTRIBUTING.md` describes how a change lands.
 
 ## [0.1.0] - 2026-10-30
 

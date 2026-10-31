@@ -80,7 +80,10 @@ Diff: notes.txt
 ```
 
 The diff is for the person at the terminal. The model gets the numbered window,
-not the diff. Neither is a diff viewer.
+not the diff. Neither is a diff viewer. The closing `---` always lands on its
+own line: `end="---\n" if diff.endswith("\n") else "\n---\n"`. Diff input is
+`splitlines()` plus `\n`, not `keepends=True`, so a file with no trailing
+newline cannot fuse a `-` line and a `+` line.
 
 ## Why this shape
 

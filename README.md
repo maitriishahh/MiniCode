@@ -6,106 +6,15 @@ One Python loop over an OpenAI-compatible chat API.
 
 **MiniCode starts in plan mode. Type `/build` to enable file writes.**
 
-## Architecture
-
-### Project Flow Diagram
-
-```text
-  [ User / Terminal ]
-         │
-         ▼  (types prompt, e.g. "Fix calculator.py" or `/build` or `/models`)
-  [ __main__.py ] (REPL loop, sessions, title thread, usage tracking)
-         │
-         ├─► Command handled locally? (any slash command, or exit/quit/bye)
-         │
-         ▼  (otherwise appends user message to history, calls agent)
-  [ agent.py ] (Agent Core & Multi-Step Turn Loop - max 16 steps)
-         │
-         ├─► _create(...) (one chat.completions.create site)
-         │        │
-         │        ├─► Model API (Gemini / Ollama)
-         │        │        │
-         │        │        ▼ (Streaming response chunks)
-         │        ├─► _consume(stream, on_event, state)
-         │        │        ├─► Emits reasoning/thinking (if present)
-         │        │        ├─► Accumulates text content & tool calls (handles missing indices/Gemini extra_content)
-         │        │        └─► Captures token usage metadata
-         │        │
-         │        ├─► KeyboardInterrupt / Exception handling during stream
-         │        │        └─► Appends interrupted/error assistant message, returns None / error
-         │        │
-         │        ▼ (No tool calls)
-         ├─► Answer tokens stream as they arrive. No `minicode >>` prefix
-         │
-         └─► Tool Calls Present?
-                  │
-                  ▼
-         [ Permission & Boundary Check ] (`_permit` in agent.py → permissions.py & resolve_path.py)
-                  │
-                  ├─► Plan mode active & tool in PLAN_DENIED (write, edit) or shell mutating sandbox?
-                  │        └─► Denied / prompts user via terminal callback (`_permission` in `__main__.py`)
-                  ├─► Target path in `.env` or external directory?
-                  │        └─► Prompts user: `[o]nce / [a]lways / [d]eny`
-                  │
-                  ▼ (Allowed)
-         [ Tool Dispatch ] (`TOOLS[name]` in `tools/`)
-                  │
-                  ├─► read.py, write.py, edit.py, glob.py, grep.py, shell.py
-                  │        └─► Validated against SANDBOX boundary (`resolve_path.py`)
-                  │        └─► Executes operation (e.g. diff for edit, subprocess for shell)
-                  │
-                  ▼
-         [ Append Tool Result ] (`role: "tool"`, `tool_call_id`)
-                  │
-                  └─► Loop continues to next step in `agent()`
-```
-
-### Component Interaction Table
-
-| Caller | Callee | What crosses |
-|---|---|---|
-| `__main__` | `agent` | `agent(messages, on_event)`; reads `SYSTEM`, `mode`, `active`, `MODELS`, usage; calls `session_title` in a worker |
-| `__main__` | `sessions` | save, load, list, rename, delete at runtime |
-| `__main__` | `permissions` | registers `ask["fn"]` at import; restores `always` on resume |
-| `__main__` | `resolve_path` | reads `SANDBOX` at import |
-| `sessions` | `permissions` | `snapshot_always` at save |
-| `sessions` | `resolve_path` | reads `SANDBOX` at import |
-| `agent` | OpenAI API | one `chat.completions.create` site inside `_create` |
-| `agent` | `permissions` | `decide` / `force_ask` / `plan_touches` |
-| `permissions` | `__main__` | calls the registered prompt (callback) |
-| `agent` | `resolve_path` | `classify` / `approve` / `clear_approved` |
-| `agent` | `schema_generator` | `tool_from_fn` at import |
-| `agent` | `tools` | imports the functions; dispatches `TOOLS[name]` |
-| `schema_generator` | `tools` | wraps each function at import into a validating `run` |
-| `tools` | `resolve_path` | `_resolve` / `SANDBOX` |
-
-`agent.py` is the only model-call site. Both the agent loop and the background title call go through `_create`; there is exactly one `chat.completions.create` call inside it. `permissions.py` only decides and remembers grants. `agent.py`, `tools/edit.py`, and `tools/shell.py` also print to stdout. `schema_generator.py` is not in the turn below. It wraps the tools once, at import. The title worker does no file I/O or printing; the main thread saves.
-
-## Features
-
-- Persistent sessions with live resume, rename, delete, `/new`, and `/export`
-- Background LLM session titles with a local fallback
-- Plan and build modes in one session
-- `read`, `write`, `edit`, `glob`, `grep`, and shell tools
-- Exact-match edits with a terminal diff
-- Live model reasoning inside a `---` block when the provider sends it. Gemini is asked for a low thought summary; that summary is not part of the answer
-- Answer tokens stream as they arrive. There is no `minicode >>` prefix
-- Model switching with `/models`
-- Workspace-bounded file access with `.env` protection
-- Permission prompts for `.env` access, plan-mode file-changing shell commands,
-  and paths outside the workspace
-- Session-scoped `always` grants
-- Per-turn token and elapsed-time status
-
 ## Requirements
 
 - Python 3.13 or newer
-- `uv`
+- [uv](https://docs.astral.sh/uv/)
 - A Gemini API key, or a local Ollama server
 
 On Windows, MiniCode uses Git Bash if it is installed, otherwise PowerShell. On
 macOS and Linux it uses bash, then sh. The status line shows the loaded shell
-name.
+name. Install details and failure modes are in `docs/setup.md`.
 
 ## Install
 
@@ -113,281 +22,93 @@ name.
 git clone https://github.com/maitriishahh/MiniCode.git
 cd MiniCode
 uv sync
-```
-
-Copy the environment template:
-
-```powershell
 Copy-Item .env.example .env
 ```
 
-On macOS or Linux:
-
-```bash
-cp .env.example .env
-```
+On macOS or Linux, `cp .env.example .env`.
 
 ## Configure
 
-Edit `.env`:
+Edit `.env`. It is gitignored. Server base URLs are in code, not in this file.
 
 | Variable | Required | Notes |
 |---|---|---|
-| `GEMINI_API_KEY` | For Gemini | Get one from https://aistudio.google.com |
+| `GEMINI_API_KEY` | For Gemini | From https://aistudio.google.com |
 | `GEMINI_MODEL` | For Gemini | Model id, for example `gemini-3.5-flash-lite`. No `gemini/` prefix. |
 | `OLLAMA_MODEL` | No | Local model id. Leave empty to disable Ollama. |
 | `OLLAMA_API_KEY` | No | Leave empty for a local server. |
 
-`.env` is gitignored. Server base URLs are built in. To use only Ollama,
-leave `GEMINI_MODEL` empty, set `OLLAMA_MODEL`, and start the local server
-first.
+To use only Ollama, leave `GEMINI_MODEL` empty, set `OLLAMA_MODEL`, and start
+the local server first.
 
 ## Run
 
-From the MiniCode directory:
-
 ```powershell
 uv run python -m minicode
-```
-
-To point MiniCode at another directory:
-
-```powershell
 uv run python -m minicode --sandbox C:\path\to\project
 ```
 
 `--sandbox` accepts a relative or absolute path and creates it if missing.
-Without it, the workspace is the directory you launch from.
+Without it, the workspace is the directory you launch from. Startup prints
+`Type /help for available commands`, then a status block with no usage line.
 
-Startup prints `Type /help for available commands`, then the same status block
-you see after a turn, with no usage line. The default mode is `plan`.
-
-## First session
-
-1. Ask for something in plain English.
-2. MiniCode may read, search, or run a permitted command.
-3. Paths outside the workspace ask for permission. Shell asks for `.env`,
-   and in plan mode for commands that read, create, or delete files.
-4. Type `/build` before asking for file changes.
-5. MiniCode saves the conversation after the turn. Use `/sessions` to find it
-   again, or `/new` to start another.
-6. Leave with `exit`, `quit`, `bye`, or Ctrl+C at the prompt.
+Ask in plain English. Type `/build` before asking for file changes. Leave with
+`exit`, `quit`, `bye`, or Ctrl+C at the prompt.
 
 ## Commands
+
+`/help` prints this list and nothing else. Exact output is in
+`docs/commands.md`. None of these is sent to the model. Any other input that
+starts with `/` prints `Unknown command: {word}. Use /help.` and is not sent.
+`/model` is the one named exception: `Unknown command: /model. Use /models.`
 
 | Command | Effect |
 |---|---|
 | `/plan` | Switch to plan mode. `write` and `edit` are disabled. |
 | `/build` | Switch to build mode. All tools are available. |
-| `/models` | List the loaded models as `N id`, with a blank line above and below. |
-| `/models N` | Switch to model number `N` from that list. |
-| `/models <id>` | Switch to another loaded model by id for this session. |
-| `/model` | Not a command. Prints `Unknown command: /model. Use /models.` |
-| `/new` | Start a new session. Reset the model, mode, thinking, effort, args, and output to their startup defaults. |
-| `/sessions` | List saved sessions for this workspace, newest first. |
-| `/sessions N` | Resume session number `N`, or a full session id. |
-| `/sessions N rename` | Rename a session. Prompts when no name follows. |
-| `/sessions N rename New name` | Rename a session to `New name`. |
-| `/sessions N delete` | Delete a session after a `[Y/N]` confirmation. |
-| `/export` | Write the current session transcript to a `.txt` named from the session title in the workspace. |
-| `/export <path>` | Write the transcript to that path. A path outside the workspace asks. `.env` is refused. |
-| `/thinking` | List `1 off` and `2 on`, with a blank line above and below. Marks `(active)`. |
-| `/thinking N` | Switch thinking to that number. |
-| `/thinking on` / `off` | Switch thinking by name. `on` shows the bars and the reasoning. `off` shows only `Thinking:`. |
-| `/effort` | List `1 low`, `2 medium`, and `3 high`, with a blank line above and below. Marks `(active)`. |
-| `/effort N` | Switch effort to that number. |
-| `/effort low` / `medium` / `high` | Switch effort by name. |
-| `/args` | List `1 off` and `2 on`. Default is `off`, which prints only `\|Tool Used: \`name\``. |
-| `/args N` | Switch argument display to that number. |
-| `/args on` / `off` | `on` shows the one-liner or the left rail. `off` hides arguments. |
-| `/output` | List `1 off` and `2 on`. Default is `off`, which hides the shell output block. The model still gets it. |
-| `/output N` | Switch shell-output display to that number. |
-| `/output on` / `off` | Show or hide the `Shell` block. Does not hide edit diffs. |
-| `/help` | List every command, with a short description and an example. |
-| `exit` / `quit` / `bye` | Leave MiniCode. |
+| `/models` | List loaded models. A number or an id switches for this session. |
+| `/new` | Start a new session. Mode, model, thinking, effort, args, and output reset to their defaults. |
+| `/sessions` | List saved sessions. A number resumes. `delete` and `rename` are actions. |
+| `/export` | Write this session's transcript to a `.txt` in the workspace. |
+| `/thinking` | Show or hide reasoning. `1 off`, `2 on`. Default `off`. |
+| `/effort` | Set effort. `1 low`, `2 medium`, `3 high`. Default `low`. |
+| `/args` | Show or hide tool arguments. `1 off`, `2 on`. Default `off`. |
+| `/output` | Show or hide the shell output block. `1 off`, `2 on`. Default `off`. The model still gets the output. |
+| `/help` | List commands. |
+| `exit` | Leave. `quit` and `bye` do the same. |
 
-Switching modes keeps the same conversation and history. `/new` resets the
-conversation and every setting to its startup default, then prints the status
-block. None of these commands is sent to the model. Any input that starts with `/`
-and matches no command prints `Unknown command: ... Use /help.` and is not
-sent either.
+`del` and `ren` are aliases. Switching modes keeps the conversation. `/new`
+does not.
 
 ## Sessions
 
-MiniCode writes one JSON file per conversation:
+One JSON file per conversation, under
+`~/.local/share/minicode/sessions/<project-key>/`. On Windows that root is
+`%USERPROFILE%\.local\share\minicode\sessions`. A different workspace has a
+different list. Nothing is written until the first message.
 
-```text
-~/.local/share/minicode/sessions/<project-key>/<session-id>.json
-```
+`/sessions` lists newest first. `/sessions N` resumes and restores the model,
+mode, display flags, output-token total, and remembered approvals. `/export`
+writes the same replay to a text file; `.env` is refused, and a path outside
+the workspace asks. Session files stay on your machine. Detail is in
+`docs/sessions.md` and `docs/export.md`.
 
-On Windows the root is `%USERPROFILE%\.local\share\minicode\sessions`. The
-project key is derived from the workspace path, so a different workspace has a
-different list. Session files are outside the sandbox. The system prompt names
-only the sessions root; individual session files are not offered as tool paths.
+## Tools and permissions
 
-```text
-/sessions
-1 Fix login redirect - 29-10-2026 14:25 (active)
-2 New session - 29-10-2026 12:04
+`read`, `write`, `edit`, `glob`, `grep`, and the loaded shell. `write` replaces
+a whole file; `edit` changes one exact span and prints a diff. Search is capped
+at 50. The shell times out at 120 seconds and keeps the last 8,000 characters. In-workspace edits do not ask. `.env` asks. A path outside the workspace
+asks. In plan, a shell command that reads, creates, or deletes asks; `ls` and
+`git` do not. Answer `o` once, `a` always (this exact value, this session), or
+`d` to deny.
 
-/sessions 2
-/sessions 1 rename Fix the redirect
-/sessions 2 delete
-```
+The workspace is a path boundary, not a container. An approved command can
+`cd` out, and the shell inherits your environment. Do not run MiniCode on a
+repository you do not trust. The rules are in `docs/permissions.md`.
 
-`del` and `ren` are aliases. A number or a full session id works as the target;
-actions are case-insensitive. Each row's date is its local `DD-MM-YYYY HH:MM`
-creation stamp.
+## Status
 
-A resumed session restores its messages, model, mode, thinking, effort, args,
-output, `Session` count, exact `always` grants, and the last turn's `In`,
-`Out`, and `Elapsed`. It replays the conversation, then prints the same status
-block the session showed before you left it:
-
-```text
->>> /sessions 2
-
-Resumed: The Evolution of Artificial Intelligence
-
->>> write an essay on ai evolution
-
-The Evolution of Artificial Intelligence: ...
-
-|Tool Used: `bash`
-
-1,225 In | 315 Out | 315 Session | Elapsed: 7.3s
-```
-
-Replay prints your prompts, the answers, and one tool line per successful
-call. File contents and command output are not reprinted. `/new` and deleting
-the active session reset every setting to its startup default, clear `always`,
-and reset `Session` to 0. Rename keeps the current ordering; newest sessions
-stay first. A rename is permanent.
-
-The title starts as `New session - YYYY-MM-DD HH:MM`. After the first message,
-MiniCode asks the active model in a background thread for a 2-5 word title with
-the major words capitalized. A failed or slow title call leaves the fallback.
-Title tokens never enter the status line or the conversation. No reasoning
-text is stored in the session.
-
-`/export` writes the same replay text to a `.txt`. With no path, the filename
-comes from the session title, with any trailing date stamp and invalid filename
-characters removed. An explicit path may be absolute or workspace-relative; a
-path outside the workspace asks, and `.env` is refused. The export has a
-title and date header, your prompts, the answers, and the tool lines. It has no
-tool bodies, shell output, or reasoning. Re-exporting the same title overwrites
-the same file.
-
-Session files may contain prompts, file contents, tool output, and command
-output. They stay on your machine and are not part of the repository.
-
-## Example session
-
-```text
-Type /help for available commands
-
----
-Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
----
-
->>> read pyproject.toml and summarize the dependencies
-
-|Tool Used: `read`
-
-The project depends on openai, pydantic, and python-dotenv.
-
----
-Model: gemini-3.5-flash-lite | Mode: plan | Tools Loaded: read, glob, grep, bash
-Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: off
-1,204 In | 48 Out | 48 Session | Elapsed: 2.1s
----
-
->>> /build
-Mode: build | Tools Loaded: read, write, edit, glob, grep, bash
-```
-
-If the model streams reasoning and `/thinking` is `on`, it appears as
-`Thinking:`, a `---` line, the text, a closing `---` on the next line, and a
-blank line, then the answer or the first tool line. Trailing newlines in the
-summary are not printed. A blank line in the middle of the summary is.
-`/thinking off` prints only `Thinking:`.
-The default is `off`. Gemini is asked for a summary at the session effort,
-`low` unless `/effort` changed it. That summary is not part of the answer.
-Not every model sends reasoning; when it does not, the label does not
-appear. The answer streams as the tokens arrive. There is no `minicode >>`
-prefix.
-
-If your shell tool is named `powershell` instead of `bash`, that is the Windows
-fallback.
-
-## Tools
-
-| Tool | What it does | Notes |
-|---|---|---|
-| `read` | Reads a file with line numbers. | Starts at line 1 and returns up to 2,000 lines by default. |
-| `write` | Creates a file or replaces a whole file. | `content` must be the full final file. Creates parent folders. |
-| `edit` | Replaces one exact unique span. | Fails on zero or multiple matches. Prints a diff to the terminal. |
-| `glob` | Finds files by name pattern. | Capped at 50 paths. |
-| `grep` | Searches file contents with a regex. | Capped at 50 matches. `include` filters file names. |
-| `bash` / `powershell` | Runs a shell command. | 120-second timeout. Output capped at 8,000 characters. |
-
-`glob` and `grep` skip dot-directories, `__pycache__`, and `.venv`. `grep`
-also skips `.env` contents. `glob` may list the name. Both tell the model
-to refine broad searches. `/args` defaults to `off`, so a tool call prints `|Tool Used: \`name\``.
-`/args on` prints `|Tool Used: \`name\` ({args})|`, or a left `|` rail when
-an argument contains a newline. `/output` defaults to `off` and hides the
-shell block. The model still gets that output. A denial does not print the
-tool line.
-
-## Plan and build
-
-**Plan** is for reading, searching, and proposing changes. `write` and `edit`
-are not offered to the model, and a guessed call is refused. Shell commands are
-still available. In plan, a command asks when it reads file contents, creates,
-or deletes. `ls` and `git` do not.
-
-**Build** offers every tool. `write` and `edit` run without a prompt inside the
-workspace. Ordinary shell commands do not ask.
-
-Plan mode is not a hard sandbox: an approved shell command can still change
-files. Use build mode deliberately.
-
-## Permissions
-
-| Key | Covers | Default |
-|---|---|---|
-| `read` | `read` | allow |
-| `edit` | `write`, `edit` | allow |
-| `glob` | `glob` | allow |
-| `grep` | `grep` | allow |
-| `shell` | `bash`, `powershell` | allow, except `.env` text and plan verbs |
-| `external_directory` | paths outside the workspace | ask |
-
-When prompted:
-
-- `o` or `once` allows this call.
-- `a` or `always` allows that exact value for this session. It survives
-  resume, and clears on `/new` or when the active session is deleted.
-- `d`, an empty answer, or Ctrl+C denies the call.
-
-`.env` and `.env.*` ask on read. `.env.example` does not. Permission denials
-return `Permission denied: <key> <value>`. A denied plan-mode shell ask returns
-the short `/build` sentence instead.
-
-## Workspace and safety
-
-The workspace is the directory you launch from, or the path passed to
-`--sandbox`. File tools may use absolute or workspace-relative paths. A path
-outside the workspace triggers the `external_directory` prompt.
-
-The workspace is a path boundary, not a container. An approved shell command
-can leave it with `cd` or change files outside it. The shell also inherits your
-environment variables. Do not run MiniCode on a repository you do not trust.
-
-## Status line
-
-After each turn:
+After each turn, and at startup with no usage line:
 
 ```text
 ---
@@ -397,11 +118,9 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 ---
 ```
 
-- `In` is the prompt size of the last model call.
-- `Out` is the output tokens for the turn.
-- `Session` is the total output tokens for this conversation. It survives
-  resume, and resets on `/new` or when the active session is deleted.
-- `Elapsed` is wall-clock time for the turn.
+`In` is the last call's prompt size. `Out` is output tokens for the turn.
+`Session` is output tokens for the conversation: it survives resume and resets
+on `/new`. There is no tokens-per-second figure.
 
 ## Troubleshooting
 
@@ -414,13 +133,8 @@ Sandbox: C:\path\to\project | Thinking: off | Effort: low | Args: off | Output: 
 | `No shell found` | Install Git Bash or PowerShell on Windows, or bash/sh on Unix. |
 | `Max limit reached: 16` | The turn hit the step limit. Ask for a smaller task. |
 
-## Not included yet
-
-Cache control, cost display, compaction, a diff viewer,
-`AGENTS.md` injection, MCP, subagents, and a graphical interface. Session files
-do not store reasoning text. Context percentage stays off until a verified
-`context_window` is set. Cost display waits until more models are added. Ctrl+C during a model call or a tool call
-aborts that step and returns to `>>> ` when Python is between chunks. On
-Windows it does not abort a call blocked in a socket read; close the terminal
-tab. A click or middle-click paste can submit every line as a request. Both
-are deferred. A grandchild shell process can survive.
+Ctrl+C during a model call or a tool call returns to `>>> ` when Python is
+between chunks. On Windows it does not abort a call blocked in a socket read;
+close the terminal tab. A click paste can submit every line as a request. A
+grandchild shell process can outlive the call. What is deliberately not built
+is listed in `DESIGN.md`.

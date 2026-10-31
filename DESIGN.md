@@ -340,7 +340,9 @@ workspace, and for a `.env`.
 a content-read, create, or delete (`rm`, `touch`, `cat`, and the rest of
 that list) or the text contains `>`. `ls`, `pwd`, `git`, `python`, `echo`,
 and `find` do not. Do not parse past the first word. Do not force-deny shell
-in plan. `python -c` can still write. A denied plan shell returns one
+in plan. `python -c` can still write. A build-mode heredoc is allowed. A
+plan-mode heredoc still asks, because its first word is a content-read verb
+or the text contains `>`. A denied plan shell returns one
 sentence telling the user to run `/build`; the prompt still showed the
 command. No config file, no env scrubbing, no transport tag. A JSON
 permissions file, where a configured `deny` beats `always`, is deferred.
