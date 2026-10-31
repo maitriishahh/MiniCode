@@ -39,7 +39,8 @@ Commit messages are an imperative sentence, with no type prefix.
 
 `## Verification` in the feature doc is the test suite. Run it when you edit
 the doc, then update `Verified:`. If a step cannot be run, say so in the doc
-rather than deleting it.
+rather than deleting it. `uv run python scripts/check_docs.py` checks links,
+the doc map, and the line limits.
 
 Do not commit `.env`, session dumps, or transcripts. Do not commit secrets.
 Contributions are under the Apache-2.0 license in `LICENSE`, unless a
