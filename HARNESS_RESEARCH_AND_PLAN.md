@@ -71,7 +71,7 @@ cannot be added through it.
 | Permissions | Implemented: `allow` / `ask` / `deny`, last matching rule wins (§5) |
 | UI | `input()` REPL + tool line + status block per turn (§7) |
 | Layout | `src/minicode/`, growing from one module (§8) |
-| Sync vs async | Sync. Streaming, abort, conditional reasoning labels, and the final-answer-only prefix are implemented (`docs/09-streaming.md`). Stay sync |
+| Sync vs async | Sync. Streaming, abort, conditional reasoning labels, and the final-answer-only prefix are implemented (`docs/streaming.md`). Stay sync |
 | Tests | Not written. Planned after `tool_from_fn`; still open |
 | Cost | Deferred until more models are added; then needs pricing on the Model record |
 
@@ -196,7 +196,7 @@ chain forever — the registry (`name → {schema, fn}`) replaces it once the
 second tool lands.
 
 **v0 tools:** `read`, then `write`, `edit`, then capped `glob` /
-`grep` (`docs/05-search.md`). Shell is implemented in `docs/07-shell.md`.
+`grep` (`docs/search.md`). Shell is implemented in `docs/shell.md`.
 One function, resolved once. Windows prefers Git Bash,
 then PowerShell. Unix prefers bash, then `sh`. The registered name matches
 the winner (`bash` or `powershell`) so the model does not speak bash into
@@ -229,7 +229,7 @@ absolute path or a workspace-relative one. An absolute path outside the
 workspace is not silently rejected: it triggers `external_directory`.
 `.env` and `.env.*` ask on read. `.env.example` does not.
 
-Permissions are implemented (Layer 7, `docs/08-permissions.md`): `allow` /
+Permissions are implemented (Layer 7, `docs/permissions.md`): `allow` /
 `ask` / `deny`, last matching rule wins, `*` crosses `/`. Defaults are
 `read` / `glob` / `grep` / `edit` allow, `shell` allow except `.env` text,
 `external_directory`
@@ -251,7 +251,7 @@ write and run code, permission prompts are mostly theater — but the sandbox
 still bounds *where* files land, which is the accident class that matters
 first.
 
-The permissions guide is `docs/08-permissions.md`, implemented in
+The permissions guide is `docs/permissions.md`, implemented in
 `permissions.py`, `agent.py`, and `__main__.py`. OpenCode's actions are
 `allow` / `ask` / `deny`, last matching rule wins. Inside the sandbox, reads
 and edits allow. `shell` allows ordinary commands. It asks when the text
@@ -269,9 +269,9 @@ You know OpenCode's version: two primary agents, Tab to switch. **Plan** runs
 with edits and bash restricted (`ask`/`deny`) — analysis, no silent writes.
 **Build** has the full toolset. Same session, same files. The guarantee is the
 **tool list / permission**, not a prompt asking nicely. MiniCode implements
-that: plan mode drops `write` / `edit` from `tools=`. `docs/07-shell.md`
+that: plan mode drops `write` / `edit` from `tools=`. `docs/shell.md`
 adds `bash` and `powershell` to that deny set. That pass is done.
-`docs/08-permissions.md` puts both names back in the tool list. The same
+`docs/permissions.md` puts both names back in the tool list. The same
 plan verb check restricts content-read, create, and delete. It does not force-deny them, and
 it is not a stricter prompt. `write` / `edit` stay dropped from the schema.
 `/plan` and `/build` switch, and the status line shows which is active.
@@ -320,7 +320,7 @@ Sandbox: D:\Pycharm_Projects\MiniCode\sandbox | Thinking: off | Effort: low | Ar
 Startup prints the same block with no usage line. `/new` does too.
 
 Streaming, abort, and conditional reasoning are implemented per
-`docs/09-streaming.md`. A thinking block is `Thinking:` / `---` / text / `---`
+`docs/streaming.md`. A thinking block is `Thinking:` / `---` / text / `---`
 when `/thinking` is `on`. Default is `off`. `/effort` defaults to `low`.
 Answer tokens stream. There is no `minicode >>` prefix. Gemini asks for a
 low thought summary; `<thought>` / `<think>` stay display-only. An aborted
@@ -364,7 +364,8 @@ src/minicode/            # package
   permissions.py         # allow / ask / deny gate
   sessions.py            # session JSON, list, rename, delete
   tools/                 # read, write, edit, glob, grep, shell
-docs/                    # setup + build guides + STATUS
+docs/                    # index + one doc per subsystem + STATUS + STYLE
+docs/archive/            # retired build guides, frozen
 AGENTS.md                # session start
 HARNESS_RESEARCH_AND_PLAN.md  # this file
 README.md                # user guide
@@ -375,10 +376,11 @@ The loop owns dispatch. Tools never import the LLM. A future UI is never
 imported by the loop. New guides name the file (`AGENTS.md`). They do not
 grow `__main__.py` with the loop.
 
-Docs follow the AgenticRoadmap shape (guide first, then the `.py` from it),
-as a product spine rather than a course: `docs/STATUS.md` (done / next),
-`docs/00-setup.md`, one build guide per layer. `tests/` arrives with
-`tool_from_fn`. `README.md` when the REPL actually runs. No `plans/` dump, no
+Docs are reference, not a course: `docs/index.md` is the map, one feature doc
+per subsystem, `DESIGN.md` for decisions, `docs/STATUS.md` for done / next. The
+original one-guide-per-layer walkthrough is archived under
+`docs/archive/build-guides/` and is not maintained. `tests/` arrives with
+`tool_from_fn`. `README.md` covers install and the REPL. No `plans/` dump, no
 empty package scaffolding.
 
 ---
@@ -402,25 +404,25 @@ returns a tool error and the model retries.
 **Layer 2 — model registry.** Done. `_SERVERS`, `/models`, OpenAI client.
 Ids from `.env`. Bases in code.
 
-**Layer 3 — workspace flip.** Done. `docs/04-workspace.md` implemented.
+**Layer 3 — workspace flip.** Done. `docs/workspace.md` implemented.
 Default workspace is launch cwd. `--sandbox path` overrides.
 
-**Layer 4 — search.** Done. `docs/05-search.md` implemented in
+**Layer 4 — search.** Done. `docs/search.md` implemented in
 `tools/glob.py` and `tools/grep.py`.
 
-**Layer 5 — plan/build.** Done. `docs/06-plan-build.md` implemented in
+**Layer 5 — plan/build.** Done. `docs/modes.md` implemented in
 `agent.py` and `__main__.py`. Startup default is `plan`. Plan drops
 `write`/`edit` from `tools=` and denies them at dispatch.
 
-**Layer 6 — shell.** Done. `docs/07-shell.md` implemented in
+**Layer 6 — shell.** Done. `docs/shell.md` implemented in
 `tools/shell.py` and `agent.py`. Plan denies `bash` and `powershell`.
 
-**Layer 7 — permissions.** Done. `docs/08-permissions.md` implemented in
+**Layer 7 — permissions.** Done. `docs/permissions.md` implemented in
 `permissions.py`, the dispatch gate in `agent.py`, and the prompt in
 `__main__.py`. Plan keeps `bash` / `powershell` in the tool list; rules
 restrict them, not a stricter prompt.
 
-**Layer 8 — streaming and abort.** Done. `docs/09-streaming.md` is the guide.
+**Layer 8 — streaming and abort.** Done. `docs/streaming.md` is the guide.
 Conditional reasoning labels
 (`Thinking:` / `---` / text / `---` only when reasoning exists and display is on) and streamed answers
 with no `minicode >>` prefix are implemented.
@@ -429,7 +431,7 @@ One streamed create, a `chunk.to_dict()` merge that keeps `extra_content`,
 and a Ctrl+C that returns to `>>> ` with a coherent history. No background
 shell. `Session` still excludes prompt tokens.
 
-**Layer 9 — sessions.** Done. `docs/10-sessions.md` is the guide.
+**Layer 9 — sessions.** Done. `docs/sessions.md` is the guide.
 `sessions.py` persists one JSON file per conversation under the user data
 directory, keyed by workspace. `/sessions` lists newest first by id, resumes by
 number or full id, renames, and deletes. `/new` starts a clean conversation and
@@ -442,7 +444,7 @@ left. `/new` prints the status block with no usage line. Any unmatched
 A daemon title worker uses the active model
 after the first save; the fallback is local. Session files exclude the system
 prompt and reasoning. Session stamps are local `DD-MM-YYYY HH:MM`.
-Layer 10 export is implemented in `docs/11-export.md`. No reasoning capture,
+Layer 10 export is implemented in `docs/export.md`. No reasoning capture,
 no compaction, and no database.
 
 **Known gaps by phase.** These are open, not new layers.

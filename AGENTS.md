@@ -25,7 +25,7 @@ the same pass that only records it unless the user says implement.
 
 ## When the user questions a shipped choice
 
-Do not defend it from this file, `docs/STATUS.md`, a build guide, or
+Do not defend it from this file, `docs/STATUS.md`, an archived build guide, or
 `HARNESS_RESEARCH_AND_PLAN.md`. Those files record what was built. They are
 not evidence it is the right shape. Compare it to a named project (OpenCode,
 Pi, Aider, Claude Code) or that project's docs. Cite the mechanism. "It is
@@ -63,7 +63,8 @@ src/minicode/            # package
   permissions.py         # allow / ask / deny gate
   sessions.py            # session JSON, list, rename, delete
   tools/                 # read.py, write.py, edit.py, glob.py, grep.py, shell.py
-docs/                    # STATUS + setup + one build guide per layer
+docs/                    # index + one doc per subsystem + STATUS + STYLE
+docs/archive/            # retired build guides, frozen
 .env.example             # copy to .env
 ```
 
@@ -104,7 +105,7 @@ repeating them is how the archived guides went stale.
   not a rebuilt `tool_calls` list. Preserve `extra_content`. A Gemini thought
   signature rides in that dict. Do not parse it. A 400 that names
   `thought_signature` is the only reason to touch that append. The streaming
-  rebuild lives in `docs/09-streaming.md`. Do not implement streaming in a
+  rebuild lives in `docs/streaming.md`. Do not implement streaming in a
   pass that is only writing the guide.
 - Tool functions use Google-style docstrings. Only the first line becomes the
   model-visible description and `Args:` entries become parameter docs;
@@ -164,7 +165,7 @@ repeating them is how the archived guides went stale.
   Plan mode may tell the model to read every `glob` match in one response,
   and it says a user-named file is read directly without a `glob` first.
   No batching sentence in `SYSTEM`. No `PLAN.md`.
-- Shell is implemented in `docs/07-shell.md`. One
+- Shell is implemented in `docs/shell.md`. One
   function in `tools/shell.py`, resolved once at import. Windows: Git Bash,
   then `pwsh`, then `powershell.exe`. Skip `System32\bash.exe`. Unix: bash,
   then `sh`. No `pwsh` on Unix. No `cmd.exe`. The registered name is `bash`
@@ -179,7 +180,7 @@ repeating them is how the archived guides went stale.
   and `$env:VAR` do not. No `workdir`,
   no background process, no persistent session. Do not point `cwd` at the
   repo root to bypass `--sandbox`.
-- Permissions are implemented in `docs/08-permissions.md`,
+- Permissions are implemented in `docs/permissions.md`,
   `permissions.py`, the dispatch gate in `agent.py`, and the prompt in
   `__main__.py`. No config file, no shell scanner, no env scrubbing, no
   transport tag. Defaults: `read` / `glob` / `grep` / `edit` allow (`edit`
@@ -203,7 +204,7 @@ repeating them is how the archived guides went stale.
   The prompt still shows the command. The tool string does not. A plan
   denial, a permission denial, and an unknown tool print that tool string.
   Still no `|Tool Used|` line.
-- Sessions are implemented in `docs/10-sessions.md`, `sessions.py`, and
+- Sessions are implemented in `docs/sessions.md`, `sessions.py`, and
   `__main__.py`. One JSON file per session under
   `~/.local/share/minicode/sessions/<project-key>/<session-id>.json`; Windows
   uses `%USERPROFILE%\.local\share\minicode`; Unix honors `XDG_DATA_HOME`.
@@ -247,7 +248,7 @@ repeating them is how the archived guides went stale.
   `New session - YYYY-MM-DD HH:MM`. The worker only assigns `title` under
   `_TITLE_LOCK`; no file I/O, prints, messages, or usage. Main saves; join 2s
   on exit. Rename wins. Title text and tokens never enter history or status.
-  No reasoning storage. `/export` is implemented in `docs/11-export.md`:
+  No reasoning storage. `/export` is implemented in `docs/export.md`:
   `_transcript()` body with a title/created/exported header, default name from
   the session title (trailing date stamp and invalid filename characters
   removed, fallback `New Session.txt`), `external_directory` for an outside
@@ -334,7 +335,7 @@ repeating them is how the archived guides went stale.
   and there is no wait line. Answer tokens stream as they arrive. There is
   no `minicode >>` prefix. Tool lines,
   `Model Error:`, max-limit notices, and `[interrupted by user]` stay plain.
-  `docs/09-streaming.md` specifies the event
+  `docs/streaming.md` specifies the event
   contract. Reasoning is display-only: never
   append it to history, never use it as `content`. Strip `<thought>` and
   `<think>` before history. Do not read `extra_content` as reasoning; it
@@ -370,7 +371,7 @@ repeating them is how the archived guides went stale.
   deferred until more models are added; when it lands, pricing makes input
   part of a total. No Tok/s. A wall-clock rate is network wait, not model
   speed, and summed `total_tokens` counts the prompt once per step. An
-  aborted stream adds nothing. `docs/09-streaming.md` does not put
+  aborted stream adds nothing. `docs/streaming.md` does not put
   `prompt_tokens` into `Session`.
 - A new slash command is a handler in `__main__.py` before any model call,
   one row in `COMMANDS`, and a README commands-table row. `/help` prints
@@ -388,7 +389,7 @@ repeating them is how the archived guides went stale.
   field to fill an empty `content` or add it to history. A click paste that
   submits every `input()` line, and a Ctrl+C that does not land while httpx
   is blocked in Winsock `recv`, are deferred. The shape is an amendment to
-  `docs/09-streaming.md`, not next and not a new guide. Do not add
+  `docs/streaming.md`, not next and not a new doc. Do not add
   `prompt_toolkit`, asyncio, a TUI, or a short read timeout for it.
 - Do not commit secrets, session dumps, or transcripts.
 

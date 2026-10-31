@@ -19,13 +19,13 @@ Cost display waits until more models are added.
   AgenticRoadmap guide structure.
 - [x] Final plan: `HARNESS_RESEARCH_AND_PLAN.md` rewritten (loop, model
   registry, sandbox, plan/build, observability, layers).
-- [x] Session files: `AGENTS.md`, this STATUS, `docs/00-setup.md`,
-  `docs/01-loop.md`, `.env.example`, `.gitignore`.
-- [x] `docs/00-setup.md` — venv, `.env`, Gemini reachable. Guide now
+- [x] Session files: `AGENTS.md`, this STATUS, `docs/setup.md`,
+  `docs/loop.md`, `.env.example`, `.gitignore`.
+- [x] `docs/setup.md` — venv, `.env`, Gemini reachable. Guide now
   targets the OpenAI client.
-- [x] `docs/01-loop.md` / Layer 0: loop in `agent.py`, REPL in
+- [x] `docs/loop.md` / Layer 0: loop in `agent.py`, REPL in
   `__main__.py`. Live status is `In | Out | Session | Elapsed: {_elapsed}`. No Tok/s.
-- [x] `docs/02-file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
+- [x] `docs/file-tools.md` / Layer 1: `write` and `edit` in `tools/`.
   Registry in `agent.py`.
 - [x] History is the raw assistant message dict from the response JSON.
   Not `model_dump`. Tool line is `|Tool Used: \`name\``. `SYSTEM`
@@ -42,7 +42,7 @@ Cost display waits until more models are added.
 - [x] Layer 2: OpenAI client, `_SERVERS` registry, `/models`, raw message
   dict. Ids from `.env`. Bases in code. Startup default is `default_id`.
   Status elapsed is `_elapsed`, not raw seconds. No Tok/s. No LiteLLM.
-- [x] Layer 3 (`docs/04-workspace.md`): default workspace is the launch cwd
+- [x] Layer 3 (`docs/workspace.md`): default workspace is the launch cwd
   (`Path.cwd().resolve()` in `resolve_path.py`). `--sandbox path`
   overrides. Dev fence is `uv run python -m minicode --sandbox sandbox`.
 - [x] Split under `src/minicode/`: REPL in `__main__.py`, loop in
@@ -51,19 +51,19 @@ Cost display waits until more models are added.
   + `_elapsed`. No Tok/s. Tool line is `|Tool Used: \`name\``.
 - [x] `edit` returns a numbered window to the model (changed span, up to 5
   lines before and after). Diff stays stdout-only.
-- [x] Layer 4 (`docs/05-search.md`): `glob` and `grep` in `tools/`. Capped
+- [x] Layer 4 (`docs/search.md`): `glob` and `grep` in `tools/`. Capped
   at 50, `.env*` omitted, non-directory root is a tool error. Registry is
   wired. `SYSTEM` has the locate sentence as its own sentence. Shell is
   layer 6.
-- [x] Layer 5 (`docs/06-plan-build.md`): `/plan` and `/build` on one
+- [x] Layer 5 (`docs/modes.md`): `/plan` and `/build` on one
   session. Startup default is `plan`. Plan drops `write`/`edit` from
   `tools=` and denies them at dispatch. `TOOLS` stays full. History is
   not rewritten. `MAX_STEPS` is `16`. Shell is layer 6.
-- [x] Layer 6 (`docs/07-shell.md`): `shell` in `tools/shell.py`. Windows:
+- [x] Layer 6 (`docs/shell.md`): `shell` in `tools/shell.py`. Windows:
   Git Bash, then PowerShell. Unix: bash, then `sh`. Registered name is
   `bash` or `powershell`. This layer denied both in plan. Layer 7 puts
   them back and adds permissions. `cwd` is `SANDBOX`.
-- [x] Layer 7 (`docs/08-permissions.md`): `permissions.py`, dispatch gate,
+- [x] Layer 7 (`docs/permissions.md`): `permissions.py`, dispatch gate,
   and the `ask` prompt. `read` / `glob` / `grep` / `edit` allow (`edit`
   gates `write` and `edit`); `shell` allows except `.env` text and plan
   verbs; `external_directory` asks.
@@ -103,7 +103,7 @@ Cost display waits until more models are added.
   The ask remains. Shell is not force-denied.
 - [x] `*` matches a newline. A build-mode heredoc is allowed. A plan-mode
   heredoc still asks. A denied ask still returns the short `/build` sentence.
-- [x] `docs/09-streaming.md` / Layer 8: streaming and Ctrl+C abort are
+- [x] `docs/streaming.md` / Layer 8: streaming and Ctrl+C abort are
   implemented. Reasoning, when the provider sends it, prints inside a
   `Thinking:` / `---` / text / `---` block when `/thinking` is `on`. Default
   is `off`, which prints only `Thinking:`. Answer tokens stream as they
@@ -115,7 +115,7 @@ Cost display waits until more models are added.
   `|Tool Used: `{name}``. `/output off` hides the shell block. The model
   still gets that output. `/help` prints the `COMMANDS` tuple in
   `__main__.py`. A new slash command adds a handler and a row there.
-- [x] Layer 9 (`docs/10-sessions.md`): `sessions.py`; session JSON under
+- [x] Layer 9 (`docs/sessions.md`): `sessions.py`; session JSON under
   `~/.local/share/minicode/sessions/<project-key>/`; `/new`; live `/sessions`
   with resume, rename, and delete; LLM summary titles in a daemon thread;
   restored settings and `Session`; session-scoped `always`; atomic writes.
@@ -124,7 +124,7 @@ Cost display waits until more models are added.
   prints the same last line as before, rebuilt from `last_turn`
   (`prompt_tokens`, `completion_tokens`, `Elapsed`). Any unmatched `/...`
   prints `Unknown command: ... Use /help.` and is not sent to the model.
-- [x] Layer 10 (`docs/11-export.md`): `/export` writes `_transcript()` with a
+- [x] Layer 10 (`docs/export.md`): `/export` writes `_transcript()` with a
   title/created/exported header. The default name comes from the session
   title, with a trailing date stamp and invalid filename characters removed
   (fallback `New Session.txt`). An explicit path follows `classify`; an
@@ -162,7 +162,7 @@ Known and accepted. These are not the next layer.
 - A click or middle-click paste into `input()` submits every newline as a
   request. On Windows, Ctrl+C does not abort a model call while httpx is
   blocked in Winsock `recv`. Both are deferred. The shape is an amendment
-  to `docs/09-streaming.md`. Not next.
+  to `docs/streaming.md`. Not next.
 
 ## Next
 
@@ -180,7 +180,7 @@ tuple, not a client per brand; API key or OAuth; user `0600` auth file,
 not project `.env`; not a key-only phase), variants (reasoning effort;
 fetched with the catalog, not a create flag), `reasoning_effort` (Gemini
 summaries use `include_thoughts` and `thinking_level: low`, not this flag),
-Windows paste and a stuck Ctrl+C (amendment to `docs/09-streaming.md`, not
+Windows paste and a stuck Ctrl+C (amendment to `docs/streaming.md`, not
 a new guide and not next: after `input()` returns, if the console already
 has more lines, do not send them; on interrupt, `FlushConsoleInputBuffer`;
 run the stream on a worker and `time.sleep` on the main thread so Ctrl+C
