@@ -381,7 +381,8 @@ repeating them is how the archived guides went stale.
   handler chain prints `Unknown command: {first word}. Use /help.` and is
   not sent to the model. Slash input is never a prompt.
 - Never bare `pip install`. Deps via `uv add`; run with `uv run`.
-  `uv.lock` is committed (pins exact versions).
+  `uv.lock` is committed (pins exact versions). `uv run minicode` and
+  `uv run python -m minicode` are the same entry point.
 - Streaming, abort, the conditional reasoning labels, and the
   final-answer-only prefix are implemented. `KeyboardInterrupt` during
   a model call or a tool call is control flow, not a tool error. `tool_from_fn`

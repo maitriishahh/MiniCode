@@ -11,10 +11,12 @@ the order the work landed.
 
 ### Added
 
-- `CHANGELOG.md`, `docs/STYLE.md`, and the Apache-2.0 `LICENSE`.
+- `CHANGELOG.md`, `docs/STYLE.md`, `docs/index.md`, and the Apache-2.0
+  `LICENSE`.
 - Developer documentation: `DESIGN.md`, `docs/architecture.md`,
   `docs/observability.md`, `docs/commands.md`, and one reference doc per
   feature.
+- A `minicode` console script. `uv run minicode` starts the REPL.
 
 ### Changed
 

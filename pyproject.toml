@@ -1,12 +1,18 @@
 [project]
 name = "minicode"
 version = "0.1.0"
+description = "A small coding agent for the terminal."
+readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
     "openai>=3.22.1",
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
 ]
+
+[project.scripts]
+minicode = "minicode.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

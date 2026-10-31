@@ -44,9 +44,11 @@ the local server first.
 ## Run
 
 ```powershell
-uv run python -m minicode
-uv run python -m minicode --sandbox C:\path\to\project
+uv run minicode
+uv run minicode --sandbox C:\path\to\project
 ```
+
+`uv run python -m minicode` is the same entry point.
 
 `--sandbox` accepts a relative or absolute path and creates it if missing.
 Without it, the workspace is the directory you launch from. Startup prints
@@ -137,4 +139,8 @@ Ctrl+C during a model call or a tool call returns to `>>> ` when Python is
 between chunks. On Windows it does not abort a call blocked in a socket read;
 close the terminal tab. A click paste can submit every line as a request. A
 grandchild shell process can outlive the call. What is deliberately not built
-is listed in `DESIGN.md`.
+is listed in `DESIGN.md`. The doc map is `docs/index.md`.
+
+## License
+
+Apache-2.0. See `LICENSE`.

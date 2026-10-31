@@ -1,6 +1,6 @@
 # Status
 
-Layers 0–10 are shipped. Each contract is its feature doc under `docs/`.
+Layers 0–10 are shipped. Each contract is linked once from `docs/index.md`.
 Why a choice was made is `DESIGN.md`. What changed by release is
 `CHANGELOG.md`.
 

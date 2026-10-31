@@ -1,7 +1,7 @@
 # Setup
 
 **Status:** shipped · **Files:** `pyproject.toml`, `.env.example`
-**Verified:** 2026-10-30
+**Verified:** 2026-10-31
 
 What you need installed, and how to prove the model is reachable before you run
 anything that writes files. `README.md` has the short version; this doc keeps
@@ -99,11 +99,10 @@ startup.
 - `.env` exists, is listed in `.gitignore`, and `git status` does not show it.
 - The one-line create prints a short greeting.
 - `uv run python -m minicode` starts and prints a status block naming a model.
+  `uv run minicode` is the same entry point.
 
 ## Gaps
 
-- No `uv tool install` entry point yet; the package runs as
-  `python -m minicode`.
 - No setup check that validates `.env` before the first call. A bad key is
   discovered at the first prompt.
 
@@ -111,3 +110,5 @@ startup.
 
 - 2026-09-30  Setup retargeted from LiteLLM to the `openai` client. The
   `LITELLM_LOG` variable and the `gemini/` id prefix were removed with it.
+- 2026-10-31  A `minicode` console script arrived. `uv run minicode` and
+  `python -m minicode` start the same REPL.
