@@ -31,7 +31,7 @@ Every tool path goes through `classify`, which returns `(kind, resolved_path)`:
 
 | Kind | When |
 |---|---|
-| `dotenv` | the final name is `.env` or starts with `.env.`, except `.env.example` |
+| `dotenv` | the final name is `.env` or starts with `.env.`, except `.env.example`; on Windows the comparison is case-insensitive |
 | `external` | the resolved path is not the workspace and the workspace is not one of its parents |
 | `inside` | everything else |
 
@@ -106,6 +106,7 @@ break them.
 | `.env` | `dotenv`, asks on read |
 | `.env.local` | `dotenv`, asks |
 | `.env.example` | `inside`, allows |
+| `.ENV` on Windows | `dotenv`, asks; `.ENV.example` still allows |
 | a symlink pointing outside | `external` |
 | `--sandbox` with a missing dir | created at startup |
 | `--sandbox` with no value | ignored; cwd is used |
@@ -136,3 +137,5 @@ break them.
   development override.
 - 2026-10-25  Git Bash drive paths started being rewritten before the sandbox
   check, because `/d/...` was resolving as a relative path.
+- 2026-10-31  The `.env` name check became case-insensitive on Windows, so
+  `.ENV` no longer slipped past as an ordinary file.

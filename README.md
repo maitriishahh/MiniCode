@@ -91,18 +91,20 @@ different list. Nothing is written until the first message.
 
 `/sessions` lists newest first. `/sessions N` resumes and restores the model,
 mode, display flags, output-token total, and remembered approvals. `/export`
-writes the same replay to a text file; `.env` is refused, and a path outside
-the workspace asks. Session files stay on your machine. Detail is in
+writes the same replay to a text file; `.env` is refused (`.ENV` too on
+Windows), and a path outside the workspace asks. Session files stay on your
+machine. Detail is in
 `docs/sessions.md` and `docs/export.md`.
 
 ## Tools and permissions
 
 `read`, `write`, `edit`, `glob`, `grep`, and the loaded shell. `write` replaces
 a whole file; `edit` changes one exact span and prints a diff. Search is capped
-at 50. The shell times out at 120 seconds and keeps the last 8,000 characters. In-workspace edits do not ask. `.env` asks. A path outside the workspace
-asks. In plan, a shell command that reads, creates, or deletes asks; `ls` and
-`git` do not. Answer `o` once, `a` always (this exact value, this session), or
-`d` to deny.
+at 50. The shell times out at 120 seconds and keeps the last 8,000 characters.
+In-workspace edits do not ask. `.env` asks (any case on Windows). A path outside
+the workspace asks. In plan, a shell command that reads, creates, or deletes
+asks; `ls` and `git` do not. Answer `o` once, `a` always (this exact value, this
+session), or `d` to deny.
 
 The workspace is a path boundary, not a container. An approved command can
 `cd` out, and the shell inherits your environment. Do not run MiniCode on a

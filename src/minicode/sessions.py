@@ -56,6 +56,12 @@ def new_id() -> str:
 
 
 def fallback_title(when: str | None = None) -> str:
+    if when:
+        try:
+            local = datetime.strptime(when, "%d-%m-%Y %H:%M")
+            return f"New session - {local:%Y-%m-%d %H:%M}"
+        except ValueError:
+            pass
     try:
         moment = datetime.fromisoformat(when) if when else datetime.now(timezone.utc)
     except (TypeError, ValueError):

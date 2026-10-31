@@ -25,10 +25,16 @@ def _from_bash(path: str) -> str:
     return f"{match.group(1)}:/{match.group(2)}"
 
 
+def _dotenv_name(name: str) -> bool:
+    if sys.platform == "win32":
+        name = name.casefold()
+    return name != ".env.example" and (name == ".env" or name.startswith(".env."))
+
+
 def classify(path: str) -> tuple[str, Path]:
     path = _from_bash(path)
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
-    if p.name != ".env.example" and (p.name == ".env" or p.name.startswith(".env.")):
+    if _dotenv_name(p.name):
         return "dotenv", p
     if p != SANDBOX and SANDBOX not in p.parents:
         return "external", p

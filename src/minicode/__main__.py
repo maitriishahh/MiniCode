@@ -219,25 +219,25 @@ def _target(items: list[dict], token: str) -> dict | None:
             return item
     return None
 
-def _show_sessions(show: bool = True) -> list[dict]:
-    _save()
+def _show_sessions(show: bool = True) -> tuple[list[dict], bool]:
+    saved = _save()
     items, errors = sessions.list_sessions()
     for error in errors:
         print(f"\nSession Error: {error}\n")
     if not show:
-        return items
+        return items, saved
     if not items:
         print("\n(no saved sessions)\n")
-        return []
+        return [], saved
     current = _STATE["session"]
     print()
     for number, item in enumerate(items, 1):
         mark = " (active)" if current is not None and item.get("id") == current.get("id") else ""
-        title = item.get("title", "New Session").split(" - 20")[0].strip()
+        title = _strip_stamp(item.get("title", "New Session"))
         stamp = _stamp(item.get("created", ""))
         print(f"{number} {title} - {stamp}{mark}")
     print()
-    return items
+    return items, saved
 
 def _apply_session(data: dict) -> None:
     global _title_locked, _title_thread
@@ -310,6 +310,11 @@ def _replay() -> None:
         print("\n\n".join(blocks))
 
 def _resume(target: dict) -> None:
+    current = _STATE["session"]
+    if current is not None and target.get("id") == current.get("id"):
+        _join_title()
+        if not _save():
+            return
     try:
         data = sessions.load(target["id"])
     except sessions.SessionError as exc:
@@ -323,9 +328,12 @@ def _resume(target: dict) -> None:
 _INVALID_CHARS = re.compile(r'[\\/*?:"<>|]')
 _TRAILING_STAMP_RE = re.compile(r"\s*-\s*\d{2,4}[-/]\d{2}[-/]\d{2,4}\s+\d{2}:\d{2}$")
 
+def _strip_stamp(title: str) -> str:
+    return _TRAILING_STAMP_RE.sub("", title).strip()
+
 def _export_name(title: str) -> str:
     # Remove any trailing date stamp like "- 2026-10-29 21:36"
-    clean = _TRAILING_STAMP_RE.sub("", title).strip()
+    clean = _strip_stamp(title)
     # Remove characters not allowed in filenames
     safe = _INVALID_CHARS.sub("", clean).strip()
     return f"{safe or 'New Session'}.txt"
@@ -447,7 +455,7 @@ def main() -> None:
             continue
         if stripped == "/sessions" or stripped.startswith("/sessions "):
             parts = stripped.split(maxsplit=3)
-            items = _show_sessions(show=len(parts) == 1)
+            items, saved = _show_sessions(show=len(parts) == 1)
             if len(parts) == 1:
                 continue
             token = parts[1]
@@ -456,7 +464,8 @@ def main() -> None:
                 print(f"\nUnknown Session: {token}\n")
                 continue
             if len(parts) == 2:
-                _resume(target)
+                if saved:
+                    _resume(target)
                 continue
             action = parts[2].lower()
             if action in ("delete", "del"):

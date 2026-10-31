@@ -29,6 +29,22 @@ the order the work landed.
   `docs/architecture.md`. `docs/STATUS.md` names the next piece of work.
   `CONTRIBUTING.md` describes how a change lands.
 
+### Fixed
+
+- The session title call sends its own minimal thinking body instead of
+  inheriting the session's effort, and strips whole thought spans. A reasoning
+  model no longer leaves sessions stuck on `New session - ...`.
+- `/sessions` strips only a trailing date stamp. A title such as
+  `Plan - 2026 roadmap` is no longer cut down to `Plan`.
+- A blank-title repair keeps the session's creation time; the fallback title
+  parser accepts the `DD-MM-YYYY HH:MM` clock the rest of the session layer
+  writes.
+- Resuming the active session joins the title thread first, and a failed save
+  no longer replaces memory with the stale file.
+- On Windows, `.env` names are compared case-insensitively, so `.ENV` is
+  refused by `read` and `/export` instead of slipping through as an ordinary
+  file.
+
 ## [0.1.0] - 2026-10-30
 
 First usable release. Everything below is the accumulated result of layers 0

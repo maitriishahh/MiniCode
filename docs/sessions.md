@@ -134,6 +134,8 @@ maximum — and duplicates are allowed.
 effort, args, output, `always`, `Session`, and `last_turn`, then prints
 `Resumed: {title}`, replays the transcript, and prints the status block.
 
+Resuming the active session joins the title thread; a failed save skips the load.
+
 Replay prints `>>> {prompt}`, each assistant text, and one tool line per call
 that actually ran. It never prints a `role: "tool"` body, so file contents and
 command output do not reappear. A call whose result starts with `Plan mode:`,
@@ -142,12 +144,13 @@ tool line. Tool lines follow the restored `/args` value.
 
 ### Title
 
-After the first message is saved, one daemon thread asks the active model for a
-title: `TITLE_SYSTEM`, the first 2000 characters of the prompt, `max_tokens=64`,
-`stream=False`, `timeout=30.0`, `max_retries=1`, no tools. The answer is cleaned
-(thought tags, surrounding quotes and markdown, a leading `title:`), capped at
-60 characters, and assigned under `_TITLE_LOCK` only if the title is not locked
-and the session is still current.
+After the first save, one daemon thread asks the active model for a title:
+`TITLE_SYSTEM`, prompt capped at 2000 characters, `max_tokens=256`,
+`stream=False`, `timeout=30.0`, `max_retries=1`, no tools. Its thinking body is
+`minimal` without thoughts on Gemini and `reasoning_effort` `low` on Ollama,
+never `/effort`. Whole thought spans, quotes, markdown, and a leading `title:`
+are removed; whitespace collapses; the 60-character result is assigned under
+`_TITLE_LOCK` only if the title is not locked and the session is current.
 
 The worker does no file I/O, printing, message append, or usage accounting; the
 main thread saves it. Exit joins it for at most 2 seconds, a rename wins, and
@@ -229,17 +232,12 @@ conversation lifetime, and history stores no per-message usage to recount from.
 
 ## Gaps
 
-- No compaction and no message cap. A long session grows until the model
-  refuses it.
-- No search across sessions and no global list; only the current workspace.
-- Two processes in one workspace share the directory with no lock, so the later
-  save wins.
-- A title is generated from the first prompt only, so a conversation that
-  changes direction keeps its first name until renamed.
-- No reasoning capture, by design: a resumed session shows the answer but not
-  why the model chose it.
-- No `/resume` flag at startup, and a corrupt file is reported but never
-  repaired, quarantined, or removed.
+- No compaction or message cap; a long session grows until the model refuses it.
+- No search across sessions or global list; only the current workspace.
+- Two processes share the directory with no lock; the later save wins.
+- A title reflects the first prompt only; a changed direction keeps its name.
+- No reasoning capture: a resumed session shows the answer, not why.
+- No `/resume` flag, and a corrupt file is reported but never repaired.
 
 ## History
 
@@ -248,3 +246,5 @@ conversation lifetime, and history stores no per-message usage to recount from.
 - 2026-10-30  Timestamps became local `DD-MM-YYYY HH:MM`, with ISO values
   rewritten on load. Session paths and the status line restored by a resume
   were fixed in the same pass.
+- 2026-10-31  The title call uses minimal thinking and strips whole thought
+  spans; active-session resume joins the thread and skips a failed-save load.

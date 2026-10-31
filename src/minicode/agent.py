@@ -213,6 +213,38 @@ def _gemini_extra(base: str) -> dict | None:
         }
     }
 
+def _title_extra(base: str) -> dict:
+    if "generativelanguage.googleapis.com" in base:
+        return {
+            "extra_body": {
+                "google": {
+                    "thinking_config": {
+                        "include_thoughts": False,
+                        "thinking_level": "minimal",
+                    }
+                }
+            }
+        }
+    if base.startswith(("http://127.0.0.1", "http://localhost")):
+        return {"reasoning_effort": "low"}
+    return {}
+
+def _strip_thoughts(text: str) -> str:
+    while True:
+        lowered = text.lower()
+        found = [
+            (lowered.find(open_tag), open_tag, close)
+            for open_tag, close in _OPEN_TAGS
+            if lowered.find(open_tag) != -1
+        ]
+        if not found:
+            return text
+        at, open_tag, close = min(found, key=lambda item: item[0])
+        end = lowered.find(close, at + len(open_tag))
+        if end == -1:
+            return text[:at]
+        text = text[:at] + text[end + len(close):]
+
 def _tag_suffix(text: str, tags: tuple[str, ...]) -> str:
     best = ""
     lowered = text.lower()
@@ -252,8 +284,7 @@ def _client_for(record: dict, max_retries: int | None = None) -> OpenAI:
 def _clean_title(text: str) -> str | None:
     if not isinstance(text, str):
         return None
-    for tag in ("<thought>", "</thought>", "<think>", "</think>"):
-        text = text.replace(tag, "")
+    text = " ".join(_strip_thoughts(text).split())
     text = text.strip("\"'`*#: \n")
     if text.lower().startswith("title:"):
         text = text[6:].strip()
@@ -265,17 +296,18 @@ def session_title(first_prompt: str, model_id: str) -> str | None:
         return None
     try:
         client = _client_for(record, max_retries=1)
-        response = _create(
-            client,
-            model=record["id"],
-            messages=[
+        create = {
+            "model": record["id"],
+            "messages": [
                 {"role": "system", "content": TITLE_SYSTEM},
                 {"role": "user", "content": first_prompt[:2000]},
             ],
-            max_tokens=64,
-            stream=False,
-            timeout=30.0,
-        )
+            "max_tokens": 256,
+            "stream": False,
+            "timeout": 30.0,
+        }
+        create.update(_title_extra(record["api_base"]))
+        response = _create(client, **create)
         return _clean_title(response.choices[0].message.content)
     except Exception:
         return None

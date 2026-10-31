@@ -70,8 +70,10 @@ I found the handler in auth.py...
 | `external` | `permissions.decide("external_directory", path)`; deny prints `Permission denied: external_directory {path}` |
 
 `.env.example` classifies as inside, so it is not refused; the rule is about the
-secret, not the template. `~` is not expanded: `~/notes.txt` becomes
-`<workspace>/~/notes.txt`. Parent directories are created, like `write`.
+secret, not the template. On Windows the name check is case-insensitive, so
+`.ENV` is refused even before the file exists. `~` is not expanded:
+`~/notes.txt` becomes `<workspace>/~/notes.txt`. Parent directories are created,
+like `write`.
 
 Success prints the workspace-relative path for an inside target and an absolute
 forward-slash path for an outside one:
@@ -156,3 +158,5 @@ prompts.
 ## History
 
 - 2026-10-30  `/export` arrived, sharing `_transcript()` with the resume replay.
+- 2026-10-31  Windows `.ENV` names classify as `dotenv`, so the export refuses
+  them instead of creating a secrets file.
