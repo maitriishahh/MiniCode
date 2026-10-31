@@ -21,6 +21,8 @@ the order the work landed.
 - Documentation rewritten from per-layer build guides into developer docs that
   describe the shipped system. The build guides are archived unchanged under
   `docs/archive/build-guides/`.
+- `HARNESS_RESEARCH_AND_PLAN.md` renamed to `DESIGN.md`. Decisions are numbered.
+  The reliability rules and the source list are unchanged.
 
 ## [0.1.0] - 2026-10-30
 

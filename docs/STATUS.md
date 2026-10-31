@@ -17,8 +17,8 @@ Cost display waits until more models are added.
   providers/Zen/config/models/agents/permissions docs, LiteLLM function
   calling + Ollama + OpenAI-compatible docs, Ronacher agent notes,
   AgenticRoadmap guide structure.
-- [x] Final plan: `HARNESS_RESEARCH_AND_PLAN.md` rewritten (loop, model
-  registry, sandbox, plan/build, observability, layers).
+- [x] Final plan: `DESIGN.md` (was `HARNESS_RESEARCH_AND_PLAN.md`) records the
+  loop, model registry, sandbox, plan/build, and observability decisions.
 - [x] Session files: `AGENTS.md`, this STATUS, `docs/setup.md`,
   `docs/loop.md`, `.env.example`, `.gitignore`.
 - [x] `docs/setup.md` — venv, `.env`, Gemini reachable. Guide now

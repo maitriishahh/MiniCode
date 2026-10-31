@@ -7,7 +7,7 @@ that describes what shipped.
 
 1. This file (`AGENTS.md`)
 2. `docs/STATUS.md` — what is shipped, what is next
-3. `HARNESS_RESEARCH_AND_PLAN.md` — decisions (loop, providers, sandbox,
+3. `DESIGN.md` — decisions (loop, providers, sandbox,
    plan/build, observability)
 4. `docs/STYLE.md` — the documentation convention
 5. `docs/index.md` — the doc map; then the feature doc for the area you touch
@@ -26,7 +26,7 @@ the same pass that only records it unless the user says implement.
 ## When the user questions a shipped choice
 
 Do not defend it from this file, `docs/STATUS.md`, an archived build guide, or
-`HARNESS_RESEARCH_AND_PLAN.md`. Those files record what was built. They are
+`DESIGN.md`. Those files record what was built. They are
 not evidence it is the right shape. Compare it to a named project (OpenCode,
 Pi, Aider, Claude Code) or that project's docs. Cite the mechanism. "It is
 locked" is not a reason. If it still wins, say why in that comparison. If it
@@ -97,7 +97,7 @@ repeating them is how the archived guides went stale.
   and callback edges. A policy gate is not a parent of the tools it governs.
 - Growing subsystem: a doc that describes a change states what is kept, added,
   and replaced. The loop shape in
-  `HARNESS_RESEARCH_AND_PLAN.md` §1 is fixed — user appended once in the
+  `DESIGN.md` §1 is fixed — user appended once in the
   REPL, assistant appended once per reply, one `role: "tool"` per call.
   History stores plain dicts only. The assistant message appended is the raw
   JSON object from the response body (`choices[0].message`) or the plain dict
