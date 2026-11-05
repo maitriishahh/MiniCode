@@ -25,6 +25,16 @@ def _from_bash(path: str) -> str:
     return f"{match.group(1)}:/{match.group(2)}"
 
 
+def _expand_tilde(path: str) -> str:
+    if path == "~":
+        return str(Path.home())
+    if path.startswith("~/"):
+        return str(Path.home() / path[2:])
+    if sys.platform == "win32" and path.startswith("~\\"):
+        return str(Path.home() / path[2:])
+    return path
+
+
 def _dotenv_name(name: str) -> bool:
     if sys.platform == "win32":
         name = name.casefold()
@@ -32,6 +42,7 @@ def _dotenv_name(name: str) -> bool:
 
 
 def classify(path: str) -> tuple[str, Path]:
+    path = _expand_tilde(path)
     path = _from_bash(path)
     p = (SANDBOX / path).resolve() if not Path(path).is_absolute() else Path(path).resolve()
     if _dotenv_name(p.name):

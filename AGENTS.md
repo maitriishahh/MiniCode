@@ -262,20 +262,23 @@ repeating them is how the archived guides went stale.
   `New Session - {id}.txt`), `external_directory` for an outside path, `.env`
   refused (case-insensitive name on Windows), works in plan, no model call,
   no save.
-- `SYSTEM` states the workspace root, that a path may be absolute, that a
-  path the user already named is read with `read` (not `glob` and not the
-  shell), and the locate order (`glob` → `grep` → `read`). It names only the
-  loaded shell. It says a new file is `write`, not the shell. It names the
-  sessions root from `sessions.data_root()`; do not copy a literal user path.
+- `SYSTEM` states the workspace root, that a path may be absolute or start
+  with `~`, that a path the user already named is read with `read` (not `glob`
+  and not the shell), and the locate order (`glob` → `grep` → `read`). It
+  names only the loaded shell. It says a new file is `write`, not the shell.
+  It names the sessions root from `sessions.data_root()`; do not copy a
+  literal user path.
   `PLAN_SYSTEM` appends: if the user named a file, read that path; do not
   glob first. It also says not to create or delete files with the shell,
   not to paste file contents, and, if the user asked for a file, to end by
   telling them to run `/build`.
 - `exit` / `quit` / `bye` leave before any `chat.completions.create` call.
-- Paths may be absolute or workspace-relative. On Windows, `classify`
-  rewrites a Git Bash drive path `/d/Pycharm_Projects/...` to
+- Paths may be absolute or workspace-relative. `classify` expands a leading
+  `~`, `~/`, or Windows `~\` to the home directory before any other rewrite.
+  `~user` is not expanded. Do not call `Path.expanduser()`. On Windows,
+  `classify` then rewrites a Git Bash drive path `/d/Pycharm_Projects/...` to
   `D:/Pycharm_Projects/...` before the sandbox check. `/tmp` and `/home`
-  do not match. No rewrite on Unix. A path outside the workspace
+  do not match. No drive rewrite on Unix. A path outside the workspace
   triggers `external_directory`: allow runs, ask prompts, deny returns
   `Permission denied: external_directory {path}`. `.env` and `.env.*` ask
   on `read`. `.env.example` does not. On Windows the `classify` name check is

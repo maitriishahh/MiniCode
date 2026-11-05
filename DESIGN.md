@@ -489,6 +489,23 @@ fallback title `New session - YYYY-MM-DD HH:MM`.
 changes the default name and leaves the old file. Two sessions no longer share
 a default path.
 
+### D19 — A leading tilde is home
+
+**Status:** active
+
+**Decision.** `classify` expands a leading `~`, `~/`, or Windows `~\` to
+`Path.home()` before the Git Bash rewrite and the sandbox check. `~user` is
+not expanded. `SYSTEM` says a path may start with `~`.
+
+**Alternative.** Leave `~/notes.txt` as a relative path under a literal `~`
+directory. Expanding it only in `/export` would make one command resolve paths
+differently from `read` and `write`. `Path.expanduser()` also expands `~user`,
+which this harness does not need.
+
+**Consequence.** `~/notes.txt` is outside the workspace and asks
+`external_directory`. A workspace file under a literal `~` directory is no
+longer reachable by that spelling.
+
 ## Deferred
 
 Deliberately not being built. Each row is the union of the lists that existed

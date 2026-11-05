@@ -93,8 +93,8 @@ different list. Nothing is written until the first message.
 mode, display flags, output-token total, and remembered approvals. `/export`
 writes the same replay to a text file named from the title and the session id.
 The header is the stored title. `.env` is refused (`.ENV` too on Windows), and
-a path outside the workspace asks. Session files stay on your machine. Detail
-is in `docs/sessions.md` and `docs/export.md`.
+a path outside the workspace asks. A path may start with `~`. Session files
+stay on your machine. Detail is in `docs/sessions.md` and `docs/export.md`.
 
 ## Tools and permissions
 

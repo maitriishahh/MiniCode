@@ -1,7 +1,7 @@
 # Workspace
 
 **Status:** shipped · **Layer:** 3 · **Files:** `resolve_path.py`
-**Verified:** 2026-10-30
+**Verified:** 2026-11-06
 
 The workspace is the directory MiniCode was launched in, or the path given to
 `--sandbox`. It is the root that relative paths resolve against and the
@@ -49,9 +49,12 @@ A relative path is resolved against `SANDBOX`. An absolute path is resolved and
 then checked. `resolve()` follows symlinks, so a link that points outside the
 workspace classifies as `external`.
 
-On Windows, a Git Bash drive path is rewritten before the check:
+A leading `~`, `~/`, or Windows `~\` is expanded to the home directory before
+anything else. `~` alone is the home directory. `~user` is left as written.
+
+On Windows, a Git Bash drive path is rewritten after that expansion:
 `/d/projects/app` becomes `D:/projects/app`. `/tmp` and `/home` do not match
-that pattern and stay as written. On Unix no rewrite happens.
+that pattern and stay as written. On Unix no drive rewrite happens.
 
 The permission gate covers the two denied kinds. `agent._permit` calls
 `classify`, asks `permissions.decide`, and on allow calls
@@ -93,6 +96,8 @@ break them.
 - An approval is single-use and cleared in a `finally`. `agent.agent`.
 - A path outside the workspace is a prompt, not a hard error.
 - `--sandbox` accepts relative or absolute and is resolved before use.
+- A leading `~` expands before the Git Bash rewrite. `resolve_path._expand_tilde`.
+  `~user` does not.
 
 ## Edge cases
 
@@ -103,6 +108,10 @@ break them.
 | `C:/elsewhere/x` | `external` |
 | `/d/projects/x` on Windows | rewritten to `D:/projects/x`, then classified |
 | `/tmp/x` on Windows | left as written, then classified |
+| `~/notes.txt` | expanded to the home path, then `external` |
+| `~` | the home directory |
+| `~user/x` | not expanded |
+| `~\notes.txt` on Windows | expanded, then classified |
 | `.env` | `dotenv`, asks on read |
 | `.env.local` | `dotenv`, asks |
 | `.env.example` | `inside`, allows |
@@ -139,3 +148,4 @@ break them.
   check, because `/d/...` was resolving as a relative path.
 - 2026-10-31  The `.env` name check became case-insensitive on Windows, so
   `.ENV` no longer slipped past as an ordinary file.
+- 2026-11-06  A leading tilde expands to the home directory before classification.

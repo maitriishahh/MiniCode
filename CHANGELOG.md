@@ -30,6 +30,7 @@ the order the work landed.
   `CONTRIBUTING.md` describes how a change lands.
 - `/export` names the default file from the session title and id, and the
   header is the stored title without a second date.
+- A leading `~` in a path expands to the home directory before classification.
 
 ### Fixed
 

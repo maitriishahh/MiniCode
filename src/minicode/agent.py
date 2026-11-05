@@ -56,7 +56,7 @@ SYSTEM = (
     "add/append means insert while preserving all existing content — never delete or rewrite it; "
     "never `write` with partial content. "
     "A new file is `write`, not the shell. "
-    f"Workspace is {SANDBOX}. A path may be absolute. Outside it asks permission. "
+    f"Workspace is {SANDBOX}. A path may be absolute or start with `~` for your home directory. Outside it asks permission. "
     "A path the user already named is read with `read`, not `glob` and not the shell. "
     "Locate an unknown file with `glob`, then `grep`, then `read`. "
     f"Run tests and git with `{shell.__name__}`. Do not use it to read or search files. "

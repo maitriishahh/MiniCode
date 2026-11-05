@@ -81,9 +81,9 @@ I found the handler in auth.py...
 
 `.env.example` classifies as inside, so it is not refused; the rule is about the
 secret, not the template. On Windows the name check is case-insensitive, so
-`.ENV` is refused even before the file exists. `~` is not expanded:
-`~/notes.txt` becomes `<workspace>/~/notes.txt`. Parent directories are created,
-like `write`.
+`.ENV` is refused even before the file exists. A leading `~` or `~/` is expanded
+by `classify` before the workspace check, so `~/notes.txt` is outside and asks.
+`~user` is not expanded. Parent directories are created, like `write`.
 
 Success prints the workspace-relative path for an inside target and an absolute
 forward-slash path for an outside one:
@@ -146,6 +146,7 @@ prompts.
 | two sessions, same title | different default names; each file stays |
 | export before the title worker lands | `New session - {id}.txt`; a later export writes the titled file and leaves the first |
 | rename, then export | a new file; the old one stays |
+| `/export ~/notes.txt` | expands to the home path and asks |
 | plan mode | works; `/export` is not `write` or `edit` |
 | `/export` after `/new` | `Nothing to export yet` |
 
@@ -166,7 +167,7 @@ prompts.
 
 - No Markdown, JSON, or HTML export, and no range selection.
 - No timestamped default name, so a second export of the same session overwrites.
-- `~` is not expanded; there is no home shortcut.
+- `~user` is not expanded.
 - The export includes tool names and arguments but not results, so a transcript
   cannot be replayed from the file.
 
@@ -177,3 +178,4 @@ prompts.
   them instead of creating a secrets file.
 - 2026-11-06  The default name appends the session id, and the header keeps the
   stored title without a second date.
+- 2026-11-06  A leading `~` expands before classification, including `/export`.
