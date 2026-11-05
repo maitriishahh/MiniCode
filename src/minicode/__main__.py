@@ -501,57 +501,11 @@ def main() -> None:
             _save()
             continue
         if stripped == "/thinking" or stripped.startswith("/thinking "):
-            choices = ("off", "on")
-            parts = stripped.split(maxsplit=1)
-            if len(parts) == 1:
-                print()
-                for n, name in enumerate(choices, 1):
-                    mark = " (active)" if name == thinking["name"] else ""
-                    print(f"{n} {name}{mark}")
-                print()
-            else:
-                chosen = parts[1].strip()
-                if chosen.isdigit():
-                    n = int(chosen)
-                    picked = choices[n - 1] if 1 <= n <= len(choices) else None
-                    if picked is None:
-                        print(f"\nUnknown Thinking: {chosen}\n")
-                        continue
-                    chosen = picked
-                else:
-                    chosen = chosen.lower()
-                if chosen not in choices:
-                    print(f"\nUnknown Thinking: {parts[1].strip()}\n")
-                else:
-                    thinking["name"] = chosen
-                    print(f"\nThinking: {thinking['name']}\n")
+            _listed("Thinking", ("off", "on"), thinking, stripped)
             _save()
             continue
         if stripped == "/effort" or stripped.startswith("/effort "):
-            choices = ("low", "medium", "high")
-            parts = stripped.split(maxsplit=1)
-            if len(parts) == 1:
-                print()
-                for n, name in enumerate(choices, 1):
-                    mark = " (active)" if name == effort["name"] else ""
-                    print(f"{n} {name}{mark}")
-                print()
-            else:
-                chosen = parts[1].strip()
-                if chosen.isdigit():
-                    n = int(chosen)
-                    picked = choices[n - 1] if 1 <= n <= len(choices) else None
-                    if picked is None:
-                        print(f"\nUnknown Effort: {chosen}\n")
-                        continue
-                    chosen = picked
-                else:
-                    chosen = chosen.lower()
-                if chosen not in choices:
-                    print(f"\nUnknown Effort: {parts[1].strip()}\n")
-                else:
-                    effort["name"] = chosen
-                    print(f"\nEffort: {effort['name']}\n")
+            _listed("Effort", ("low", "medium", "high"), effort, stripped)
             _save()
             continue
         if stripped == "/args" or stripped.startswith("/args "):

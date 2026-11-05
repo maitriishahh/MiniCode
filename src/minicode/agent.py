@@ -312,55 +312,6 @@ def session_title(first_prompt: str, model_id: str) -> str | None:
     except Exception:
         return None
 
-    # record = MODELS.get(model_id)
-    # if record is None:
-    #     return None
-    # base = record["api_base"]
-    #
-    # # 45s timeout and 512 max_tokens so reasoning models have room to finish
-    # create_kwargs = {
-    #     "model": record["id"],
-    #     "messages": [
-    #         {"role": "system", "content": TITLE_SYSTEM},
-    #         {"role": "user", "content": first_prompt[:2000]},
-    #     ],
-    #     "max_tokens": 512,
-    #     "stream": False,
-    #     "timeout": 45.0,
-    # }
-    #
-    # # Use thinking_level: minimal (valid for Gemini 3.x) with double-nested extra_body
-    # if "generativelanguage.googleapis.com" in base:
-    #     create_kwargs["extra_body"] = {
-    #         "extra_body": {
-    #             "google": {
-    #                 "thinking_config": {
-    #                     "thinking_level": "minimal",
-    #                     "include_thoughts": False,
-    #                 }
-    #             }
-    #         }
-    #     }
-    # elif base.startswith(("http://127.0.0.1", "http://localhost")):
-    #     create_kwargs["reasoning_effort"] = "low"
-    #
-    # try:
-    #     client = _client_for(record, max_retries=2)
-    #     response = _create(client, **create_kwargs)
-    #     content = response.choices[0].message.content
-    #     title = _clean_title(content)
-    #     if title:
-    #         return title
-    # except Exception:
-    #     pass
-    #
-    # # Safe fallback: extract first 5-6 words from prompt if API call fails
-    # words = [w for w in first_prompt.strip().split() if w]
-    # if words:
-    #     clean_prompt = " ".join(words[:6]).strip("\"'`*# ")
-    #     return clean_prompt[:60]
-    # return None
-
 
 def _consume(stream, on_event, state: dict) -> None:
     state["text"] = ""

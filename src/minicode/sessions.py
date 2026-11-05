@@ -243,7 +243,7 @@ def delete(session_id: str) -> None:
 def list_sessions() -> tuple[list[dict], list[str]]:
     folder = _project_dir()
     try:
-        paths = sorted(folder.glob("*.json"))
+        paths = folder.glob("*.json")
     except OSError as exc:
         return [], [str(exc)]
     found: list[dict] = []
