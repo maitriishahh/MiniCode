@@ -149,14 +149,14 @@ After the first save, one daemon thread asks the active model for a title:
 `stream=False`, `timeout=30.0`, `max_retries=1`, no tools. Its thinking body is
 `minimal` without thoughts on Gemini and `reasoning_effort` `low` on Ollama,
 never `/effort`. Whole thought spans, quotes, markdown, and a leading `title:`
-are removed; whitespace collapses; the 60-character result is assigned under
-`_TITLE_LOCK` only if the title is not locked and the session is current.
+are removed and whitespace collapses. The 60-character result is assigned
+under `_TITLE_LOCK` onto the live session when its id matches the thread's
+start, and only if not locked; a replaced dict of that id still receives it.
 
-The worker does no file I/O, printing, message append, or usage accounting; the
-main thread saves it. Exit joins it for at most 2 seconds, a rename wins, and
-title tokens never enter `In`, `Out`, `Session`, or history. The fallback is
-`New session - YYYY-MM-DD HH:MM` local, so a row always exists before the
-summary lands.
+The worker does no file I/O, printing, message append, or usage accounting;
+the main thread saves it. Exit joins it for at most 2 seconds, a rename
+wins, and title tokens never enter `In`, `Out`, `Session`, or history. The
+fallback is `New session - YYYY-MM-DD HH:MM` local, so a row exists first.
 
 ## Why this shape
 
@@ -195,7 +195,7 @@ conversation lifetime, and history stores no per-message usage to recount from.
   added to it. `sessions._snapshot`.
 - Writes are atomic. `sessions._write`.
 - The title worker touches only `session["title"]`, only under the lock, and
-  only when the session is still current. `__main__._start_title`.
+  only on the live dict of that id. `__main__._start_title`.
 - The title call never updates usage. `agent.session_title`.
 - A bad file is skipped by the list and raises on direct load.
 - `/new` and an active delete leave no file behind.
@@ -234,7 +234,6 @@ conversation lifetime, and history stores no per-message usage to recount from.
 
 - No compaction or message cap; a long session grows until the model refuses it.
 - No search across sessions or global list; only the current workspace.
-- Two processes share the directory with no lock; the later save wins.
 - A title reflects the first prompt only; a changed direction keeps its name.
 - No reasoning capture: a resumed session shows the answer, not why.
 - No `/resume` flag, and a corrupt file is reported but never repaired.
@@ -248,3 +247,4 @@ conversation lifetime, and history stores no per-message usage to recount from.
   were fixed in the same pass.
 - 2026-10-31  The title call uses minimal thinking and strips whole thought
   spans; active-session resume joins the thread and skips a failed-save load.
+- 2026-11-05  A late title is kept when the resumed session id matches.

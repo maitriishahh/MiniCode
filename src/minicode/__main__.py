@@ -190,9 +190,17 @@ def _start_title(target: dict, prompt: str, model_id: str) -> None:
         if not title:
             return
         with _TITLE_LOCK:
-            if _title_locked or _STATE["session"] is not target:
+            current = _STATE["session"]
+            wanted = target.get("id")
+            if (
+                _title_locked
+                or not isinstance(wanted, str)
+                or not wanted
+                or current is None
+                or current.get("id") != wanted
+            ):
                 return
-            target["title"] = title
+            current["title"] = title
 
     with _TITLE_LOCK:
         _title_locked = False
@@ -258,6 +266,7 @@ def _apply_session(data: dict) -> None:
         item for item in data.get("messages", [])
         if isinstance(item, dict) and item.get("role") != "system"
     ]
+    previous_id = _STATE["session"].get("id") if isinstance(_STATE["session"], dict) else None
     _STATE["messages"] = [_system()] + history
     _STATE["session"] = data
     usage = data.get("usage")
@@ -274,7 +283,8 @@ def _apply_session(data: dict) -> None:
     last_turn["Elapsed"] = float(seconds) if isinstance(seconds, (int, float)) else None
     restore_always(data.get("always", []))
     with _TITLE_LOCK:
-        _title_locked = False
+        if not (_title_locked and previous_id == data.get("id")):
+            _title_locked = False
         _title_thread = None
 
 _NOTE_PREFIXES = ("Plan mode:", "Permission denied:", "Unknown tool:", "Tool error:", "Model Error:")

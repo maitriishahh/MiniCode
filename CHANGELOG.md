@@ -44,6 +44,7 @@ the order the work landed.
 - On Windows, `.env` names are compared case-insensitively, so `.ENV` is
   refused by `read` and `/export` instead of slipping through as an ordinary
   file.
+- A title that arrives after a resume is kept when the session id is the same.
 
 ## [0.1.0] - 2026-10-30
 

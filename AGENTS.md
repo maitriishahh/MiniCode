@@ -248,11 +248,13 @@ repeating them is how the archived guides went stale.
   `reasoning_effort` `low`, never the session `/effort`. Thought spans
   (`<thought>` / `<think>`, opener to closer) are removed, then whitespace
   collapses, before the title is used. Fallback
-  `New session - YYYY-MM-DD HH:MM`. The worker only assigns `title` under
+  `New session - YYYY-MM-DD HH:MM`. The worker assigns `title` on the live
+  session dict when the id matches, not when the object is the same, under
   `_TITLE_LOCK`; no file I/O, prints, messages, or usage. Main saves; join 2s
   on exit. Resume of the active session joins the title thread and saves again
   before it replaces the session object; a failed save does not load from
-  disk. Rename wins. Title text and tokens never enter history or status.
+  disk. Rename wins, including across a resume of that id. Title text and
+  tokens never enter history or status.
   No reasoning storage. `/export` is implemented in `docs/export.md`:
   `_transcript()` body with a title/created/exported header, default name from
   the session title (trailing date stamp and invalid filename characters
