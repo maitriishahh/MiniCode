@@ -256,11 +256,12 @@ repeating them is how the archived guides went stale.
   disk. Rename wins, including across a resume of that id. Title text and
   tokens never enter history or status.
   No reasoning storage. `/export` is implemented in `docs/export.md`:
-  `_transcript()` body with a title/created/exported header, default name from
-  the session title (trailing date stamp and invalid filename characters
-  removed, fallback `New Session.txt`), `external_directory` for an outside
-  path, `.env` refused (case-insensitive name on Windows), works in plan, no
-  model call, no save.
+  `_transcript()` body with the stored title and an `Exported:` line, default
+  name from the session title plus the session id (trailing date stamp and
+  invalid filename characters removed, then ` - {id}`, fallback
+  `New Session - {id}.txt`), `external_directory` for an outside path, `.env`
+  refused (case-insensitive name on Windows), works in plan, no model call,
+  no save.
 - `SYSTEM` states the workspace root, that a path may be absolute, that a
   path the user already named is read with `read` (not `glob` and not the
   shell), and the locate order (`glob` → `grep` → `read`). It names only the

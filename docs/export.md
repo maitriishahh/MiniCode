@@ -1,7 +1,7 @@
 # Export
 
 **Status:** shipped · **Layer:** 9 · **Files:** `__main__.py`
-**Verified:** 2026-10-30
+**Verified:** 2026-11-06
 
 `/export` writes the current conversation to a plain-text file in the same shape
 the resume replay prints. It is a view of live state: no model call, no message
@@ -11,23 +11,31 @@ append, no save, no change to any counter.
 
 | Input | Result |
 |---|---|
-| `/export` | write `<title>.txt` in the workspace root |
+| `/export` | write `<title> - <session id>.txt` in the workspace root |
 | `/export <path>` | write there, absolute or workspace-relative |
 | `/export` before the first message | `Nothing to export yet`, no file |
 | `/export .env` or `/export .env.local` | `Export Error: refusing to write .env files`, no file |
 | outside the workspace | `external_directory` prompt, then write or deny |
 | `/export my notes.txt` | the whole remainder is the path, spaces included |
 
-The default name comes from the session title:
+The default name comes from the session title and id:
 
 ```python
-_TRAILING_STAMP_RE = re.compile(r"\s*-\s*\d{2,4}[-/]\d{2}[-/]\d{2,4}\s+\d{2}:\d{2}$")
-_INVALID_CHARS = re.compile(r'[\\/*?:"<>|]')
+def _export_name(title: str, session_id: str) -> str:
+    # Remove any trailing date stamp like "- 2026-10-29 21:36"
+    clean = _strip_stamp(title)
+    # Remove characters not allowed in filenames
+    safe = _INVALID_CHARS.sub("", clean).strip()
+    suffix = f" - {session_id}" if session_id else ""
+    return f"{safe or 'New Session'}{suffix}.txt"
 ```
 
 A trailing date stamp is removed, then characters that Windows cannot use in a
-filename. An empty result is `New Session.txt`. The fallback title
-`New session - 2026-10-30 14:25` therefore exports as `New session.txt`.
+filename. The session id is appended after both, so two sessions with the same
+title get different files and a re-export of one session overwrites its own.
+An empty title falls back to `New Session`. The fallback title
+`New session - 2026-10-31 14:25` therefore exports as
+`New session - 20261031-142500-3d1d.txt`; the id is the session's own.
 
 Because the name follows the title, a rename or a late title changes the default
 target. The previous file stays where it was.
@@ -35,7 +43,7 @@ target. The previous file stays where it was.
 ### File shape
 
 ```text
-Fix login redirect - 29-10-2026 14:25
+Fix login redirect
 Exported: 29-10-2026 15:02
 
 >>> the login form redirects to / instead of /home
@@ -45,8 +53,10 @@ I found the handler in auth.py...
 |Tool Used: `read`
 ```
 
-- Line 1 is the title and the local `created` stamp; line 2 is the local export
-  time. Both use `%d-%m-%Y %H:%M`, the same shape as `/sessions`.
+- Line 1 is the stored title verbatim; line 2 is the local export time. The
+  `created` stamp is not repeated, because the fallback title already carries
+  its own date. `Exported:` uses `%d-%m-%Y %H:%M`, the same shape as
+  `/sessions`.
 - A blank line, then `_transcript()` joined with one blank line between blocks,
   then one trailing newline.
 - No model id and no mode: both can change mid-session and would misdescribe
@@ -95,8 +105,13 @@ belongs in a document the user might paste somewhere. The tool line records that
 the call happened.
 
 **No model metadata.** The model and mode change during a session, so a single
-header value would be wrong for most of the file. The title and the creation
-time are the two facts that hold for the whole conversation.
+header value would be wrong for most of the file. The stored title already
+names the conversation. Repeating `created` doubled the date on a fallback
+title such as `New session - YYYY-MM-DD HH:MM`.
+
+**The id belongs in the filename.** A title-only name made two sessions share
+one file. The session id is unique and does not change on rename, so a
+re-export still overwrites that session's file and leaves the other alone.
 
 **The permission path is `decide`, not `_resolve`.** `_resolve` raises for
 `.env` and outside paths; export needs to print a specific message and offer the
@@ -115,7 +130,8 @@ prompts.
 - An outside target uses `external_directory`, the same key as the tools.
 - `_transcript` omits every `role: "tool"` body and every call whose result
   starts with a note prefix. `__main__._NOTE_PREFIXES`.
-- The header order is title, created, exported.
+- The header is the stored title, then `Exported:`. The stored title is not
+  stripped.
 - The file ends with exactly one newline when it has blocks.
 
 ## Edge cases
@@ -127,8 +143,8 @@ prompts.
 | `/export` answered `always` | the next export to that path does not ask |
 | a target that is a directory | `Export Error:` from `OSError` |
 | a session with no messages | header lines only |
-| two sessions, same title | same default name; the later export overwrites |
-| export before the title worker lands | `New session.txt`; a later export writes the titled file and leaves the first |
+| two sessions, same title | different default names; each file stays |
+| export before the title worker lands | `New session - {id}.txt`; a later export writes the titled file and leaves the first |
 | rename, then export | a new file; the old one stays |
 | plan mode | works; `/export` is not `write` or `edit` |
 | `/export` after `/new` | `Nothing to export yet` |
@@ -149,8 +165,7 @@ prompts.
 ## Gaps
 
 - No Markdown, JSON, or HTML export, and no range selection.
-- No timestamped default name, so two exports of the same session overwrite.
-- Two sessions with the same title collide on the default path.
+- No timestamped default name, so a second export of the same session overwrites.
 - `~` is not expanded; there is no home shortcut.
 - The export includes tool names and arguments but not results, so a transcript
   cannot be replayed from the file.
@@ -160,3 +175,5 @@ prompts.
 - 2026-10-30  `/export` arrived, sharing `_transcript()` with the resume replay.
 - 2026-10-31  Windows `.ENV` names classify as `dotenv`, so the export refuses
   them instead of creating a secrets file.
+- 2026-11-06  The default name appends the session id, and the header keeps the
+  stored title without a second date.

@@ -28,6 +28,8 @@ the order the work landed.
 - `README.md` is the install and command guide. The turn diagram moved to
   `docs/architecture.md`. `docs/STATUS.md` names the next piece of work.
   `CONTRIBUTING.md` describes how a change lands.
+- `/export` names the default file from the session title and id, and the
+  header is the stored title without a second date.
 
 ### Fixed
 

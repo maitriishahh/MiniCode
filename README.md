@@ -71,7 +71,7 @@ starts with `/` prints `Unknown command: {word}. Use /help.` and is not sent.
 | `/models` | List loaded models. A number or an id switches for this session. |
 | `/new` | Start a new session. Mode, model, thinking, effort, args, and output reset to their defaults. |
 | `/sessions` | List saved sessions. A number resumes. `delete` and `rename` are actions. |
-| `/export` | Write this session's transcript to a `.txt` in the workspace. |
+| `/export` | Write this session's transcript to a `.txt`. The default name is the title plus the session id. |
 | `/thinking` | Show or hide reasoning. `1 off`, `2 on`. Default `off`. |
 | `/effort` | Set effort. `1 low`, `2 medium`, `3 high`. Default `low`. |
 | `/args` | Show or hide tool arguments. `1 off`, `2 on`. Default `off`. |
@@ -91,10 +91,10 @@ different list. Nothing is written until the first message.
 
 `/sessions` lists newest first. `/sessions N` resumes and restores the model,
 mode, display flags, output-token total, and remembered approvals. `/export`
-writes the same replay to a text file; `.env` is refused (`.ENV` too on
-Windows), and a path outside the workspace asks. Session files stay on your
-machine. Detail is in
-`docs/sessions.md` and `docs/export.md`.
+writes the same replay to a text file named from the title and the session id.
+The header is the stored title. `.env` is refused (`.ENV` too on Windows), and
+a path outside the workspace asks. Session files stay on your machine. Detail
+is in `docs/sessions.md` and `docs/export.md`.
 
 ## Tools and permissions
 

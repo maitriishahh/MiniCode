@@ -341,12 +341,13 @@ _TRAILING_STAMP_RE = re.compile(r"\s*-\s*\d{2,4}[-/]\d{2}[-/]\d{2,4}\s+\d{2}:\d{
 def _strip_stamp(title: str) -> str:
     return _TRAILING_STAMP_RE.sub("", title).strip()
 
-def _export_name(title: str) -> str:
+def _export_name(title: str, session_id: str) -> str:
     # Remove any trailing date stamp like "- 2026-10-29 21:36"
     clean = _strip_stamp(title)
     # Remove characters not allowed in filenames
     safe = _INVALID_CHARS.sub("", clean).strip()
-    return f"{safe or 'New Session'}.txt"
+    suffix = f" - {session_id}" if session_id else ""
+    return f"{safe or 'New Session'}{suffix}.txt"
 
 def _export(raw: str) -> None:
     session = _STATE["session"]
@@ -355,8 +356,9 @@ def _export(raw: str) -> None:
         return
     blocks = _transcript()
 
+    raw_title = session.get("title", "New Session")
     text = (
-        f"{session.get('title', 'Untitled')} - {_stamp(session.get('created', ''))}\n"
+        f"{raw_title}\n"
         f"Exported: {datetime.now():%d-%m-%Y %H:%M}\n"
     )
     if blocks:
@@ -375,9 +377,9 @@ def _export(raw: str) -> None:
                 print(f"\nPermission denied: external_directory {shown}\n")
                 return
 
-    # Use the session title for the filename
+    # Name the default file after this session
     if target is None:
-        target = SANDBOX / _export_name(session.get("title", "New Session"))
+        target = SANDBOX / _export_name(raw_title, session.get("id", ""))
 
     try:
         target.parent.mkdir(parents=True, exist_ok=True)

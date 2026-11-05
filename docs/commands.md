@@ -101,7 +101,8 @@ block rebuilt from the saved turn.
 other than `y` or `yes` prints `Cancelled`. A delete prints `Deleted: {title}`.
 
 **`/export`.** `Exported as {path}` with a workspace-relative path inside the
-workspace and an absolute forward-slash path outside it. `.env` is refused with
+workspace and an absolute forward-slash path outside it. A bare `/export` names
+the file from the title plus the session id. `.env` is refused with
 `Export Error: refusing to write .env files`. A session that has not started
 prints `Nothing to export yet`.
 

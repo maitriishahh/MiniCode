@@ -473,6 +473,22 @@ describe behaviour that exists in `src/` today.
 and `README.md` when the user can see it, in the same commit. A shipped
 decision is not edited; it is superseded here.
 
+### D18 — An export is named for the session
+
+**Status:** active
+
+**Decision.** A bare `/export` writes `<stripped title> - <session id>.txt`.
+The header is the stored title, then `Exported:`. The created stamp is not
+repeated, and the stored title is not stripped.
+
+**Alternative.** A title-only filename, which collided when two sessions shared
+a title, and a header that appended `created`, which doubled the date on the
+fallback title `New session - YYYY-MM-DD HH:MM`.
+
+**Consequence.** A re-export of the same session overwrites one file. A rename
+changes the default name and leaves the old file. Two sessions no longer share
+a default path.
+
 ## Deferred
 
 Deliberately not being built. Each row is the union of the lists that existed
@@ -544,9 +560,8 @@ workspace is a path boundary, not a container; no permissions config file; no
 env scrubbing; no diff viewer; `AGENTS.md` is not injected; cost is not
 displayed; a paste can submit every line; Ctrl+C does not land in a blocked
 Winsock `recv`. Each of those is a row in ## Deferred, except the ones that
-are accepted limits of a shipped feature (`docs/export.md` overwrites a file
-when two sessions share a title; session files exclude reasoning on purpose,
-D15).
+are accepted limits of a shipped feature (session files exclude reasoning on
+purpose, D15).
 
 ## Invariants
 
