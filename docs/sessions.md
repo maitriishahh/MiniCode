@@ -137,10 +137,10 @@ effort, args, output, `always`, `Session`, and `last_turn`, then prints
 Resuming the active session joins the title thread; a failed save skips the load.
 
 Replay prints `>>> {prompt}`, each assistant text, and one tool line per call
-that actually ran. It never prints a `role: "tool"` body, so file contents and
-command output do not reappear. A call whose result starts with `Plan mode:`,
-`Permission denied:`, `Unknown tool:`, `Tool error:`, or `Model Error:` gets no
-tool line. Tool lines follow the restored `/args` value.
+that ran, using the restored `/args` value. It never prints a `role: "tool"`
+body. A call with `note` true gets no tool line; an older message without
+`note` is skipped when its result starts with `Plan mode:`, `Permission denied:`,
+`Unknown tool:`, `Tool error:`, or `Model Error:`.
 
 ### Title
 
@@ -245,6 +245,6 @@ conversation lifetime, and history stores no per-message usage to recount from.
 - 2026-10-30  Timestamps became local `DD-MM-YYYY HH:MM`, with ISO values
   rewritten on load. Session paths and the status line restored by a resume
   were fixed in the same pass.
-- 2026-10-31  The title call uses minimal thinking and strips whole thought
-  spans; active-session resume joins the thread and skips a failed-save load.
+- 2026-10-31  Minimal title thinking, thought-span stripping, and a resume that skips a failed save.
 - 2026-11-05  A late title is kept when the resumed session id matches.
+- 2026-11-06  Replay trusts a stored `note` and falls back to the old prefixes.

@@ -61,8 +61,8 @@ I found the handler in auth.py...
   then one trailing newline.
 - No model id and no mode: both can change mid-session and would misdescribe
   earlier turns.
-- No system prompt, no `role: "tool"` bodies, no reasoning. History stores none
-  of them, so nothing has to be filtered out beyond the tool results.
+- No system prompt, no `role: "tool"` bodies, no reasoning. A call marked
+  `note` is omitted the same way replay omits it.
 - Tool lines follow the current `/args` value, exactly as replay does.
 - `[interrupted by user]` and `[model error]` export as written.
 - Newlines are `\n` via `newline="\n"`, matching session files and git.
@@ -128,8 +128,8 @@ prompts.
 - `.env` is refused before any write. `classify` decides, so `resolve_path` owns
   the rule.
 - An outside target uses `external_directory`, the same key as the tools.
-- `_transcript` omits every `role: "tool"` body and every call whose result
-  starts with a note prefix. `__main__._NOTE_PREFIXES`.
+- `_transcript` omits every `role: "tool"` body. A call with `note` true is
+  omitted; a saved message without `note` falls back to `__main__._NOTE_PREFIXES`.
 - The header is the stored title, then `Exported:`. The stored title is not
   stripped.
 - The file ends with exactly one newline when it has blocks.
@@ -145,8 +145,8 @@ prompts.
 | a session with no messages | header lines only |
 | two sessions, same title | different default names; each file stays |
 | export before the title worker lands | `New session - {id}.txt`; a later export writes the titled file and leaves the first |
-| rename, then export | a new file; the old one stays |
 | `/export ~/notes.txt` | expands to the home path and asks |
+| rename, then export | a new file; the old one stays |
 | plan mode | works; `/export` is not `write` or `edit` |
 | `/export` after `/new` | `Nothing to export yet` |
 
@@ -179,3 +179,4 @@ prompts.
 - 2026-11-06  The default name appends the session id, and the header keeps the
   stored title without a second date.
 - 2026-11-06  A leading `~` expands before classification, including `/export`.
+- 2026-11-06  Replay trusts a stored `note` and falls back to the old prefixes.

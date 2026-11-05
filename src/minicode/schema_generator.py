@@ -59,13 +59,13 @@ def tool_from_fn(fn):
         },
     }
 
-    def run(raw_json: str) -> str:
+    def run(raw_json: str) -> tuple[str, bool]:
         try:
             args = model.model_validate_json(raw_json)
         except ValidationError as exc:
-            return f"Invalid Arguments: {exc}"
+            return f"Invalid Arguments: {exc}", True
         try:
-            return str(fn(**args.model_dump()))
+            return str(fn(**args.model_dump())), False
         except Exception as exc:
-            return f"Tool error: {exc}"
+            return f"Tool error: {exc}", True
     return schema, run

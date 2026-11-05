@@ -1,7 +1,7 @@
 # Loop
 
 **Status:** shipped · **Layer:** 0 · **Files:** `agent.py`, `__main__.py`
-**Verified:** 2026-10-30
+**Verified:** 2026-11-06
 
 One request, one tool batch, repeat until the model stops asking for tools.
 This doc owns the message flow and the stop conditions. `docs/architecture.md`
@@ -73,6 +73,12 @@ Empty arguments are stored as `{}` so the next request stays valid.
 With no text and no tool calls, content becomes `[empty response]` so history
 is never a blank assistant turn.
 
+Each tool message also stores `note`. It is true when the call did not run,
+when `run` reports a failure, and on the `Interrupted by user.` filler for a
+call that had not started. `agent._create` copies the list and drops `note`
+before `chat.completions.create`. The stored dict keeps it. `extra_content`
+is not part of that strip.
+
 ## Why this shape
 
 Prompt, model, tool calls, results, repeat. One node with a self-loop, not a
@@ -100,6 +106,7 @@ hand-built loop is fully owned.
 - Tool code never raises out of the loop. `schema_generator.tool_from_fn` →
   `run`.
 - The step limit returns a string. It never raises.
+- `note` stays in history and is absent from the request. `agent._api_messages`.
 - `last_usage` resets at the start of the turn, not at the start of the process.
 - `exit`, `quit`, and `bye` leave before any create call.
 
@@ -111,6 +118,7 @@ hand-built loop is fully owned.
 | the model returns text and tool calls | both are kept; text streams, then the calls run |
 | the model returns nothing at all | `[empty response]` in history, printed once |
 | the model repeats a failing call | it sees the same error string again until the step limit |
+| a tool result starts with `Tool error:` but the call succeeded | `note` is false; replay still shows the tool line |
 | Ctrl+C between steps | the turn ends, history stays coherent |
 
 ## Verification
@@ -136,3 +144,5 @@ hand-built loop is fully owned.
 - 2026-10-27  Streaming replaced the raw response read. The assistant message
   is now assembled from `chunk.to_dict()` deltas instead of
   `json.loads(raw.text)`.
+- 2026-11-06  A failed tool call stores `note`. The create call strips it and
+  does not remove it from history.

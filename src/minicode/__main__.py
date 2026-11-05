@@ -290,11 +290,21 @@ def _apply_session(data: dict) -> None:
 _NOTE_PREFIXES = ("Plan mode:", "Permission denied:", "Unknown tool:", "Tool error:", "Model Error:")
 
 
+def _skipped(tool: dict | None) -> bool:
+    if not isinstance(tool, dict):
+        return False
+    note = tool.get("note")
+    if isinstance(note, bool):
+        return note
+    content = tool.get("content")
+    return isinstance(content, str) and content.startswith(_NOTE_PREFIXES)
+
+
 def _transcript() -> list[str]:
-    results: dict[str, str] = {}
+    results: dict[str, dict] = {}
     for message in _STATE["messages"][1:]:
-        if message.get("role") == "tool" and isinstance(message.get("content"), str):
-            results[message.get("tool_call_id", "")] = message["content"]
+        if message.get("role") == "tool":
+            results[message.get("tool_call_id", "")] = message
     blocks: list[str] = []
     for message in _STATE["messages"][1:]:
         role = message.get("role")
@@ -307,7 +317,7 @@ def _transcript() -> list[str]:
             for call in message.get("tool_calls") or []:
                 if not isinstance(call, dict):
                     continue
-                if results.get(call.get("id", ""), "").startswith(_NOTE_PREFIXES):
+                if _skipped(results.get(call.get("id", ""))):
                     continue
                 function = call.get("function") or {}
                 line = _tool_line(function.get("name", "?"), function.get("arguments", ""))

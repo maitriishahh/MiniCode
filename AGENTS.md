@@ -104,7 +104,10 @@ repeating them is how the archived guides went stale.
   rebuilt from `chunk.to_dict()` in the streaming loop, not an SDK object and
   not a rebuilt `tool_calls` list. Preserve `extra_content`. A Gemini thought
   signature rides in that dict. Do not parse it. A 400 that names
-  `thought_signature` is the only reason to touch that append. The streaming
+  `thought_signature` is the only reason to touch that append. A failed or
+  denied tool call stores `note: true` on the `role: "tool"` dict. `_create`
+  strips `note` for the request and does not pop it from history. Do not touch
+  `extra_content` to do that. The streaming
   rebuild lives in `docs/streaming.md`. Do not implement streaming in a
   pass that is only writing the guide.
 - Tool functions use Google-style docstrings. Only the first line becomes the
@@ -225,7 +228,8 @@ repeating them is how the archived guides went stale.
   and no `Elapsed` uses `0.0` so the line still prints.
   Transcript replay prints `>>> {text}`, assistant text, and one
   `|Tool Used: \`name\`` per successful call. It never prints `role: "tool"`
-  bodies and skips a call whose result starts with `Plan mode:`,
+  bodies. A call with `note` true is skipped. A saved message without `note`
+  falls back to a result that starts with `Plan mode:`,
   `Permission denied:`, `Unknown tool:`, `Tool error:`, or `Model Error:`.
   `/new` resets the model to `default_id`, mode to `plan`, thinking to `off`,
   effort to `low`, args and output to `off`; it clears `always`, resets

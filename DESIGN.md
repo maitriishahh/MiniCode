@@ -506,6 +506,22 @@ which this harness does not need.
 `external_directory`. A workspace file under a literal `~` directory is no
 longer reachable by that spelling.
 
+### D20 — A failed tool call is marked, not matched
+
+**Status:** active
+
+**Decision.** `run` returns `(content, failed)`. The loop stores `note` on the
+`role: "tool"` dict. Replay and export skip a call when `note` is true. A
+saved message without `note` still skips when the result starts with the old
+prefixes. `_create` strips `note` before the API call and does not pop it from
+history. `extra_content` is untouched.
+
+**Alternative.** Prefix-matching the result text, which hid a successful
+`read` whose contents started with `Tool error:` or `Permission denied:`.
+
+**Consequence.** Old session files keep working. A new failure is marked even
+when its text does not match a prefix. The model never sees `note`.
+
 ## Deferred
 
 Deliberately not being built. Each row is the union of the lists that existed

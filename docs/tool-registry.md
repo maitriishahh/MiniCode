@@ -1,7 +1,7 @@
 # Tool registry
 
 **Status:** shipped · **Layer:** 0 · **Files:** `schema_generator.py`, `agent.py`
-**Verified:** 2026-10-30
+**Verified:** 2026-11-06
 
 A tool is an ordinary Python function with a Google-style docstring. One
 wrapper turns it into the JSON schema the model sees and the callable the loop
@@ -25,20 +25,21 @@ runs, so the schema and its validator can never disagree.
 `run(raw_json)` validates and calls:
 
 ```python
-def run(raw_json: str) -> str:
+def run(raw_json: str) -> tuple[str, bool]:
     try:
         args = model.model_validate_json(raw_json)
     except ValidationError as exc:
-        return f"Invalid Arguments: {exc}"
+        return f"Invalid Arguments: {exc}", True
     try:
-        return str(fn(**args.model_dump()))
+        return str(fn(**args.model_dump())), False
     except Exception as exc:
-        return f"Tool error: {exc}"
+        return f"Tool error: {exc}", True
 ```
 
-Both failure paths return a string. Neither raises. `KeyboardInterrupt` is not
-caught: `except Exception` does not match it, which is what lets Ctrl+C abort a
-tool.
+`run` returns `(content, failed)`. Both failure paths return a string and
+`failed=True`. Neither raises. `KeyboardInterrupt` is not caught: `except
+Exception` does not match it, which is what lets Ctrl+C abort a tool. The loop
+stores `failed` as `note` on the tool message.
 
 The registry is built once at import:
 
@@ -81,7 +82,8 @@ becomes a phantom parameter named `Returns`.
 ## Invariants
 
 - The pair is `(schema, run)`. `schema_generator.tool_from_fn`.
-- Validation and execution failures both return strings.
+- Validation and execution failures both return `(string, True)`. A successful
+  call returns `(string, False)`. `schema_generator.tool_from_fn`.
 - `except Exception` only, never `BaseException`. Ctrl+C must escape.
 - The registry key is `fn.__name__`. `shell.__name__` is replaced before
   wrapping, so the key is `bash`, `sh`, or `powershell`, never `shell`.
@@ -99,7 +101,7 @@ becomes a phantom parameter named `Returns`.
 | an unknown key in the arguments | ignored; pydantic's default is `extra="ignore"` |
 | a function with no docstring | the function name becomes the description |
 | a function returning a non-string | `str()` of the value |
-| the tool raises `ValueError` | `Tool error: {message}` |
+| the tool raises `ValueError` | `("Tool error: {message}", True)` |
 | the user presses Ctrl+C inside a tool | propagates as `KeyboardInterrupt` |
 
 ## Verification
@@ -124,3 +126,5 @@ becomes a phantom parameter named `Returns`.
   `write` and `edit` share the same resolver.
 - 2026-10-21  The shell tool's name is resolved before wrapping, so the model
   never sees a tool called `shell`.
+- 2026-11-06  `run` returns `(content, failed)` so a failure is a flag, not a
+  prefix of the result text.

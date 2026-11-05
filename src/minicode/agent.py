@@ -266,7 +266,19 @@ def _apply_usage(usage: dict | None) -> None:
     session_usage["completion_tokens"] += step_out
 
 
+def _api_messages(messages: list) -> list:
+    if not any(isinstance(message, dict) and "note" in message for message in messages):
+        return messages
+    return [
+        {key: value for key, value in message.items() if key != "note"}
+        if isinstance(message, dict) else message
+        for message in messages
+    ]
+
+
 def _create(client, **kwargs):
+    if "messages" in kwargs:
+        kwargs["messages"] = _api_messages(kwargs["messages"])
     return client.chat.completions.create(**kwargs)
 
 
@@ -577,16 +589,21 @@ def agent(messages: list, on_event=None) -> str | None:
                                 note = True
                                 ran = False
                             else:
-                                content = run(args)
-                                note = False
-                                ran = True
+                                content, failed = run(args)
+                                note = failed
+                                ran = not failed
                         finally:
                             clear_approved()
                     else:
                         content = f"Unknown tool: {name}"
                         note = True
                         ran = False
-                messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call["id"],
+                    "content": content,
+                    "note": note,
+                })
                 done.add(call["id"])
                 if note:
                     _tool_note(content)
@@ -599,6 +616,7 @@ def agent(messages: list, on_event=None) -> str | None:
                         "role": "tool",
                         "tool_call_id": call["id"],
                         "content": "Interrupted by user.",
+                        "note": True,
                     })
             return None
         _ = appended

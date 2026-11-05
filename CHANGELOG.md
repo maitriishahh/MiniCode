@@ -31,6 +31,9 @@ the order the work landed.
 - `/export` names the default file from the session title and id, and the
   header is the stored title without a second date.
 - A leading `~` in a path expands to the home directory before classification.
+- A failed tool call is marked with `note` instead of matching its text, so a
+  successful read whose contents start with `Tool error:` still shows its tool
+  line.
 
 ### Fixed
 
